@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Secrets / local env (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+web/dist/
+*.tsbuildinfo
+
+# Prisma / SQLite databases (schema + migrations stay tracked)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/prisma/*.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caches
+.cache/
+.vite/
+.eslintcache
+coverage/
+
+# Local tooling / editor
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+
+# OS cruft
+.DS_Store
+Thumbs.db

@@ -1,0 +1,556 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions         Transaction[]
+  categories           Category[]
+  vendors              Vendor[]
+  categoryRules        CategoryRule[]
+  categorizationRules  CategorizationRule[]
+  imports              Import[]
+  analytics            Analytics[]
+  settings             UserSettings?
+
+  // Life-hub relations (additive)
+  modules              Module[]
+  goals                Goal[]
+  habits               Habit[]
+  habitCompletions     HabitCompletion[]
+  workoutSessions      WorkoutSession[]
+  playerProfile        PlayerProfile?
+  quests               Quest[]
+  questCompletions     QuestCompletion[]
+  xpLedger             XpLedger[]
+  dailyQuestRuns       DailyQuestRun[]
+
+  @@map("users")
+}
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Preferences
+  currency           String  @default("USD")
+  dateFormat         String  @default("MM/dd/yyyy")
+  theme              String  @default("cyberpunk")
+  autoCategoriztion  Boolean @default(true)
+  notifications      Boolean @default(true)
+
+  // Privacy
+  dataRetention      Int     @default(365) // days
+  shareAnalytics     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+model Transaction {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Core transaction data
+  date        DateTime
+  description String
+  amount      Float     // Negative for expenses, positive for income
+  
+  // Categorization
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  vendorId    String?
+  vendor      Vendor?   @relation(fields: [vendorId], references: [id])
+  
+  // Metadata
+  originalDescription String? // Original before any processing
+  confidence  Float?    // AI categorization confidence (0-1)
+  isManual    Boolean   @default(false) // User manually edited
+  isRecurring Boolean   @default(false)
+  
+  // Analysis flags
+  isWasteful  Boolean   @default(false)
+  isSuspicious Boolean  @default(false)
+  
+  // Import tracking
+  importId    String?
+  import      Import?   @relation(fields: [importId], references: [id])
+  
+  // Notes and tags
+  notes       String?
+  tags        String?   // JSON array of tags
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("transactions")
+  @@index([userId, date])
+  @@index([userId, categoryId])
+  @@index([userId, amount])
+}
+
+model Category {
+  id          String @id @default(cuid())
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String
+  icon        String?
+  color       String?
+  parentId    String?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  
+  // Metadata
+  isSystem    Boolean   @default(false) // Built-in categories
+  isActive    Boolean   @default(true)
+  
+  // Budgeting
+  budget Float?
+  
+  // Relations
+  transactions Transaction[]
+  rules        CategoryRule[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, name])
+  @@map("categories")
+}
+
+model Vendor {
+  id          String @id @default(cuid())
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String
+  aliases     String? // JSON array of alternative names
+  website     String?
+  categoryId  String? // Default category for this vendor
+  
+  // Metadata
+  isActive    Boolean @default(true)
+  frequency   Float?  // Average transactions per month
+  
+  // Relations
+  transactions Transaction[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@map("vendors")
+}
+
+model CategoryRule {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name       String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  // Rule definition
+  keywords   String  // JSON array of keywords
+  conditions String? // JSON object for advanced conditions
+  priority   Int     @default(0)
+  
+  // Metadata
+  isActive   Boolean @default(true)
+  confidence Float   @default(0.8)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("category_rules")
+  @@index([userId, priority])
+}
+
+model Import {
+  id              String @id @default(cuid())
+  userId          String
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  filename        String
+  originalName    String
+  fileSize        Int
+  format          String  // csv, xlsx, etc.
+  
+  // Processing results
+  totalRows       Int
+  processedRows   Int
+  errorRows       Int
+  duplicateRows   Int
+  
+  // Status
+  status          String  // pending, processing, completed, failed
+  errorMessage    String?
+  
+  // Relations
+  transactions    Transaction[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("imports")
+  @@index([userId, createdAt])
+}
+
+model WastefulPattern {
+  id            String   @id @default(cuid())
+  userId        String
+  
+  type          String   // frequent_small, large_discretionary, etc.
+  description   String
+  amount        Float
+  frequency     Float?
+  confidence    Float    @default(0.5)
+  
+  // Pattern data
+  transactionIds String  // JSON array of transaction IDs
+  metadata       String? // JSON object for pattern-specific data
+  
+  // Status
+  isActive       Boolean  @default(true)
+  isAcknowledged Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("wasteful_patterns")
+  @@index([userId, type])
+}
+
+model CategorizationRule {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name       String
+  conditions String // JSON object for rule conditions
+  actions    String // JSON object for rule actions
+  priority   Int    @default(100)
+  isActive   Boolean @default(true)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("categorization_rules")
+  @@index([userId, priority])
+}
+
+model Analytics {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Time period
+  period   String   // daily, weekly, monthly, yearly
+  date     DateTime
+  
+  // Metrics
+  metrics  String   // JSON object with all calculated metrics
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, period, date])
+  @@map("analytics")
+  @@index([userId, date])
+}
+
+// =====================================================================
+// Life-hub additions: modules, goals, habits/chores, workouts,
+// gamification (player profile, quests, XP ledger, daily-run lock).
+// All scoped by userId; JSON stored as String for SQLite portability.
+// =====================================================================
+
+model Module {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  key       String   // "finance" | "fitness" | "habits" | "chores"
+  name      String
+  icon      String?
+  color     String?  // CSS var name or hex (drives the nav accent)
+  isEnabled Boolean  @default(true)
+  sortOrder Int      @default(0)
+  config    String?  // JSON: module-specific settings
+
+  goals     Goal[]
+  habits    Habit[]
+  workouts  WorkoutSession[]
+  quests    Quest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@map("modules")
+}
+
+model Goal {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId     String
+  module       Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String?
+  metric       String   // "count" | "minutes" | "currency" | "boolean" | "distance"
+  targetValue  Float?
+  currentValue Float    @default(0)
+  unit         String?
+  period       String   @default("ongoing") // "daily"|"weekly"|"monthly"|"ongoing"
+  status       String   @default("active")  // "active"|"completed"|"archived"
+  dueDate      DateTime?
+
+  // Links a goal back to a domain entity it tracks (no FK; loose pointer).
+  sourceType   String?  // "habit"|"category"|"wastefulPattern"
+  sourceId     String?
+
+  quests       Quest[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, moduleId])
+  @@index([userId, status])
+  @@map("goals")
+}
+
+model Habit {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId        String
+  module          Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  kind            String   @default("habit") // "habit" | "chore"
+  title           String
+  description     String?
+  icon            String?
+  color           String?
+
+  // Recurrence. One-off chores use cadence="once" + dueDate.
+  cadence         String   @default("daily") // "daily"|"weekly"|"custom"|"once"
+  schedule        String?  // JSON: {daysOfWeek:[1,3,5]} or {everyN:2}
+  dueDate         DateTime?
+  targetPerDay    Int      @default(1)
+
+  // Gamification tuning
+  baseXp          Int      @default(10)
+  difficulty      String   @default("easy") // "easy"|"medium"|"hard"
+  isActive        Boolean  @default(true)
+
+  // Optional throttling: minimum days between completions. Independent
+  // of cadence — "weekly" with minInterval=4 means weekly schedule but
+  // skip if done <4 days ago.
+  minIntervalDays Int?
+
+  // Optional outdoor / weather gating, evaluated by WeatherService +
+  // QuestEngine. US units. JSON shape:
+  //   { outdoor: true, dryDaysRequired?: 2, maxRainTodayIn?: 0.1,
+  //     minTempF?: 40, maxTempF?: 95, maxWindMph?: 20 }
+  // When weather data is unavailable (no HUB_LAT/HUB_LON set, API
+  // down), the gate degrades to interval-only.
+  weatherRule     String?
+
+  // Denormalized streak (also reconstructable from completions).
+  currentStreak   Int      @default(0)
+  longestStreak   Int      @default(0)
+  lastCompletedOn DateTime?
+
+  completions     HabitCompletion[]
+  quests          Quest[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, kind, isActive])
+  @@map("habits")
+}
+
+model HabitCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId     String
+  habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  // Date-at-local-midnight (server-computed). Backbone of idempotency.
+  completedOn DateTime
+  count       Int      @default(1)
+  note        String?
+  xpAwarded   Int      @default(0)
+  source      String   @default("manual") // "manual"|"quest"
+
+  createdAt   DateTime @default(now())
+
+  @@unique([habitId, completedOn])
+  @@index([userId, completedOn])
+  @@map("habit_completions")
+}
+
+model WorkoutSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  title       String?
+  type        String   // "strength"|"cardio"|"mobility"|"sport"|"other"
+  performedAt DateTime
+  durationMin Int?
+  intensity   String?  // "low"|"moderate"|"high"
+  caloriesEst Int?
+  notes       String?
+
+  // Structured detail as JSON-string (SQLite-friendly):
+  // e.g. [{exercise:"Bench",sets:[{reps:8,weight:60},...]}, ...]
+  exercises   String?  // JSON
+  metrics     String?  // JSON: {distanceKm, avgHr, ...}
+
+  xpAwarded   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, performedAt])
+  @@map("workout_sessions")
+}
+
+model PlayerProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  level         Int      @default(1)
+  totalXp       Int      @default(0)
+  xpIntoLevel   Int      @default(0)   // cached; derivable from level + totalXp
+  currentStreak Int      @default(0)   // global daily-activity streak
+  longestStreak Int      @default(0)
+  lastActiveOn  DateTime?
+
+  // Per-domain XP as JSON: {"fitness":120,"finance":80}
+  domainXp      String?
+  title         String?  // cosmetic rank, e.g. "Runner — Tier 2"
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("player_profiles")
+}
+
+model Quest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  // Date-at-local-midnight for the "day" this quest belongs to.
+  questDate   DateTime
+  title       String     // themed name e.g. "Ghost Protocol"
+  description String
+  difficulty  String     @default("easy")
+  xpReward    Int
+
+  // Provenance: what generated this quest.
+  source      String     // "habit"|"goal"|"workout"|"finance"|"ai"|"rule"
+  sourceId    String?    // habitId / goalId / wastefulPatternId / null
+
+  habitId     String?
+  habit       Habit?     @relation(fields: [habitId], references: [id])
+  goalId      String?
+  goal        Goal?      @relation(fields: [goalId], references: [id])
+
+  status      String     @default("pending") // "pending"|"completed"|"skipped"|"expired"
+  target      Float      @default(1)
+  progress    Float      @default(0)
+  isAiThemed  Boolean    @default(false)
+  meta        String?    // JSON: theming, color, emoji, generator notes
+
+  completion  QuestCompletion?
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Idempotency guard: one quest per (day, source, sourceId) per user.
+  @@unique([userId, questDate, source, sourceId])
+  @@index([userId, questDate, status])
+  @@map("quests")
+}
+
+model QuestCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId     String   @unique
+  quest       Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+
+  completedAt DateTime @default(now())
+  xpAwarded   Int
+  meta        String?  // JSON: streakBefore/after, leveledUp, etc.
+
+  @@index([userId, completedAt])
+  @@map("quest_completions")
+}
+
+model XpLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount    Int      // +ve earn, -ve correction
+  reason    String   // "quest_complete"|"habit_log"|"workout_log"|"streak_bonus"|"level_up"
+  module    String?  // "fitness" etc., for domainXp rollups
+  refType   String?  // "quest"|"habit"|"workout"
+  refId     String?
+  meta      String?  // JSON
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, reason])
+  @@map("xp_ledger")
+}
+
+model DailyQuestRun {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Date-at-local-midnight: unique guarantees one generation per day per user.
+  runDate    DateTime
+  generator  String   @default("rule") // "ai" | "rule" | "ai-fallback"
+  questCount Int      @default(0)
+  meta       String?  // JSON: prompt hash, model id, errors
+
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, runDate])
+  @@map("daily_quest_runs")
+}

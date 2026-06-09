@@ -1,0 +1,106 @@
+import { z } from 'zod';
+
+const configSchema = z.object({
+  port: z.number().default(3001),
+  nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
+  
+  database: z.object({
+    url: z.string().default('file:./questman.db')
+  }),
+  
+  jwt: z.object({
+    secret: z.string().min(32),
+    expiresIn: z.string().default('7d')
+  }),
+  
+  upload: z.object({
+    maxFileSize: z.number().default(50 * 1024 * 1024), // 50MB
+    allowedTypes: z.array(z.string()).default(['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'])
+  }),
+  
+  analytics: z.object({
+    retentionDays: z.number().default(365),
+    batchSize: z.number().default(1000)
+  }),
+  
+  rateLimit: z.object({
+    windowMs: z.number().default(15 * 60 * 1000), // 15 minutes
+    maxRequests: z.number().default(100)
+  }),
+
+  anthropic: z.object({
+    apiKey: z.string().optional(),
+    model: z.string().default('claude-opus-4-8')
+  }),
+
+  features: z.object({
+    aiQuests: z.boolean().default(true)
+  }),
+
+  // Hub location for weather-aware chores. Both must be set for the
+  // WeatherService to call Open-Meteo; otherwise outdoor gating
+  // degrades to interval-only. Latitude -90..90, longitude -180..180.
+  weather: z.object({
+    lat: z.number().min(-90).max(90).optional(),
+    lon: z.number().min(-180).max(180).optional()
+  }),
+
+  // Single-user self-hosted hub: public signup is off by default.
+  allowRegistration: z.boolean().default(false)
+});
+
+const env = {
+  port: Number(process.env.PORT) || 3001,
+  nodeEnv: process.env.NODE_ENV as 'development' | 'production' | 'test' || 'development',
+  
+  database: {
+    url: process.env.DATABASE_URL || 'file:./questman.db'
+  },
+  
+  jwt: {
+    secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-min-32-chars',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+  },
+  
+  upload: {
+    maxFileSize: Number(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024,
+    allowedTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || [
+      'text/csv', 
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+      'application/vnd.ms-excel'
+    ]
+  },
+  
+  analytics: {
+    retentionDays: Number(process.env.ANALYTICS_RETENTION_DAYS) || 365,
+    batchSize: Number(process.env.ANALYTICS_BATCH_SIZE) || 1000
+  },
+  
+  rateLimit: {
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+    maxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
+  },
+
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY || undefined,
+    model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-8'
+  },
+
+  features: {
+    aiQuests: process.env.AI_QUESTS ? process.env.AI_QUESTS !== 'false' : true
+  },
+
+  weather: {
+    lat: process.env.HUB_LAT ? Number(process.env.HUB_LAT) : undefined,
+    lon: process.env.HUB_LON ? Number(process.env.HUB_LON) : undefined
+  },
+
+  allowRegistration: process.env.ALLOW_REGISTRATION === 'true'
+};
+
+export const config = configSchema.parse(env);
+
+// Validate critical config on startup
+if (config.nodeEnv === 'production' && config.jwt.secret === 'your-super-secret-jwt-key-min-32-chars') {
+  throw new Error('JWT_SECRET must be set in production');
+}

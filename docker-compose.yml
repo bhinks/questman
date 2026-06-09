@@ -1,0 +1,72 @@
+# =====================================================================
+# Questman — local self-hosted deployment.
+#
+#   docker compose up --build
+#
+# Two services:
+#   - backend: Node/Express/Prisma/Socket.io, SQLite on a named volume.
+#   - web:     nginx serving the Vite build, proxying /api + /socket.io
+#              to the backend.
+#
+# Reach the app at http://localhost:8080. Sign in with the hub user
+# from .env (HUB_USER_EMAIL / HUB_USER_PASSWORD). If the hub user
+# variables are unset, the seeded demo account (demo@questman.app /
+# demo123) is the only login that works.
+# =====================================================================
+
+# Pin the compose project name so it's independent of the parent
+# directory (which is still /mnt/d/projects/findash until the outer
+# rename). Without this, container/network/volume names would be
+# prefixed `findash_` not `questman_`.
+name: questman
+
+services:
+  backend:
+    build: ./backend
+    container_name: questman-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Container-internal path; persisted via the named volume below.
+      DATABASE_URL: file:/data/questman.db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      ALLOW_REGISTRATION: "false"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
+      AI_QUESTS: ${AI_QUESTS:-true}
+      # All day-based @@unique constraints in the schema rely on a
+      # consistent local-midnight. Set TZ so streaks and quest dates
+      # match the user's actual day.
+      TZ: ${TZ:-UTC}
+      # Optional one-time hub provisioning.
+      HUB_USER_EMAIL: ${HUB_USER_EMAIL:-}
+      HUB_USER_PASSWORD: ${HUB_USER_PASSWORD:-}
+      HUB_USER_NAME: ${HUB_USER_NAME:-You}
+      # Location for weather-aware chores. Both must be set for the
+      # WeatherService to gate outdoor habits; unset → interval-only.
+      HUB_LAT: ${HUB_LAT:-}
+      HUB_LON: ${HUB_LON:-}
+    volumes:
+      - questman-data:/data
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  web:
+    build: ./web
+    container_name: questman-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  questman-data:

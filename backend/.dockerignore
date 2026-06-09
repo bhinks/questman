@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.local
+prisma/findash.db
+prisma/findash.db-journal
+*.log
+.git
+.DS_Store
+dist
