@@ -149,8 +149,86 @@ export interface PlayerSnapshot {
   lastActiveOn: string | null;
   domainXp: Record<string, number>;
   title: string | null;
+  // ---- Economy & rewards (mechanics bundle) ----
+  overclockStreak: number;       // consecutive full-clear days
+  overclockMultiplier: number;   // eddie earn multiplier, 1.0 .. 2.0
+  skipTokens: number;            // free skips remaining
+  rerollTokens: number;          // quest rerolls remaining
+  rrCredits: number;             // R&R downtime credits (activate backlog media)
+  cosmetics: string[];           // owned cosmetic theme keys
+  equippedTheme: string | null;  // active cosmetic theme key
   leveledUp?: boolean;
   previousLevel?: number;
+  /** Set on an awardXp response when the overclock multiplier boosted the eddie earn. */
+  eddieMultiplierApplied?: number;
+}
+
+// ---- economy & rewards: shop + achievements ------------------------
+
+export type ShopCategory =
+  | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate';
+
+export interface ShopItem {
+  key: string;
+  name: string;
+  description: string;
+  category: ShopCategory;
+  priceEddies: number;
+  payload?: Record<string, unknown>;
+  /** Server-computed: cosmetic already owned (so the UI disables "buy"). */
+  owned?: boolean;
+}
+export interface ShopResponse {
+  items: ShopItem[];
+  player: PlayerSnapshot;
+}
+export interface Purchase {
+  id: string;
+  itemKey: string;
+  name: string;
+  category: ShopCategory;
+  priceEddies: number;
+  createdAt: string;
+}
+/** Result of POST /api/shop/buy — updated balances + what the purchase granted. */
+export interface BuyResponse {
+  purchase: Purchase;
+  player: PlayerSnapshot;
+  /** Category-specific result, e.g. { tokens: 1 } or a loot-crate reward. */
+  granted?: Record<string, unknown>;
+  message?: string;
+}
+
+export interface Achievement {
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  tier?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  xpReward?: number;
+  eddieReward?: number;
+  unlocked: boolean;
+  unlockedAt: string | null;
+  /** Progress toward unlock (0..1), when measurable. */
+  progress?: number;
+  progressLabel?: string;
+}
+export interface AchievementsResponse {
+  achievements: Achievement[];
+  unlockedCount: number;
+  totalCount: number;
+}
+/** One newly-unlocked achievement, returned by GET /api/player for a toast. */
+export interface UnlockedAchievement {
+  key: string;
+  name: string;
+  icon?: string;
+  xpReward?: number;
+  eddieReward?: number;
+}
+export interface PlayerResponse {
+  player: PlayerSnapshot;
+  newAchievements?: UnlockedAchievement[];
 }
 
 /** One row of the player's economy history (XP grant or eddie movement). */

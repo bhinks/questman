@@ -22,6 +22,26 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { levelFromXp, levelInfo } from '../utils/leveling';
 import { isSameLocalDay, isYesterdayLocal, startOfLocalDay } from '../utils/dates';
+import { overclockMultiplier, xpStreakBonus } from '../utils/economy';
+
+/** Reasons that are NOT subject to the overclock multiplier: spends and
+ *  corrections (must pass through raw), plus achievement payouts (one-time
+ *  fixed rewards — the amount in the catalog is exactly what you get,
+ *  regardless of your current overclock streak). */
+const NON_EARN_REASONS = new Set(['shop_purchase', 'rr_redeem', 'achievement']);
+function isEddieEarn(reason: string, eddies: number): boolean {
+  return eddies > 0 && !reason.endsWith('_undo') && !NON_EARN_REASONS.has(reason);
+}
+
+function parseCosmetics(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 type Tx = Prisma.TransactionClient;
 
@@ -33,6 +53,14 @@ export interface AwardOptions {
   refType?: string;   // "quest" | "habit" | "workout"
   refId?: string;
   meta?: Record<string, unknown>;
+  /**
+   * Whether this award counts as daily activity for the streak. Default
+   * true. Set false for economy moves that aren't "doing something" —
+   * shop purchases/spends and lazily-evaluated achievement grants — so
+   * they never tick the streak or move lastActiveOn (otherwise merely
+   * opening the HUD could maintain a streak).
+   */
+  touchStreak?: boolean;
 }
 
 export interface PlayerSnapshot {
@@ -47,8 +75,18 @@ export interface PlayerSnapshot {
   lastActiveOn: Date | null;
   domainXp: Record<string, number>;
   title: string | null;
+  // Economy & rewards.
+  overclockStreak: number;
+  overclockMultiplier: number;
+  skipTokens: number;
+  rerollTokens: number;
+  rrCredits: number;
+  cosmetics: string[];
+  equippedTheme: string | null;
   leveledUp?: boolean;
   previousLevel?: number;
+  /** Set on awardXp when the overclock multiplier boosted this eddie earn. */
+  eddieMultiplierApplied?: number;
 }
 
 export class GamificationService {
@@ -132,6 +170,13 @@ export class GamificationService {
       lastActiveOn: p.lastActiveOn,
       domainXp,
       title: p.title,
+      overclockStreak: p.overclockStreak,
+      overclockMultiplier: overclockMultiplier(p.overclockStreak),
+      skipTokens: p.skipTokens,
+      rerollTokens: p.rerollTokens,
+      rrCredits: p.rrCredits,
+      cosmetics: parseCosmetics(p.cosmetics),
+      equippedTheme: p.equippedTheme,
     };
   }
 
@@ -162,45 +207,65 @@ export class GamificationService {
       // this award's deltas.
       const prevTotalXp = await this.sumXp(userId, t);
       const prevEddies = await this.sumEddies(userId, t);
-      const eddiesDelta = opts.eddies ?? 0;
+
+      // XP streak bonus (quest completions only — Brent: no XP multiplier,
+      // but a small streak bonus is fine).
+      const streakBonus = opts.reason === 'quest_complete'
+        ? xpStreakBonus(before.currentStreak) : 0;
+      const xpDelta = opts.amount + streakBonus;
+
+      // Overclock: boost positive eddie EARNS by the multiplier from the
+      // full-clear-day streak. Spends/undos/corrections pass through raw.
+      const rawEddies = opts.eddies ?? 0;
+      const mult = overclockMultiplier(before.overclockStreak);
+      const earn = isEddieEarn(opts.reason, rawEddies);
+      const eddiesDelta = earn ? Math.round(rawEddies * mult) : rawEddies;
 
       const previousLevel = levelFromXp(prevTotalXp);
-      const nextTotalXp = prevTotalXp + opts.amount;
+      const nextTotalXp = prevTotalXp + xpDelta;
       const nextEddies = prevEddies + eddiesDelta;
       const nextLevel = levelFromXp(nextTotalXp);
 
-      // Streak math (against local day, server tz).
+      // Streak math (against local day, server tz). Economy moves that
+      // aren't real activity (shop spends, lazy achievement grants) pass
+      // touchStreak:false and leave the streak + lastActiveOn untouched.
       const today = startOfLocalDay();
+      const touchStreak = opts.touchStreak !== false;
       let currentStreak = before.currentStreak;
       let longestStreak = before.longestStreak;
       const last = before.lastActiveOn;
-      if (!last) {
-        currentStreak = 1;
-      } else if (isSameLocalDay(last, today)) {
-        // Already counted today; do nothing.
-      } else if (isYesterdayLocal(last, today)) {
-        currentStreak += 1;
-      } else {
-        currentStreak = 1;
+      if (touchStreak) {
+        if (!last) {
+          currentStreak = 1;
+        } else if (isSameLocalDay(last, today)) {
+          // Already counted today; do nothing.
+        } else if (isYesterdayLocal(last, today)) {
+          currentStreak += 1;
+        } else {
+          currentStreak = 1;
+        }
+        if (currentStreak > longestStreak) longestStreak = currentStreak;
       }
-      if (currentStreak > longestStreak) longestStreak = currentStreak;
+      const nextLastActiveOn = touchStreak ? today : before.lastActiveOn;
 
       // Append the XP ledger entry FIRST so a partial write at least
       // leaves an audit trail that can be replayed.
+      const xpMeta = { ...(opts.meta ?? {}), ...(streakBonus > 0 ? { streakBonus } : {}) };
       await t.xpLedger.create({
         data: {
           userId,
-          amount: opts.amount,
+          amount: xpDelta,
           reason: opts.reason,
           module: opts.module ?? null,
           refType: opts.refType ?? null,
           refId: opts.refId ?? null,
-          meta: opts.meta ? JSON.stringify(opts.meta) : null,
+          meta: Object.keys(xpMeta).length ? JSON.stringify(xpMeta) : null,
         },
       });
 
       // Parallel eddie ledger entry, when this award moves the wallet.
       if (eddiesDelta !== 0) {
+        const edMeta = { ...(opts.meta ?? {}), ...(earn && mult > 1 ? { overclock: mult, base: rawEddies } : {}) };
         await t.walletLedger.create({
           data: {
             userId,
@@ -209,7 +274,7 @@ export class GamificationService {
             module: opts.module ?? null,
             refType: opts.refType ?? null,
             refId: opts.refId ?? null,
-            meta: opts.meta ? JSON.stringify(opts.meta) : null,
+            meta: Object.keys(edMeta).length ? JSON.stringify(edMeta) : null,
           },
         });
       }
@@ -225,7 +290,7 @@ export class GamificationService {
           eddies: nextEddies,
           currentStreak,
           longestStreak,
-          lastActiveOn: today,
+          lastActiveOn: nextLastActiveOn,
           domainXp: JSON.stringify(domainXp),
         },
       });
@@ -252,11 +317,19 @@ export class GamificationService {
         eddies: nextEddies,
         currentStreak,
         longestStreak,
-        lastActiveOn: today,
+        lastActiveOn: nextLastActiveOn,
         domainXp,
         title: before.title,
+        overclockStreak: before.overclockStreak,
+        overclockMultiplier: mult,
+        skipTokens: before.skipTokens,
+        rerollTokens: before.rerollTokens,
+        rrCredits: before.rrCredits,
+        cosmetics: parseCosmetics(before.cosmetics),
+        equippedTheme: before.equippedTheme,
         leveledUp: nextLevel > previousLevel,
         previousLevel,
+        eddieMultiplierApplied: earn && mult > 1 ? mult : undefined,
       } satisfies PlayerSnapshot;
     };
 

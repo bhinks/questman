@@ -192,7 +192,11 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
   });
 }));
 
-/** POST /api/quests/:id/skip — mark skipped, no XP. */
+/**
+ * POST /api/quests/:id/skip — drop a quest with no penalty, no XP.
+ * Consumes a SKIP TOKEN (3 free/week + buyable). Skipped quests are
+ * neutral (not a miss), so they don't break the overclock streak.
+ */
 router.post('/:id/skip', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
   const quest = await prisma.quest.findFirst({
@@ -203,11 +207,63 @@ router.post('/:id/skip', asyncHandler(async (req: AuthRequest, res) => {
     throw new AppError(`Cannot skip a ${quest.status} quest`, 400);
   }
 
-  const updated = await prisma.quest.update({
-    where: { id: quest.id },
-    data: { status: 'skipped' },
+  const updated = await prisma.$transaction(async (tx) => {
+    // The quest's pending->skipped transition is the idempotency guard: only
+    // the request that actually flips the row spends a token. On a double-
+    // submit the second pass matches 0 rows here and the whole tx rolls back,
+    // so it burns no token (the status read above is outside the tx and can't
+    // be the guard). Mirrors the guarded-write pattern in /progress.
+    const flip = await tx.quest.updateMany({
+      where: { id: quest.id, userId, status: 'pending' },
+      data: { status: 'skipped' },
+    });
+    if (flip.count !== 1) throw new AppError('Quest already resolved', 409);
+    // Guarded token spend: the WHERE pins skipTokens > 0 so it can't underflow.
+    const dec = await tx.playerProfile.updateMany({
+      where: { userId, skipTokens: { gt: 0 } },
+      data: { skipTokens: { decrement: 1 } },
+    });
+    if (dec.count !== 1) throw new AppError('No skip tokens left — buy more in the Shop', 400);
+    return tx.quest.findUniqueOrThrow({ where: { id: quest.id } });
   });
-  res.json({ quest: updated });
+
+  const player = await game().getSnapshot(userId);
+  res.json({ quest: updated, player });
+}));
+
+/**
+ * POST /api/quests/:id/reroll — swap a quest for a different one.
+ * Consumes a REROLL TOKEN, but only if a fresh alternative exists (else
+ * the token is NOT spent and we say so).
+ */
+router.post('/:id/reroll', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const quest = await prisma.quest.findFirst({
+    where: { id: req.params.id, userId },
+  });
+  if (!quest) throw new AppError('Quest not found', 404);
+  if (quest.status !== 'pending') {
+    throw new AppError(`Cannot reroll a ${quest.status} quest`, 400);
+  }
+
+  // Fast-path UX check; the AUTHORITATIVE guarded token spend happens inside
+  // rerollQuest's transaction (atomic with the swap), so a double-submit can't
+  // spend twice or leave a quest skipped without a replacement.
+  const profile = await prisma.playerProfile.findUnique({
+    where: { userId }, select: { rerollTokens: true },
+  });
+  if (!profile || profile.rerollTokens <= 0) {
+    throw new AppError('No reroll tokens left — buy more in the Shop', 400);
+  }
+
+  const result = await engine().rerollQuest(userId, quest.id);
+  if (!result.replaced) {
+    res.json({ replaced: false, message: 'No alternative quests available to reroll into right now.' });
+    return;
+  }
+
+  const player = await game().getSnapshot(userId);
+  res.json({ replaced: true, newQuestId: result.newQuestId, player });
 }));
 
 /**

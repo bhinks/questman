@@ -21,6 +21,8 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
+import { isoWeekKey } from '../utils/economy';
+import { AppError } from '../middleware/errorHandler';
 import { generateThemedQuests, QuestCandidate, ThemedQuest } from './anthropic';
 import { WeatherService, WeatherSnapshot } from './WeatherService';
 import { isHabitDueToday } from '../routes/habits';
@@ -86,13 +88,19 @@ export class QuestEngine {
       throw err;
     }
 
+    // Economy roll-over (overclock streak + weekly tokens + R&R credit).
+    // MUST run before the carry-over/expire mutations below, because it
+    // judges whether yesterday was a "full clear" from the quests' current
+    // (pre-expiry) statuses.
+    const yesterday = daysAgoLocal(1);
+    await this.updateEconomyForNewDay(userId, today, yesterday);
+
     // Carry-over + expiry of yesterday's pending quests (roadmap §5).
     // Quests flagged carryOver (or mustDo, which always carries) roll
     // forward to today by moving their questDate; everything else
     // expires. Carrying happens BEFORE generation so today's fresh
     // candidates that dup a carried source get skipped by the Quest
     // @@unique([userId, questDate, source, sourceId]) guard.
-    const yesterday = daysAgoLocal(1);
     await this.prisma.quest.updateMany({
       where: {
         userId, questDate: yesterday, status: 'pending',
@@ -188,6 +196,61 @@ export class QuestEngine {
     return { generated: true, generator, questCount: chosen.length };
   }
 
+  /**
+   * Once-per-day economy roll-over (roadmap §"overclock" + skip/reroll
+   * tokens + R&R credits). Called from ensureToday before carry-over/expiry.
+   *
+   *  - Overclock streak: a "full clear" of yesterday (≥1 completed quest,
+   *    and nothing left pending that wasn't carried/must-do → i.e. no
+   *    impending miss) bumps the streak and banks 1 R&R downtime credit.
+   *    Any impending miss resets the streak ("cooling unstable"). A day of
+   *    only skips/carries is neutral. The streak drives the eddie multiplier.
+   *  - Weekly token allowance: once per ISO week, top up skip (+3, cap 10)
+   *    and reroll (+1, cap 5) tokens. Idempotent via lastTokenGrantWeek.
+   */
+  private async updateEconomyForNewDay(userId: string, today: Date, yesterday: Date): Promise<void> {
+    const profile = await this.prisma.playerProfile.findUnique({
+      where: { userId },
+      select: { overclockStreak: true, skipTokens: true, rerollTokens: true, lastTokenGrantWeek: true },
+    });
+    if (!profile) return;
+
+    const yQuests = await this.prisma.quest.findMany({
+      where: { userId, questDate: yesterday },
+      select: { status: true, carryOver: true, mustDo: true },
+    });
+    // Quests still pending that WON'T carry are about to expire = misses.
+    const willExpire = yQuests.filter(q => q.status === 'pending' && !q.carryOver && !q.mustDo);
+    const completed = yQuests.filter(q => q.status === 'completed');
+
+    let overclockStreak = profile.overclockStreak;
+    let rrGrant = 0;
+    if (willExpire.length > 0) {
+      overclockStreak = 0; // a miss breaks the overclock
+    } else if (completed.length > 0) {
+      overclockStreak += 1; // full clear
+      rrGrant = 1;          // bank a downtime credit
+    } // else: nothing to clear / all skipped or carried → unchanged
+
+    const week = isoWeekKey(today);
+    const grantWeek = profile.lastTokenGrantWeek !== week;
+
+    await this.prisma.playerProfile.update({
+      where: { userId },
+      data: {
+        overclockStreak,
+        ...(rrGrant > 0 ? { rrCredits: { increment: rrGrant } } : {}),
+        ...(grantWeek
+          ? {
+              skipTokens: Math.min(10, profile.skipTokens + 3),
+              rerollTokens: Math.min(5, profile.rerollTokens + 1),
+              lastTokenGrantWeek: week,
+            }
+          : {}),
+      },
+    });
+  }
+
   /** Force-regenerate today (dev only; the route guards this). */
   async regenerateToday(userId: string): Promise<GenerateResult> {
     const today = startOfLocalDay();
@@ -196,6 +259,95 @@ export class QuestEngine {
       this.prisma.dailyQuestRun.deleteMany({ where: { userId, runDate: today } }),
     ]);
     return this.ensureToday(userId);
+  }
+
+  /**
+   * Reroll a single pending quest: spend a reroll token, mark the old quest
+   * skipped, and swap in a DIFFERENT candidate not already represented in
+   * today's set. Returns replaced:false (token NOT spent) when there's no
+   * fresh alternative. Uses the deterministic fallback title (no AI call —
+   * must be snappy).
+   *
+   * Atomicity: the slow reads (candidate build) happen first, OUTSIDE the tx.
+   * The mutation tx then (1) flips old pending->skipped as the idempotency
+   * guard — a double-submit's loser matches 0 rows and rolls back, spending
+   * nothing; (2) spends the reroll token guarded so it can't underflow; (3)
+   * creates the replacement. All three share one tx, so a committed swap is
+   * always paid for and any failure leaves the token + quests untouched. A
+   * P2002 (a concurrent reroll already created the same candidate) degrades
+   * to replaced:false rather than a 500.
+   */
+  async rerollQuest(userId: string, oldQuestId: string): Promise<{ replaced: boolean; newQuestId?: string }> {
+    const today = startOfLocalDay();
+    const old = await this.prisma.quest.findFirst({
+      where: { id: oldQuestId, userId, questDate: today },
+    });
+    if (!old || old.status !== 'pending') return { replaced: false };
+
+    // Source:sourceId keys already present today (any status) — avoid dups
+    // (this also excludes the quest being rerolled, so we get a NEW one).
+    const todays = await this.prisma.quest.findMany({
+      where: { userId, questDate: today },
+      select: { source: true, sourceId: true },
+    });
+    const existingKeys = new Set(todays.map(q => `${q.source}:${q.sourceId ?? ''}`));
+
+    const candidates = await this.buildCandidates(userId, today);
+    const pick = candidates.find(c => !existingKeys.has(`${c.source}:${c.sourceId ?? ''}`));
+    if (!pick) return { replaced: false };
+
+    try {
+      const newId = await this.prisma.$transaction(async (tx) => {
+        // (1) Idempotency guard: only the request that actually flips the old
+        // quest proceeds. A double-submit's second pass matches 0 rows here.
+        const flip = await tx.quest.updateMany({
+          where: { id: old.id, userId, status: 'pending' },
+          data: { status: 'skipped' },
+        });
+        if (flip.count !== 1) return null; // lost the race — already rerolled
+        // (2) Guarded token spend (can't underflow). If the pre-check passed
+        // but a concurrent spend drained tokens, this rolls the swap back.
+        const dec = await tx.playerProfile.updateMany({
+          where: { userId, rerollTokens: { gt: 0 } },
+          data: { rerollTokens: { decrement: 1 } },
+        });
+        if (dec.count !== 1) throw new AppError('No reroll tokens left — buy more in the Shop', 400);
+        // (3) Create the replacement.
+        const created = await tx.quest.create({
+          data: {
+            userId,
+            moduleId: await this.moduleIdFor(tx, userId, pick.moduleKey),
+            questDate: today,
+            title: this.fallbackTitle(pick),
+            description: pick.baseTitle,
+            difficulty: pick.difficulty,
+            xpReward: pick.xpReward,
+            source: pick.source,
+            sourceId: pick.sourceId,
+            habitId: pick.source === 'habit' ? pick.sourceId : null,
+            goalId: pick.source === 'goal' ? pick.sourceId : null,
+            status: 'pending',
+            target: 1,
+            progress: 0,
+            isAiThemed: false,
+            meta: this.buildMeta(pick, null, undefined),
+            estMinutes: pick.estMinutes ?? null,
+            targetCount: pick.targetCount ?? 1,
+            currentCount: 0,
+            carryOver: pick.carryOver ?? false,
+            mustDo: pick.mustDo ?? false,
+            originDate: today,
+          },
+          select: { id: true },
+        });
+        return created.id;
+      });
+      if (newId == null) return { replaced: false };
+      return { replaced: true, newQuestId: newId };
+    } catch (e: any) {
+      if (e?.code === 'P2002') return { replaced: false };
+      throw e;
+    }
   }
 
   // -------------------------------------------------------------------

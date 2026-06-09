@@ -286,6 +286,17 @@ router.post('/:id/check', asyncHandler(async (req: AuthRequest, res) => {
       player = snap;
       xpAwarded = habit.baseXp;
 
+      // Record the ACTUAL eddies banked (overclock multiplier included) so an
+      // undo reverses exactly this — not a recomputed raw value. Otherwise a
+      // check (multiplied) + undo (raw) cycle would mint eddies while overclocked.
+      const eddiesGranted = Math.round(
+        eddiesForReward(habit.baseXp, habit.difficulty) * (snap.eddieMultiplierApplied ?? 1),
+      );
+      await tx.habitCompletion.update({
+        where: { id: created.id },
+        data: { eddiesAwarded: eddiesGranted },
+      });
+
       // Auto-complete any pending quest tied to this habit today.
       const pending = await tx.quest.findFirst({
         where: {
@@ -368,13 +379,15 @@ router.delete('/:id/check', asyncHandler(async (req: AuthRequest, res) => {
     const moduleKey = await tx.module.findUnique({
       where: { id: habit.moduleId }, select: { key: true },
     });
-    if (completion.xpAwarded > 0) {
+    if (completion.xpAwarded > 0 || completion.eddiesAwarded > 0) {
       // Un-checking is a legitimate "undo completion" — reverse both the
       // XP and the eddies that the check granted (roadmap: undo reverses;
-      // deleting the task definition does not).
+      // deleting the task definition does not). Reverse the EXACT eddies
+      // banked at check time (overclock multiplier included); the `||`
+      // fallback covers legacy rows created before eddiesAwarded existed.
       await game().awardXp(userId, {
         amount: -completion.xpAwarded,
-        eddies: -eddiesForReward(completion.xpAwarded, habit.difficulty),
+        eddies: -(completion.eddiesAwarded || eddiesForReward(completion.xpAwarded, habit.difficulty)),
         reason: 'habit_log_undo',
         module: moduleKey?.key,
         refType: 'habit', refId: habit.id,

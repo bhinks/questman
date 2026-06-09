@@ -27,6 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'vitals', label: 'Vitals', icon: 'heart' },
   { id: 'social', label: 'Social', icon: 'flag' },
   { id: 'progress', label: 'Progress', icon: 'layers' },
+  { id: 'shop', label: 'Shop', icon: 'bag' },
+  { id: 'achievements', label: 'Street Cred', icon: 'trophy' },
   // Finance group (existing dashboard)
   { id: 'overview', label: 'Finance', icon: 'grid' },
   { id: 'categories', label: 'Categories', icon: 'layers' },

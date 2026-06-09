@@ -48,6 +48,10 @@ model User {
   metricDefs           MetricDef[]
   npcs                 Npc[]
 
+  // Economy & rewards (phase 4)
+  purchases            Purchase[]
+  achievements         UserAchievement[]
+
   @@map("users")
 }
 
@@ -427,6 +431,10 @@ model HabitCompletion {
   count       Int      @default(1)
   note        String?
   xpAwarded   Int      @default(0)
+  // Actual eddies banked for this check (already overclock-multiplied).
+  // Undo reverses THIS exact amount — never a recomputed raw value — so a
+  // check+undo cycle nets zero even when the overclock multiplier was active.
+  eddiesAwarded Int    @default(0)
   source      String   @default("manual") // "manual"|"quest"
 
   createdAt   DateTime @default(now())
@@ -478,6 +486,28 @@ model PlayerProfile {
   // permanent progression, eddies are earned-and-spent (roadmap economy).
   eddies        Int      @default(0)
   currentStreak Int      @default(0)   // global daily-activity streak
+
+  // --- Economy & rewards (phase 4) ---
+  // Consecutive FULL-CLEAR days. Drives the "overclock" eddie multiplier
+  // (1.0–2.0). Bumped/reset in QuestEngine.ensureToday by evaluating
+  // whether the previous day was fully cleared. A miss (an expired quest)
+  // resets it; this is the "cooling unstable" heat meter.
+  overclockStreak Int    @default(0)
+  // Burnout-relief tokens. skip = drop a quest with no penalty; reroll =
+  // swap a quest for a different one. A free weekly allowance is granted
+  // in ensureToday; extras are bought in the Shop.
+  skipTokens    Int      @default(3)
+  rerollTokens  Int      @default(1)
+  // R&R / downtime credits — earned on clean days + achievements, spent to
+  // start a guilt-free media session (earn your downtime).
+  rrCredits     Int      @default(0)
+  // ISO-week key (e.g. "2026-W24") of the last weekly token grant, so the
+  // allowance refills once per week, lazily, on the first run of the week.
+  lastTokenGrantWeek String?
+  // Cosmetics: JSON array of unlocked cosmetic keys; equippedTheme is the
+  // active HUD palette (null = default neon).
+  cosmetics     String?
+  equippedTheme String?
   longestStreak Int      @default(0)
   lastActiveOn  DateTime?
 
@@ -816,4 +846,43 @@ model Interaction {
   @@index([npcId, date])
   @@index([userId])
   @@map("interactions")
+}
+
+// =====================================================================
+// Economy & rewards (phase 4). The shop CATALOG and the achievement
+// CATALOG live in code (services/shopCatalog.ts, services/achievements.ts)
+// since they're fixed; these tables record what a user has BOUGHT and
+// UNLOCKED. Eddie spends are also recorded in WalletLedger (the balance
+// source of truth); Purchase is the human-readable receipt log.
+// =====================================================================
+
+model Purchase {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  itemKey     String   // matches a SHOP_ITEMS catalog key
+  name        String   // denormalized for the receipt log
+  category    String   // "token_skip"|"token_reroll"|"rr_credit"|"cosmetic"|"loot_crate"
+  priceEddies Int
+  grantedJson String?  // JSON: what the purchase granted (esp. loot-crate rolls)
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("purchases")
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  key           String   // matches an ACHIEVEMENTS catalog key
+  unlockedAt    DateTime @default(now())
+  meta          String?  // JSON: snapshot of the metric that unlocked it
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_achievements")
 }

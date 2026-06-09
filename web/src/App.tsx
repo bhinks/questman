@@ -1,10 +1,10 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Transaction, SpendingAnalysis } from './types';
 import { analyzeSpending } from './utils/analyzer';
 import { categorizeTransactions } from './utils/categorizer';
 import { api } from './lib/api';
-import type { ApiTransaction, TransactionListResponse, ImportPreviewResponse, ImportResultResponse } from './lib/api';
+import type { ApiTransaction, TransactionListResponse, ImportPreviewResponse, ImportResultResponse, PlayerResponse } from './lib/api';
 import { AppShell } from './components/AppShell';
 import { OverviewCards } from './components/OverviewCards';
 import { SavingsMissions } from './components/SavingsMissions';
@@ -22,6 +22,8 @@ import { ProjectsView } from './components/ProjectsView';
 import { MediaView } from './components/MediaView';
 import { VitalsView } from './components/VitalsView';
 import { NpcsView } from './components/NpcsView';
+import { ShopView } from './components/ShopView';
+import { AchievementsView } from './components/AchievementsView';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -64,6 +66,20 @@ function HubApp() {
   const [activeTab, setActiveTab] = useState('today');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // Player snapshot (shared via react-query cache with TodayView/Shop/etc.).
+  // We read it here only to apply the equipped cosmetic theme to the whole
+  // app: setting data-theme on <html> swaps the neon palette in index.css.
+  const playerQuery = useQuery({
+    queryKey: ['player'],
+    queryFn: () => api.get<PlayerResponse>('/api/player').then(r => r.player),
+  });
+  const equippedTheme = playerQuery.data?.equippedTheme ?? null;
+  useEffect(() => {
+    const el = document.documentElement;
+    if (equippedTheme) el.dataset.theme = equippedTheme;
+    else delete el.dataset.theme;
+  }, [equippedTheme]);
 
   // Transactions now live in the DB. Pull the full set (single-user hub;
   // a high limit is fine) and map to the presentational shape the finance
@@ -258,6 +274,12 @@ function HubApp() {
 
       case 'progress':
         return <ProgressView />;
+
+      case 'shop':
+        return <ShopView />;
+
+      case 'achievements':
+        return <AchievementsView />;
 
       // --- Existing finance tabs (still local-CSV mode for now) ---
       case 'overview':

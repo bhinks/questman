@@ -41,6 +41,11 @@
   --warn:          var(--amber);
   --brand:         var(--cyan);
 
+  /* Primary accent as raw RGB triplet so component rules can build their
+     own rgba() alphas. Cosmetic themes ([data-theme]) override this (and
+     the neon palette) to reskin the whole UI. */
+  --accent-rgb:    28, 226, 255;
+
   /* ---- Glow helpers ---- */
   --glow-cyan:     0 0 0.5px rgba(28,226,255,.8), 0 0 12px rgba(28,226,255,.35);
   --glow-magenta:  0 0 0.5px rgba(255,46,154,.8), 0 0 12px rgba(255,46,154,.35);
@@ -58,6 +63,94 @@
   --font-display: 'Chakra Petch', 'Space Grotesk', sans-serif;
 
   --maxw: 1320px;
+}
+
+/* ============================================================
+   Cosmetic themes (Shop → "Neon Skins"). Applied via
+   <html data-theme="KEY">. Each remaps the neon ACCENT palette
+   only — surfaces and text stay constant so contrast always
+   holds. The Shop cosmetic catalog's themeKey payloads must
+   match these keys: synthwave | matrix | vaporwave | gold |
+   bloodmoon | arctic.  --accent-rgb mirrors --cyan as a triplet.
+   ============================================================ */
+
+/* Synthwave Sunset — hot pink + violet */
+[data-theme="synthwave"] {
+  --cyan:        #ff3d8b;
+  --cyan-deep:   #c01e63;
+  --magenta:     #ff77c8;
+  --violet:      #b06bff;
+  --teal:        #ff9de0;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 61, 139;
+  --line-bright: rgba(255, 61, 139, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,61,139,.8), 0 0 12px rgba(255,61,139,.40);
+}
+
+/* Matrix — phosphor-green terminal */
+[data-theme="matrix"] {
+  --cyan:        #43ff8e;
+  --cyan-deep:   #1fae5c;
+  --magenta:     #b6ff4d;
+  --violet:      #6bffb0;
+  --lime:        #8bff43;
+  --teal:        #2ff5a6;
+  --brand:       var(--cyan);
+  --accent-rgb:  67, 255, 142;
+  --line-bright: rgba(67, 255, 142, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(67,255,142,.85), 0 0 12px rgba(67,255,142,.40);
+}
+
+/* Vaporwave — pastel cyan + pink */
+[data-theme="vaporwave"] {
+  --cyan:        #67e8ff;
+  --cyan-deep:   #38b6cf;
+  --magenta:     #ff9ed6;
+  --violet:      #c9a6ff;
+  --teal:        #9ef7e4;
+  --brand:       var(--cyan);
+  --accent-rgb:  103, 232, 255;
+  --line-bright: rgba(103, 232, 255, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(103,232,255,.8), 0 0 12px rgba(255,158,214,.35);
+}
+
+/* Gold Chrome — amber luxe */
+[data-theme="gold"] {
+  --cyan:        #ffc24b;
+  --cyan-deep:   #c9912a;
+  --magenta:     #ffe08a;
+  --violet:      #ffb347;
+  --teal:        #ffd76b;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 194, 75;
+  --line-bright: rgba(255, 194, 75, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(255,194,75,.85), 0 0 12px rgba(255,194,75,.40);
+}
+
+/* Blood Moon — crimson */
+[data-theme="bloodmoon"] {
+  --cyan:        #ff4d6d;
+  --cyan-deep:   #c01e3c;
+  --magenta:     #ff7a99;
+  --violet:      #ff6b6b;
+  --teal:        #ff9db0;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 77, 109;
+  --line-bright: rgba(255, 77, 109, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,77,109,.8), 0 0 12px rgba(255,77,109,.40);
+}
+
+/* Arctic — ice white-blue */
+[data-theme="arctic"] {
+  --cyan:        #8fd8ff;
+  --cyan-deep:   #4d9bcf;
+  --magenta:     #c9e6ff;
+  --violet:      #a6c8ff;
+  --teal:        #b8f0ff;
+  --brand:       var(--cyan);
+  --accent-rgb:  143, 216, 255;
+  --line-bright: rgba(143, 216, 255, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(143,216,255,.85), 0 0 12px rgba(143,216,255,.40);
 }
 
 * { box-sizing: border-box; }
@@ -163,14 +256,14 @@ input, textarea, select { font-family: inherit; }
 }
 .btn:hover { border-color: var(--line-bright); background: var(--panel-3); }
 .btn-primary {
-  background: linear-gradient(180deg, rgba(28,226,255,0.18), rgba(28,226,255,0.06));
-  border-color: rgba(28,226,255,0.45);
+  background: linear-gradient(180deg, rgba(var(--accent-rgb),0.18), rgba(var(--accent-rgb),0.06));
+  border-color: rgba(var(--accent-rgb),0.45);
   color: #d7faff;
-  box-shadow: 0 0 0 1px rgba(28,226,255,0.05), 0 6px 24px -8px rgba(28,226,255,0.5);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb),0.05), 0 6px 24px -8px rgba(var(--accent-rgb),0.5);
 }
 .btn-primary:hover {
   border-color: var(--cyan);
-  box-shadow: 0 0 0 1px rgba(28,226,255,0.15), 0 8px 30px -8px rgba(28,226,255,0.7);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb),0.15), 0 8px 30px -8px rgba(var(--accent-rgb),0.7);
 }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
 .btn-ghost:hover { background: var(--panel-2); color: var(--text); border-color: var(--line); }
@@ -267,8 +360,8 @@ input, textarea, select { font-family: inherit; }
 }
 .nav-item:hover { background: var(--panel-2); color: var(--text); }
 .nav-item.active {
-  background: linear-gradient(90deg, rgba(28,226,255,0.14), rgba(28,226,255,0.03));
-  border-color: rgba(28,226,255,0.28);
+  background: linear-gradient(90deg, rgba(var(--accent-rgb),0.14), rgba(var(--accent-rgb),0.03));
+  border-color: rgba(var(--accent-rgb),0.28);
   color: var(--text);
   box-shadow: inset 2px 0 0 var(--cyan);
 }

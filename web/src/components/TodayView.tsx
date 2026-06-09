@@ -74,8 +74,15 @@ export function TodayView() {
     onSuccess: invalidateAll,
   });
   const skipQuest = useMutation({
+    // Skipping now spends a skip token, so refresh the player HUD too.
     mutationFn: (id: string) => api.post(`/api/quests/${id}/skip`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['quests'] }),
+    onSuccess: invalidateAll,
+  });
+  const rerollQuest = useMutation({
+    // Swap a quest for a fresh candidate; spends a reroll token (server-side,
+    // only if a replacement was actually found).
+    mutationFn: (id: string) => api.post(`/api/quests/${id}/reroll`),
+    onSuccess: invalidateAll,
   });
   const focusLog = useMutation({
     mutationFn: ({ id, minutes }: { id: string; minutes: number }) =>
@@ -115,9 +122,12 @@ export function TodayView() {
         today={today}
         plan={plan}
         focus={focus}
+        skipTokens={player.skipTokens}
+        rerollTokens={player.rerollTokens}
         onComplete={id => completeQuest.mutate(id)}
         onProgress={id => progressQuest.mutate(id)}
         onSkip={id => skipQuest.mutate(id)}
+        onReroll={id => rerollQuest.mutate(id)}
         onJackIn={jackIn}
         onJackOut={jackOut}
       />
@@ -227,6 +237,52 @@ function PlayerHud({
           </div>
           <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>EARNED / AVAILABLE</div>
         </div>
+
+        <OverclockTile streak={player.overclockStreak} mult={player.overclockMultiplier} />
+        <ResourcesTile skip={player.skipTokens} reroll={player.rerollTokens} rr={player.rrCredits} />
+      </div>
+    </div>
+  );
+}
+
+/** The overclock "heat meter": eddie-earn multiplier that climbs with each
+ *  consecutive full-clear day (×1.0 → ×2.0 at a 10-day chain). */
+function OverclockTile({ streak, mult }: { streak: number; mult: number }) {
+  const pct = Math.min(100, streak * 10); // maxes at a 10-day chain (×2.0)
+  const hot = mult >= 1.8 ? 'var(--red)' : mult >= 1.4 ? 'var(--amber)' : mult > 1 ? 'var(--cyan)' : 'var(--text-faint)';
+  return (
+    <div className="panel-inset" style={{ padding: 12, minWidth: 132, textAlign: 'center' }}>
+      <div className="kicker" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+        <Icon name="flame" size={12} style={{ color: hot }} /> OVERCLOCK
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: hot, fontFamily: 'var(--font-display)', textShadow: mult > 1 ? `0 0 10px ${hot}` : undefined }}>
+        ×{mult.toFixed(1)}
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden', margin: '6px 0 4px' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, var(--cyan), var(--amber), var(--red))', transition: 'width 0.4s ease' }} />
+      </div>
+      <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+        {streak > 0 ? `${streak}-DAY CHAIN` : 'NO CHAIN'}
+      </div>
+    </div>
+  );
+}
+
+/** Spendable mechanics: skip / reroll tokens + R&R downtime credits. */
+function ResourcesTile({ skip, reroll, rr }: { skip: number; reroll: number; rr: number }) {
+  const row = (label: string, value: number, color: string) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+      <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.05em' }}>{label}</span>
+      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color }}>{value}</span>
+    </div>
+  );
+  return (
+    <div className="panel-inset" style={{ padding: 12, minWidth: 116 }}>
+      <div className="kicker" style={{ marginBottom: 7, textAlign: 'center' }}>RESOURCES</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {row('SKIP', skip, 'var(--text-dim)')}
+        {row('REROLL', reroll, 'var(--violet)')}
+        {row('R&R', rr, 'var(--teal)')}
       </div>
     </div>
   );
@@ -240,14 +296,17 @@ function fmtMin(n: number): string {
 
 /** The day planner: budget bar + quests split into "in plan" / "later". */
 function QuestPlanner({
-  today, plan, focus, onComplete, onProgress, onSkip, onJackIn, onJackOut,
+  today, plan, focus, skipTokens, rerollTokens, onComplete, onProgress, onSkip, onReroll, onJackIn, onJackOut,
 }: {
   today: TodayResponse;
   plan: DayPlan | undefined;
   focus: { id: string; start: number } | null;
+  skipTokens: number;
+  rerollTokens: number;
   onComplete: (id: string) => void;
   onProgress: (id: string) => void;
   onSkip: (id: string) => void;
+  onReroll: (id: string) => void;
   onJackIn: (id: string) => void;
   onJackOut: () => void;
 }) {
@@ -280,7 +339,8 @@ function QuestPlanner({
   const renderCard = (q: Quest) => (
     <QuestCard
       key={q.id} quest={q} focus={focus}
-      onComplete={onComplete} onProgress={onProgress} onSkip={onSkip}
+      skipTokens={skipTokens} rerollTokens={rerollTokens}
+      onComplete={onComplete} onProgress={onProgress} onSkip={onSkip} onReroll={onReroll}
       onJackIn={onJackIn} onJackOut={onJackOut}
     />
   );
@@ -361,13 +421,16 @@ function BudgetBar({ plan }: { plan: DayPlan }) {
 }
 
 function QuestCard({
-  quest, focus, onComplete, onProgress, onSkip, onJackIn, onJackOut,
+  quest, focus, skipTokens, rerollTokens, onComplete, onProgress, onSkip, onReroll, onJackIn, onJackOut,
 }: {
   quest: Quest;
   focus: { id: string; start: number } | null;
+  skipTokens: number;
+  rerollTokens: number;
   onComplete: (id: string) => void;
   onProgress: (id: string) => void;
   onSkip: (id: string) => void;
+  onReroll: (id: string) => void;
   onJackIn: (id: string) => void;
   onJackOut: () => void;
 }) {
@@ -445,8 +508,23 @@ function QuestCard({
                   ▸ JACK IN
                 </button>
               )}
-              <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => onSkip(quest.id)}>
-                SKIP
+              <button
+                className="btn btn-ghost"
+                style={{ padding: '6px 10px', fontSize: 11, opacity: rerollTokens > 0 ? 1 : 0.4, color: 'var(--violet)' }}
+                disabled={rerollTokens <= 0}
+                title={rerollTokens > 0 ? 'Swap for a different quest (1 reroll token)' : 'No reroll tokens — buy more in the Shop'}
+                onClick={() => onReroll(quest.id)}
+              >
+                ↻ REROLL · {rerollTokens}
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ padding: '6px 10px', fontSize: 11, opacity: skipTokens > 0 ? 1 : 0.4 }}
+                disabled={skipTokens <= 0}
+                title={skipTokens > 0 ? 'Skip this quest (1 skip token)' : 'No skip tokens — buy more in the Shop'}
+                onClick={() => onSkip(quest.id)}
+              >
+                SKIP · {skipTokens}
               </button>
               {isCounter ? (
                 <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} onClick={() => onProgress(quest.id)}>

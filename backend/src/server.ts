@@ -29,6 +29,8 @@ import projectRoutes from './routes/projects';
 import mediaRoutes from './routes/media';
 import metricRoutes from './routes/metrics';
 import npcRoutes from './routes/npcs';
+import shopRoutes from './routes/shop';
+import achievementRoutes from './routes/achievements';
 
 const app = express();
 const server = createServer(app);
@@ -81,6 +83,8 @@ app.use('/api/projects', authMiddleware, projectRoutes);
 app.use('/api/media', authMiddleware, mediaRoutes);
 app.use('/api/metrics', authMiddleware, metricRoutes);
 app.use('/api/npcs', authMiddleware, npcRoutes);
+app.use('/api/shop', authMiddleware, shopRoutes);
+app.use('/api/achievements', authMiddleware, achievementRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

@@ -329,6 +329,66 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
   res.json({ item: serialize(item), player, questAutoCompleted });
 }));
 
+// --- R&R redemption (spend a downtime credit to activate a backlog item) -
+
+/**
+ * POST /api/media/:id/rr-session
+ *
+ * Spend one R&R credit — banked from full-clear days (QuestEngine) — to pull
+ * a media item out of the backlog and onto the active shelf, where it starts
+ * generating "braindance" quests. This is Brent's downtime loop: a full,
+ * productive day earns the right to guilt-free leisure from the backlog.
+ *
+ * Atomic guarded decrement so the credit balance can never go negative.
+ * Already-active / done / dropped items are rejected without spending.
+ */
+router.post('/:id/rr-session', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+
+  const existing = await prisma.mediaItem.findFirst({
+    where: { id: req.params.id, userId },
+  });
+  if (!existing) throw new AppError('Media item not found', 404);
+  if (existing.status === 'active') {
+    throw new AppError('That item is already on the active shelf', 400);
+  }
+  if (existing.status !== 'backlog') {
+    throw new AppError('Only backlog items can be activated with an R&R credit', 400);
+  }
+
+  const item = await prisma.$transaction(async (tx) => {
+    // The backlog->active transition is the idempotency guard: only the
+    // request that actually flips the row spends a credit. A double-submit
+    // matches 0 rows here and the whole tx rolls back, so it burns no credit
+    // (the status read above is outside the tx and can't be the guard).
+    const moved = await tx.mediaItem.updateMany({
+      where: { id: existing.id, userId, status: 'backlog' },
+      data: { status: 'active' },
+    });
+    if (moved.count !== 1) {
+      throw new AppError('That item is no longer in the backlog', 400);
+    }
+    // Guarded decrement: only fires while the player actually has a credit.
+    const dec = await tx.playerProfile.updateMany({
+      where: { userId, rrCredits: { gt: 0 } },
+      data: { rrCredits: { decrement: 1 } },
+    });
+    if (dec.count !== 1) {
+      throw new AppError('No R&R credits — clear a full day to bank one', 400);
+    }
+    return tx.mediaItem.findUniqueOrThrow({ where: { id: existing.id } });
+  });
+
+  const player = await game().getSnapshot(userId);
+
+  const ws = (global as any).wsService;
+  if (ws?.broadcastGameEvent) {
+    ws.broadcastGameEvent(userId, 'rr-session', { mediaId: existing.id });
+  }
+
+  res.json({ item: serialize(item), player });
+}));
+
 // --- delete -------------------------------------------------------------
 
 /**

@@ -4,6 +4,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
+import { evaluateAchievements } from '../services/achievements';
 import { daysAgoLocal } from '../utils/dates';
 
 const router = express.Router();
@@ -19,11 +20,21 @@ function game(): GamificationService {
 /**
  * GET /api/player
  * Player HUD: level, totalXp, xpIntoLevel, xpForNextLevel, progress,
- * currentStreak, longestStreak, domainXp.
+ * currentStreak, longestStreak, domainXp, plus the economy fields
+ * (overclock, tokens, R&R credits, cosmetics).
+ *
+ * Achievements are evaluated lazily here — the HUD is fetched constantly,
+ * so this is the cheapest place to detect newly-met criteria, unlock them
+ * (idempotent via UserAchievement @@unique), and bank their rewards. We
+ * evaluate BEFORE snapshotting so any just-unlocked XP/eddies are already
+ * reflected in the returned balances. `newAchievements` lets the client
+ * pop a toast for anything unlocked on this fetch.
  */
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
-  const snapshot = await game().getSnapshot(req.user!.id);
-  res.json({ player: snapshot });
+  const userId = req.user!.id;
+  const newAchievements = await evaluateAchievements(prisma, game(), userId);
+  const snapshot = await game().getSnapshot(userId);
+  res.json({ player: snapshot, newAchievements });
 }));
 
 /**
