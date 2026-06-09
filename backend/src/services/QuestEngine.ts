@@ -219,10 +219,14 @@ export class QuestEngine {
       });
     });
 
-    // Intelligence layer: the Handler's daily rundown. Best-effort and AFTER
-    // the quest tx commits, so a narration hiccup can never block generation.
-    // Runs once per day (gated by the same DailyQuestRun claim above).
-    await this.generateDailyRundown(userId, today);
+    // Intelligence layer: the Handler's daily rundown. FIRE-AND-FORGET — it
+    // runs AFTER the quest tx commits and must not add a Claude call to the
+    // /today response latency. It persists a HandlerMessage + broadcasts over
+    // the socket, and the HUD ticker live-refreshes on that event, so the line
+    // surfaces without blocking the page. generateDailyRundown swallows all
+    // errors internally, so the detached promise never rejects. Gated once/day
+    // by the DailyQuestRun claim above.
+    void this.generateDailyRundown(userId, today);
 
     return { generated: true, generator, questCount: chosen.length };
   }

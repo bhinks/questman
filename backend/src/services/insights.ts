@@ -17,6 +17,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { startOfLocalDay } from '../utils/dates';
 import { computeCorrelations, CorrelationFinding, InsightActionType } from './digest';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 type Tx = Prisma.TransactionClient;
 type Db = PrismaClient | Tx;
@@ -30,6 +31,7 @@ export async function generateInsightsForWeek(
   userId: string,
   weekOf: Date,
 ): Promise<Array<{ title: string; evidence: string }>> {
+  if (!config.features.insights) return [];
   let findings: CorrelationFinding[] = [];
   try {
     findings = await computeCorrelations(db, userId);

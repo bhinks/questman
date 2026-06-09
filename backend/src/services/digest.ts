@@ -293,7 +293,7 @@ export async function computeCorrelations(db: Db, userId: string, windowDays = 2
         out.push({
           kind: 'sleep_spend',
           title: 'Short sleep, looser wallet?',
-          body: `On nights you logged under 6 hours of sleep, your spending the next day ran about ${pct}% higher on average. Possible pattern — worth watching, not a verdict.`,
+          body: `On days you logged under 6 hours of sleep, your spending that day ran about ${pct}% higher on average. Possible pattern — worth watching, not a verdict.`,
           evidence: `avg spend $${Math.round(lo)} on <6h-sleep days vs $${Math.round(hi)} otherwise (${low.length}+${high.length} days)`,
           confidence: low.length + high.length >= 14 ? 'medium' : 'low',
           windowDays,

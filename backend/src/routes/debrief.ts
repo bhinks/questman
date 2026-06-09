@@ -56,7 +56,27 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const reviews = await prisma.weeklyReview.findMany({
     where: { userId }, orderBy: { weekOf: 'desc' }, take: q.limit,
   });
-  res.json({ reviews: reviews.map(r => ({ ...r, stats: parseStats(r.statsJson) })) });
+  // Attach each week's insights so the archive selector can show patterns for a
+  // past week (one grouped query, keyed by the weekOf timestamp).
+  const insights = await prisma.insight.findMany({
+    where: { userId, weekOf: { in: reviews.map(r => r.weekOf) } },
+    orderBy: { createdAt: 'asc' },
+  });
+  const byWeek = new Map<number, typeof insights>();
+  for (const ins of insights) {
+    if (!ins.weekOf) continue;
+    const k = ins.weekOf.getTime();
+    const arr = byWeek.get(k) ?? [];
+    arr.push(ins);
+    byWeek.set(k, arr);
+  }
+  res.json({
+    reviews: reviews.map(r => ({
+      ...r,
+      stats: parseStats(r.statsJson),
+      insights: byWeek.get(r.weekOf.getTime()) ?? [],
+    })),
+  });
 }));
 
 /**

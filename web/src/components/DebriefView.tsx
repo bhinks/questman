@@ -57,7 +57,9 @@ export function DebriefView() {
       qc.invalidateQueries({ queryKey: ['debrief', 'latest'] });
       qc.invalidateQueries({ queryKey: ['debrief', 'list'] });
     };
-    const evts = ['debrief-generated', 'player-updated'];
+    // 'handler-message' is what ensureWeeklyReview actually broadcasts when a
+    // fresh debrief lands; the others are belt-and-suspenders.
+    const evts = ['handler-message', 'debrief-generated', 'player-updated'];
     evts.forEach(e => s.on(e, refresh));
     return () => evts.forEach(e => s.off(e, refresh));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -243,7 +245,9 @@ function StatsGrid({ stats }: { stats: WeeklyStats | null }) {
     );
   }
 
-  const completionPct = Math.round((stats.completionRate ?? 0) * 100);
+  // completionRate is already a 0-100 integer percent from the server digest
+  // (buildWeeklyDigest) — do NOT multiply by 100 again.
+  const completionPct = Math.round(stats.completionRate ?? 0);
   const v = stats.vitals;
   const hasVitals = v && (v.sleepAvg != null || v.moodAvg != null || v.weightDelta != null);
   const topCats = stats.topCategories ?? [];

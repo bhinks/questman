@@ -57,7 +57,8 @@ export function NetView() {
       qc.invalidateQueries({ queryKey: ['handler', 'messages'] });
       qc.invalidateQueries({ queryKey: ['handler', 'persona'] });
     };
-    const insightEvts = ['insight-created', 'player-updated'];
+    // The weekly insight batch co-emits 'handler-message', so refresh insights on it too.
+    const insightEvts = ['insight-created', 'handler-message', 'player-updated'];
     const handlerEvts = ['handler-message', 'daily-generated', 'weekly-debrief'];
     insightEvts.forEach(e => s.on(e, refreshInsights));
     handlerEvts.forEach(e => s.on(e, refreshHandler));
