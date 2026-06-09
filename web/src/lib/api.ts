@@ -16,13 +16,22 @@ export const API_BASE: string =
 export const TOKEN_KEY = 'questman.auth.token';
 
 export function getToken(): string | null {
-  return typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY);
+  if (typeof window === 'undefined') return null;
+  // "Remember me" stores in localStorage (survives restart); otherwise
+  // sessionStorage (cleared when the browser/tab closes). Read both.
+  return window.localStorage.getItem(TOKEN_KEY)
+    ?? window.sessionStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string | null): void {
+export function setToken(token: string | null, remember = true): void {
   if (typeof window === 'undefined') return;
-  if (token) window.localStorage.setItem(TOKEN_KEY, token);
-  else window.localStorage.removeItem(TOKEN_KEY);
+  // Always clear both stores first so toggling "remember" never leaves a
+  // stale copy behind in the other one.
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  if (token) {
+    (remember ? window.localStorage : window.sessionStorage).setItem(TOKEN_KEY, token);
+  }
 }
 
 export class ApiError extends Error {
@@ -134,6 +143,7 @@ export interface PlayerSnapshot {
   xpIntoLevel: number;
   xpForNextLevel: number;
   progress: number;
+  eddies: number;        // spendable currency (€$) balance
   currentStreak: number;
   longestStreak: number;
   lastActiveOn: string | null;
@@ -141,6 +151,26 @@ export interface PlayerSnapshot {
   title: string | null;
   leveledUp?: boolean;
   previousLevel?: number;
+}
+
+/** One row of the player's economy history (XP grant or eddie movement). */
+export interface LedgerEntry {
+  id: string;
+  currency: 'xp' | 'eddies';
+  amount: number;
+  reason: string;
+  module: string | null;
+  refType: string | null;
+  refId: string | null;
+  createdAt: string;
+}
+export interface PlayerStats {
+  player: PlayerSnapshot;
+  xpLast7Days: number;
+  xpLast30Days: number;
+  completionsLast30Days: number;
+  xpByModule: Record<string, number>;
+  recent: Array<Omit<LedgerEntry, 'currency'>>;
 }
 export interface Module {
   id: string;
@@ -160,7 +190,7 @@ export interface Quest {
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
   xpReward: number;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'ai' | 'rule';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule';
   sourceId: string | null;
   status: 'pending' | 'completed' | 'skipped' | 'expired';
   target: number;
@@ -168,6 +198,133 @@ export interface Quest {
   isAiThemed: boolean;
   meta: { emoji?: string; flavor?: string; bestWindow?: string } | null;
   module: { key: string; name: string; color: string | null; icon: string | null };
+  // Planner / check-in fields (roadmap §5).
+  estMinutes: number | null;
+  targetCount: number;
+  currentCount: number;
+  carryOver: boolean;
+  mustDo: boolean;
+  originDate: string | null;
+  actualMinutes: number | null;
+}
+
+/** One quest in the day planner, flagged whether it fits the budget. */
+export interface PlanQuest {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  xpReward: number;
+  estMinutes: number | null;
+  assumedMinutes: number;
+  mustDo: boolean;
+  carryOver: boolean;
+  targetCount: number;
+  currentCount: number;
+  source: string;
+  module: { key: string; name: string; color: string | null; icon: string | null };
+  meta: { emoji?: string; flavor?: string; bestWindow?: string } | null;
+  inPlan: boolean;
+}
+export interface DayPlan {
+  budgetMin: number;
+  isWeekend: boolean;
+  plannedMin: number;
+  totalEstMin: number;
+  estimatedMissing: number;
+  quests: PlanQuest[];
+}
+
+// ---- new quest pools (phase 2) -------------------------------------
+
+export interface ProjectTask {
+  id: string;
+  projectId: string;
+  title: string;
+  done: boolean;
+  estMinutes: number | null;
+  priority: number;
+  sortOrder: number;
+  completedAt: string | null;
+}
+export interface Milestone {
+  id: string;
+  projectId: string;
+  title: string;
+  done: boolean;
+  dueDate: string | null;
+  bonusXp: number;
+  sortOrder: number;
+  completedAt: string | null;
+}
+export interface Project {
+  id: string;
+  moduleId: string;
+  name: string;
+  description: string | null;
+  status: 'active' | 'paused' | 'done' | 'archived';
+  color: string | null;
+  tasks?: ProjectTask[];
+  milestones?: Milestone[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MediaItem {
+  id: string;
+  moduleId: string;
+  type: 'movie' | 'show' | 'game' | 'book';
+  title: string;
+  status: 'backlog' | 'active' | 'done' | 'dropped';
+  estMinutes: number | null;
+  totalUnits: number | null;
+  unitsDone: number;
+  externalId: string | null;
+  externalSource: string | null;
+  coverUrl: string | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MetricDef {
+  id: string;
+  key: string;
+  label: string;
+  unit: string | null;
+  kind: 'number' | 'scale' | 'integer';
+  enabled: boolean;
+  sortOrder: number;
+  min: number | null;
+  max: number | null;
+}
+export interface DailyMetric {
+  id: string;
+  date: string;
+  key: string;
+  value: number;
+}
+
+export interface Interaction {
+  id: string;
+  npcId: string;
+  date: string;
+  minutes: number | null;
+  planned: boolean;
+  note: string | null;
+}
+export interface Npc {
+  id: string;
+  moduleId: string;
+  name: string;
+  relationship: string | null;
+  cadenceDays: number | null;
+  lastContactOn: string | null;
+  notes: string | null;
+  daysSinceContact?: number | null;
+  interactions?: Interaction[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Outdoor weather gating stored on a Habit. `outdoor` is the switch. */
@@ -203,6 +360,7 @@ export interface Habit {
   targetPerDay: number;
   baseXp: number;
   difficulty: 'easy' | 'medium' | 'hard';
+  estMinutes: number | null;
   isActive: boolean;
   minIntervalDays: number | null;
   weatherRule: WeatherRule | null;

@@ -38,7 +38,15 @@ model User {
   quests               Quest[]
   questCompletions     QuestCompletion[]
   xpLedger             XpLedger[]
+  walletLedger         WalletLedger[]
   dailyQuestRuns       DailyQuestRun[]
+
+  // New quest pools (phase 2)
+  projects             Project[]
+  mediaItems           MediaItem[]
+  dailyMetrics         DailyMetric[]
+  metricDefs           MetricDef[]
+  npcs                 Npc[]
 
   @@map("users")
 }
@@ -58,6 +66,13 @@ model UserSettings {
   // Privacy
   dataRetention      Int     @default(365) // days
   shareAnalytics     Boolean @default(false)
+
+  // Day-planner time budget (minutes of "go" available). Brent's
+  // defaults: 4h on weekdays, 10h on weekends. The planner fits a
+  // ranked quest set inside this; the user only gets suggestions of
+  // WHAT to do, never WHEN (roadmap §5).
+  weekdayBudgetMin   Int     @default(240)
+  weekendBudgetMin   Int     @default(600)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -302,6 +317,9 @@ model Module {
   habits    Habit[]
   workouts  WorkoutSession[]
   quests    Quest[]
+  projects  Project[]
+  mediaItems MediaItem[]
+  npcs      Npc[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -363,6 +381,11 @@ model Habit {
   baseXp          Int      @default(10)
   difficulty      String   @default("easy") // "easy"|"medium"|"hard"
   isActive        Boolean  @default(true)
+
+  // Estimated time-to-complete in minutes. Foundational for the day
+  // planner (roadmap §5) — flows into generated quests so the engine
+  // can fit a set inside a daily time budget. Optional; null = unknown.
+  estMinutes      Int?
 
   // Optional throttling: minimum days between completions. Independent
   // of cadence — "weekly" with minInterval=4 means weekly schedule but
@@ -450,6 +473,10 @@ model PlayerProfile {
   level         Int      @default(1)
   totalXp       Int      @default(0)
   xpIntoLevel   Int      @default(0)   // cached; derivable from level + totalXp
+  // Spendable currency (Eddies, €$). Cached running balance; the
+  // authoritative value is the sum of WalletLedger entries. XP is
+  // permanent progression, eddies are earned-and-spent (roadmap economy).
+  eddies        Int      @default(0)
   currentStreak Int      @default(0)   // global daily-activity streak
   longestStreak Int      @default(0)
   lastActiveOn  DateTime?
@@ -492,6 +519,23 @@ model Quest {
   progress    Float      @default(0)
   isAiThemed  Boolean    @default(false)
   meta        String?    // JSON: theming, color, emoji, generator notes
+
+  // --- Quest-engine overhaul fields (roadmap §5) ---
+  // Estimated minutes to complete — drives the day planner's time-budget fit.
+  estMinutes   Int?
+  // Check-in progress counter (e.g. "drink 8 glasses" → targetCount=8).
+  // Normal one-shot quests keep targetCount=1. currentCount drips XP.
+  targetCount  Int       @default(1)
+  currentCount Int       @default(0)
+  // Persistence: a carry-over quest rolls to the next day if left
+  // incomplete instead of expiring. mustDo quests always carry + rank first.
+  carryOver    Boolean   @default(false)
+  mustDo       Boolean   @default(false)
+  // The local day this quest was first generated (set on carry so the UI
+  // can show "carried from <date>"); null = generated for its questDate.
+  originDate   DateTime?
+  // Focus-timer actuals (JACK IN/OUT) — feeds estimate accuracy over time.
+  actualMinutes Int?
 
   completion  QuestCompletion?
 
@@ -538,6 +582,31 @@ model XpLedger {
   @@map("xp_ledger")
 }
 
+// Append-only audit of the Eddies (€$) economy — the spendable-currency
+// sibling of XpLedger. Balance = SUM(amount). Earns are +ve, spends are
+// -ve. Like the XP ledger, it is deletion-proof: a grant survives the
+// deletion of whatever task produced it, so the wallet history is
+// immutable. The server is the only minter (Claude/handler never write
+// here).
+model WalletLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount    Int      // +ve earn, -ve spend/correction
+  reason    String   // "quest_complete"|"habit_log"|"workout_log"|"shop_purchase"|"streak_bonus"|"undo"
+  module    String?  // domain that produced the earn, for rollups
+  refType   String?  // "quest"|"habit"|"workout"|"shopItem"
+  refId     String?
+  meta      String?  // JSON
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, reason])
+  @@map("wallet_ledger")
+}
+
 model DailyQuestRun {
   id         String   @id @default(cuid())
   userId     String
@@ -553,4 +622,198 @@ model DailyQuestRun {
 
   @@unique([userId, runDate])
   @@map("daily_quest_runs")
+}
+
+// =====================================================================
+// New quest pools (phase 2). Each follows the existing model+route+
+// candidate+UI pattern. Child rows carry a bare `userId` for query
+// scoping; they cascade-delete via their parent (which cascades from
+// User), so no formal User back-relation is needed on the children.
+// =====================================================================
+
+// --- Projects ("Operations" / "Gigs") -------------------------------
+// Replaces the half-built Goal feature (Brent chose: Projects supersede
+// Goals). A Project is a work-breakdown: tasks + milestones. Incomplete
+// tasks become quest candidates; completing a milestone grants bonus XP.
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      String   @default("active") // "active"|"paused"|"done"|"archived"
+  color       String?
+
+  tasks       ProjectTask[]
+  milestones  Milestone[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, status])
+  @@map("projects")
+}
+
+model ProjectTask {
+  id          String   @id @default(cuid())
+  userId      String   // scoping; cascades via project
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title       String
+  done        Boolean  @default(false)
+  estMinutes  Int?
+  priority    Int      @default(0)   // higher = surfaced first
+  sortOrder   Int      @default(0)
+  completedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId, done])
+  @@index([userId])
+  @@map("project_tasks")
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  userId      String   // scoping; cascades via project
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title       String
+  done        Boolean  @default(false)
+  dueDate     DateTime?
+  bonusXp     Int      @default(50)
+  sortOrder   Int      @default(0)
+  completedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId, done])
+  @@map("milestones")
+}
+
+// --- Media & consumption backlog ("Braindance queue") ---------------
+// type ∈ movie|show|game|book. estMinutes is the auto-estimated time
+// commitment (TMDb runtime, HLTB main story, pages × min/page, etc.).
+// For books, progress is tracked in pages (unitsDone/totalUnits) and the
+// reading-speed avg is kept in metaJson (default 3 min/page until data).
+model MediaItem {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId       String
+  module         Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  type           String   // "movie"|"show"|"game"|"book"
+  title          String
+  status         String   @default("backlog") // "backlog"|"active"|"done"|"dropped"
+
+  estMinutes     Int?     // total time commitment
+  totalUnits     Int?     // pages (book) / episodes (show)
+  unitsDone      Int      @default(0)
+
+  externalId     String?
+  externalSource String?  // "tmdb"|"openlibrary"|"googlebooks"|"hltb"|"manual"
+  coverUrl       String?
+  metaJson       String?  // JSON: runtime, episodeCount, pageCount, readingMinPerPage, ...
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, type])
+  @@map("media_items")
+}
+
+// --- Daily log / vitals ("Biomonitor") ------------------------------
+// Flexible key/value per day. One row per (user, day, key). The metric
+// SET is user-configurable via MetricDef. Water lives here (moved out of
+// habits per Brent).
+model DailyMetric {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date      DateTime // local midnight
+  key       String   // matches a MetricDef.key
+  value     Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, key])
+  @@index([userId, key, date])
+  @@map("daily_metrics")
+}
+
+model MetricDef {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  key       String   // "weight"|"sleepHours"|"mood"|"water"|"workHours"|"steps"|"bpSys"|"bpDia"|"restingHr"
+  label     String
+  unit      String?
+  kind      String   @default("number") // "number"|"scale"|"integer"
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0)
+  min       Float?
+  max       Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@map("metric_defs")
+}
+
+// --- Social: NPCs & relationships -----------------------------------
+// Contacts ("crew / street contacts"). cadenceDays is optional; we track
+// time-since-last-contact for everyone. Quests are NOT person-specific
+// (Brent): a generic "reach out to someone you've neglected" candidate
+// fires when any contact is overdue.
+model Npc {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId      String
+  module        Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  name          String
+  relationship  String?  // "family"|"friend"|"partner"|"colleague"|...
+  cadenceDays   Int?     // optional desired contact cadence
+  lastContactOn DateTime?
+  notes         String?
+
+  interactions  Interaction[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@map("npcs")
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  userId    String   // scoping; cascades via npc
+  npcId     String
+  npc       Npc      @relation(fields: [npcId], references: [id], onDelete: Cascade)
+
+  date      DateTime
+  minutes   Int?
+  planned   Boolean  @default(false)
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([npcId, date])
+  @@index([userId])
+  @@map("interactions")
 }

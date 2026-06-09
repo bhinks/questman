@@ -9,7 +9,7 @@ interface AuthState {
   loading: boolean;       // true during the initial /me probe on mount
   isAuthed: boolean;      // shorthand for `!!user`
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => void;
 }
 
@@ -42,11 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, remember = true) => {
     setError(null);
     try {
-      const res = await api.post<LoginResponse>('/api/auth/login', { email, password });
-      setToken(res.token);
+      const res = await api.post<LoginResponse>('/api/auth/login', { email, password, remember });
+      setToken(res.token, remember);
       setUser({ id: res.user.id, email: res.user.email, name: res.user.name });
       connectSocket();
     } catch (err) {

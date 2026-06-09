@@ -25,6 +25,10 @@ import workoutRoutes from './routes/workouts';
 import goalRoutes from './routes/goals';
 import questRoutes from './routes/quests';
 import weatherRoutes from './routes/weather';
+import projectRoutes from './routes/projects';
+import mediaRoutes from './routes/media';
+import metricRoutes from './routes/metrics';
+import npcRoutes from './routes/npcs';
 
 const app = express();
 const server = createServer(app);
@@ -73,6 +77,10 @@ app.use('/api/workouts', authMiddleware, workoutRoutes);
 app.use('/api/goals', authMiddleware, goalRoutes);
 app.use('/api/quests', authMiddleware, questRoutes);
 app.use('/api/weather', authMiddleware, weatherRoutes);
+app.use('/api/projects', authMiddleware, projectRoutes);
+app.use('/api/media', authMiddleware, mediaRoutes);
+app.use('/api/metrics', authMiddleware, metricRoutes);
+app.use('/api/npcs', authMiddleware, npcRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

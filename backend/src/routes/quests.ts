@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { QuestEngine } from '../services/QuestEngine';
 import { GamificationService } from '../services/GamificationService';
+import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
 
@@ -101,6 +102,12 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
   if (quest.status !== 'pending') {
     throw new AppError(`Cannot complete a ${quest.status} quest`, 400);
   }
+  // Counter quests drip XP through /progress; completing them here would
+  // pay the full reward again on top of the dripped ticks. Route them to
+  // /progress (the UI already does this off targetCount).
+  if (quest.targetCount > 1) {
+    throw new AppError('Use /progress to advance a counter quest', 400);
+  }
 
   const today = startOfLocalDay();
   let questCompletion;
@@ -146,6 +153,7 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
     });
     player = await game().awardXp(userId, {
       amount: quest.xpReward,
+      eddies: eddiesForReward(quest.xpReward, quest.difficulty),
       reason: 'quest_complete',
       module: moduleKey?.key,
       refType: 'quest',
@@ -200,6 +208,251 @@ router.post('/:id/skip', asyncHandler(async (req: AuthRequest, res) => {
     data: { status: 'skipped' },
   });
   res.json({ quest: updated });
+}));
+
+/**
+ * POST /api/quests/:id/progress  { delta?: number = 1 }
+ *
+ * Check-in counter for progress quests (roadmap §5: "5/8 → tap +1").
+ * XP drips proportionally per check-in; reaching the target completes
+ * the quest and pays the remainder + a completion bonus (Brent: "partial
+ * reward + bonus"). Eddies are pegged to the XP awarded in each call.
+ * Idempotent at the cap: extra +1s past the target are no-ops.
+ */
+router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const { delta } = z.object({ delta: z.number().int().min(1).max(100).default(1) }).parse(req.body ?? {});
+
+  const quest = await prisma.quest.findFirst({ where: { id: req.params.id, userId } });
+  if (!quest) throw new AppError('Quest not found', 404);
+  if (quest.status === 'completed') {
+    const player = await game().getSnapshot(userId);
+    res.json({ quest, player, alreadyCompleted: true });
+    return;
+  }
+  if (quest.status !== 'pending') {
+    throw new AppError(`Cannot advance a ${quest.status} quest`, 400);
+  }
+
+  const target = Math.max(1, quest.targetCount);
+  const before = Math.min(quest.currentCount, target);
+  const after = Math.min(before + delta, target);
+  if (after === before) {
+    const player = await game().getSnapshot(userId);
+    res.json({ quest, player, noop: true });
+    return;
+  }
+
+  // Proportional XP: what should be credited at `after` ticks minus what
+  // was credited at `before` ticks. Completion pays out the full reward
+  // plus a 20% bonus (counter quests only; one-shots match /complete).
+  const creditedAt = (count: number) => Math.floor((quest.xpReward * count) / target);
+  const willComplete = after >= target;
+  const completionBonus = target > 1 && willComplete ? Math.round(quest.xpReward * 0.2) : 0;
+  const baseXp = willComplete ? quest.xpReward - creditedAt(before) : creditedAt(after) - creditedAt(before);
+  const xpAward = baseXp + completionBonus;
+  // Eddies: intermediate ticks are pegged 1:1 to the tick XP with NO flat
+  // difficulty bonus — otherwise an 8-tick counter quest would pay the
+  // bonus 8×. The flat bonus is applied ONCE, on the completing tick.
+  const eddieAward = willComplete
+    ? eddiesForReward(xpAward, quest.difficulty)
+    : Math.max(0, baseXp);
+
+  const today = startOfLocalDay();
+  let player: Awaited<ReturnType<GamificationService['awardXp']>> | null = null;
+  let raced = false;
+
+  await prisma.$transaction(async (tx) => {
+    // Guarded update: the WHERE pins currentCount to the value we read.
+    // Under a concurrent +1 (double-click / retry) only the first commit
+    // matches; the loser updates 0 rows and bails WITHOUT awarding, so a
+    // tick's XP/eddies are never paid twice (the count read happened
+    // outside the tx, so this conditional write is the integrity guard).
+    const upd = await tx.quest.updateMany({
+      where: { id: quest.id, userId, currentCount: before, status: 'pending' },
+      data: {
+        currentCount: after,
+        progress: after / target,
+        status: willComplete ? 'completed' : 'pending',
+      },
+    });
+    if (upd.count !== 1) { raced = true; return; }
+
+    if (willComplete) {
+      await tx.questCompletion.create({
+        data: { userId, questId: quest.id, xpAwarded: quest.xpReward, meta: JSON.stringify({ via: 'progress', completionBonus }) },
+      });
+      // Habit linkage (mirror /complete): write today's HabitCompletion + bump streak.
+      if (quest.source === 'habit' && quest.sourceId) {
+        try {
+          await tx.habitCompletion.create({
+            data: { userId, habitId: quest.sourceId, completedOn: today, xpAwarded: 0, source: 'quest' },
+          });
+        } catch (err: any) {
+          if (err?.code !== 'P2002') throw err;
+        }
+        await game().bumpHabitStreak(quest.sourceId, today, tx);
+      }
+    }
+
+    const moduleKey = await tx.module.findUnique({
+      where: { id: quest.moduleId }, select: { key: true },
+    });
+    player = await game().awardXp(userId, {
+      amount: xpAward,
+      eddies: eddieAward,
+      reason: willComplete ? 'quest_complete' : 'quest_progress',
+      module: moduleKey?.key,
+      refType: 'quest',
+      refId: quest.id,
+    }, tx);
+  });
+
+  // Lost a concurrent race — another +1 already advanced the counter. Return
+  // the fresh state without awarding anything again.
+  if (raced) {
+    const [fresh, snap] = await Promise.all([
+      prisma.quest.findFirst({ where: { id: quest.id, userId } }),
+      game().getSnapshot(userId),
+    ]);
+    res.json({ quest: fresh, player: snap, noop: true });
+    return;
+  }
+
+  const ws = (global as any).wsService;
+  if (ws?.broadcastGameEvent) {
+    ws.broadcastGameEvent(userId, willComplete ? 'quest-completed' : 'quest-progress', {
+      questId: quest.id, xpAwarded: xpAward, count: after, target,
+      leveledUp: player?.leveledUp ?? false,
+    });
+  }
+
+  res.json({
+    quest: { ...quest, currentCount: after, progress: after / target, status: willComplete ? 'completed' : 'pending' },
+    xpAwarded: xpAward,
+    eddiesAwarded: eddieAward,
+    completed: willComplete,
+    player,
+  });
+}));
+
+/**
+ * POST /api/quests/:id/focus  { actualMinutes: number }
+ *
+ * Focus-timer "JACK OUT": logs real time spent on a quest (count-up or
+ * timeboxed). Accumulates across sessions. Feeds estimate accuracy so
+ * the planner gets smarter; does not itself complete the quest or award
+ * XP. No hard stops (Brent: stopping the timer ≠ stopping the activity).
+ */
+router.post('/:id/focus', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const { actualMinutes } = z.object({
+    actualMinutes: z.number().int().min(0).max(1440),
+  }).parse(req.body);
+
+  const quest = await prisma.quest.findFirst({ where: { id: req.params.id, userId } });
+  if (!quest) throw new AppError('Quest not found', 404);
+
+  const updated = await prisma.quest.update({
+    where: { id: quest.id },
+    data: { actualMinutes: (quest.actualMinutes ?? 0) + actualMinutes },
+  });
+  res.json({ quest: updated });
+}));
+
+/**
+ * GET /api/quests/plan?budget=<minutes>
+ *
+ * The day planner (roadmap §5). Ranks today's pending quests and greedily
+ * fits a subset inside the time budget (default: 4h weekdays / 10h
+ * weekends, from UserSettings). Returns a RANKED LIST with each quest
+ * flagged inPlan/overflow — the app suggests WHAT to do, never WHEN.
+ * Ranking: must-do first, then quests whose best weather window is open
+ * now, then higher reward, then shorter (so more fit).
+ */
+router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const today = startOfLocalDay();
+  const DEFAULT_EST = 20; // assumed minutes for quests with no estimate
+
+  const settings = await prisma.userSettings.findUnique({ where: { userId } });
+  const isWeekend = [0, 6].includes(today.getDay());
+  const defaultBudget = isWeekend
+    ? (settings?.weekendBudgetMin ?? 600)
+    : (settings?.weekdayBudgetMin ?? 240);
+  const budgetMin = req.query.budget
+    ? Math.max(0, Number(req.query.budget))
+    : defaultBudget;
+
+  const quests = await prisma.quest.findMany({
+    where: { userId, questDate: today, status: 'pending' },
+    include: { module: { select: { key: true, name: true, color: true, icon: true } } },
+  });
+
+  const nowHour = new Date().getHours();
+  const windowOpenNow = (meta: any): boolean => {
+    const w: string | undefined = meta?.bestWindow;
+    if (!w) return false;
+    // Parse a label like "1–3pm" / "7-9am" loosely; boost if `now` is inside.
+    const m = w.match(/(\d+)\D+(\d+)\s*(am|pm)?/i);
+    if (!m) return false;
+    const to24 = (h: number, ap?: string) => ap?.toLowerCase() === 'pm' && h < 12 ? h + 12 : (ap?.toLowerCase() === 'am' && h === 12 ? 0 : h);
+    const start = to24(parseInt(m[1], 10), m[3]);
+    const end = to24(parseInt(m[2], 10), m[3]);
+    return nowHour >= start && nowHour <= end;
+  };
+
+  const score = (q: typeof quests[number]): number => {
+    const meta = parseJson<any>(q.meta);
+    let s = 0;
+    if (q.mustDo) s += 10_000;
+    if (windowOpenNow(meta)) s += 1_000;
+    s += q.xpReward; // higher reward ranks higher
+    return s;
+  };
+
+  const ranked = [...quests].sort((a, b) => {
+    const ds = score(b) - score(a);
+    if (ds !== 0) return ds;
+    // Tie-break: shorter first, so more quests fit the budget.
+    return (a.estMinutes ?? DEFAULT_EST) - (b.estMinutes ?? DEFAULT_EST);
+  });
+
+  let plannedMin = 0;
+  let totalEstMin = 0;
+  const out = ranked.map((q) => {
+    const est = q.estMinutes ?? DEFAULT_EST;
+    totalEstMin += est;
+    // must-do always makes the plan even if it blows the budget.
+    const fits = q.mustDo || plannedMin + est <= budgetMin;
+    if (fits) plannedMin += est;
+    return {
+      id: q.id,
+      title: q.title,
+      description: q.description,
+      difficulty: q.difficulty,
+      xpReward: q.xpReward,
+      estMinutes: q.estMinutes,
+      assumedMinutes: est,
+      mustDo: q.mustDo,
+      carryOver: q.carryOver,
+      targetCount: q.targetCount,
+      currentCount: q.currentCount,
+      source: q.source,
+      module: q.module,
+      meta: parseJson(q.meta),
+      inPlan: fits,
+    };
+  });
+
+  res.json({
+    budgetMin,
+    isWeekend,
+    plannedMin,
+    totalEstMin,
+    estimatedMissing: out.filter(q => q.estMinutes == null).length,
+    quests: out,
+  });
 }));
 
 /**

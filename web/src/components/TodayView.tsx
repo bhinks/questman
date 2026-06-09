@@ -1,106 +1,134 @@
 /**
- * TodayView — landing tab for the life-hub. Player HUD + today's quests.
+ * TodayView — landing tab. Player HUD + the DAY PLANNER (roadmap §5).
  *
- * Phase 4 ships a working but minimal layout. Phase 5 will:
- *   - Add the full Mission card with progress ring (reusing primitives
- *     from SavingsMissions.tsx)
- *   - Add an animated XP bar / level-up confetti on completion
- *   - Add the streak flame + last-7-days dot calendar
- *
- * For now: HUD strip with level/streak/xp, then grouped quest cards.
+ * The planner asks the server to rank today's pending quests and fit a
+ * subset inside a time budget (4h weekday / 10h weekend by default). We
+ * render WHAT to do (ranked, split into "in plan" vs "later"), never
+ * WHEN — Brent wants suggestions, not a schedule. Quests support:
+ *   - check-in counters (tap +1, drip XP) for targetCount > 1
+ *   - a focus timer ("JACK IN/OUT") that logs actual vs estimated time
+ *   - must-do / carry-over / best-window badges
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday } from '../lib/api';
+import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
 
 export function TodayView() {
   const qc = useQueryClient();
+  // The single quest the focus timer is running against (client-side count-up).
+  const [focus, setFocus] = useState<{ id: string; start: number } | null>(null);
+  const [, force] = useState(0); // ticks the elapsed display while focusing
 
   const playerQ = useQuery({
     queryKey: ['player'],
     queryFn: () => api.get<{ player: PlayerSnapshot }>('/api/player').then(r => r.player),
   });
-
   const todayQ = useQuery({
     queryKey: ['quests', 'today'],
     queryFn: () => api.get<TodayResponse>('/api/quests/today'),
   });
-
+  const planQ = useQuery({
+    queryKey: ['quests', 'plan'],
+    queryFn: () => api.get<DayPlan>('/api/quests/plan'),
+  });
   const weatherQ = useQuery({
     queryKey: ['weather', 'today'],
     queryFn: () => api.get<WeatherToday>('/api/weather/today'),
-    staleTime: 30 * 60 * 1000, // forecast is per-day; don't refetch often
+    staleTime: 30 * 60 * 1000,
   });
 
-  // Socket-driven invalidation: when another tab/device completes a
-  // quest, refresh ours. The HTTP response is the source of truth for
-  // OUR action; this is only for cross-client sync.
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['player'] });
+    qc.invalidateQueries({ queryKey: ['quests', 'today'] });
+    qc.invalidateQueries({ queryKey: ['quests', 'plan'] });
+    qc.invalidateQueries({ queryKey: ['player', 'stats'] });
+  };
+
+  // Cross-client sync.
   useEffect(() => {
     const s = getSocket();
     if (!s) return;
-    const refresh = () => {
-      qc.invalidateQueries({ queryKey: ['player'] });
-      qc.invalidateQueries({ queryKey: ['quests', 'today'] });
-    };
-    s.on('player-updated', refresh);
-    s.on('quest-completed', refresh);
-    s.on('habit-checked', refresh);
-    s.on('workout-logged', refresh);
-    return () => {
-      s.off('player-updated', refresh);
-      s.off('quest-completed', refresh);
-      s.off('habit-checked', refresh);
-      s.off('workout-logged', refresh);
-    };
+    const refresh = () => invalidateAll();
+    const evts = ['player-updated', 'quest-completed', 'quest-progress', 'habit-checked', 'workout-logged'];
+    evts.forEach(e => s.on(e, refresh));
+    return () => evts.forEach(e => s.off(e, refresh));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qc]);
 
+  // Re-render the focus elapsed clock every second while a timer runs.
+  useEffect(() => {
+    if (!focus) return;
+    const t = setInterval(() => force(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [focus]);
+
   const completeQuest = useMutation({
-    mutationFn: (questId: string) =>
-      api.post(`/api/quests/${questId}/complete`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['player'] });
-      qc.invalidateQueries({ queryKey: ['quests', 'today'] });
-    },
+    mutationFn: (id: string) => api.post(`/api/quests/${id}/complete`),
+    onSuccess: invalidateAll,
+  });
+  const progressQuest = useMutation({
+    mutationFn: (id: string) => api.post(`/api/quests/${id}/progress`, { delta: 1 }),
+    onSuccess: invalidateAll,
+  });
+  const skipQuest = useMutation({
+    mutationFn: (id: string) => api.post(`/api/quests/${id}/skip`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['quests'] }),
+  });
+  const focusLog = useMutation({
+    mutationFn: ({ id, minutes }: { id: string; minutes: number }) =>
+      api.post(`/api/quests/${id}/focus`, { actualMinutes: minutes }),
+    onSuccess: invalidateAll,
   });
 
-  const skipQuest = useMutation({
-    mutationFn: (questId: string) =>
-      api.post(`/api/quests/${questId}/skip`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['quests', 'today'] });
-    },
-  });
+  const jackOut = () => {
+    if (!focus) return;
+    const minutes = Math.max(1, Math.round((Date.now() - focus.start) / 60000));
+    focusLog.mutate({ id: focus.id, minutes });
+    setFocus(null);
+  };
+  const jackIn = (id: string) => {
+    // Switching timers: flush the running session's minutes before starting
+    // a new one, so they aren't silently discarded.
+    if (focus && focus.id !== id) jackOut();
+    setFocus({ id, start: Date.now() });
+  };
 
   if (playerQ.isLoading || todayQ.isLoading) {
-    return (
-      <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: 'var(--text-faint)' }}>
-        <div className="mono" style={{ fontSize: 13 }}>LOADING…</div>
-      </div>
-    );
+    return <Splash>LOADING…</Splash>;
   }
   if (playerQ.isError || todayQ.isError) {
-    return (
-      <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: 'var(--red)' }}>
-        <div className="mono" style={{ fontSize: 13 }}>FAILED TO LOAD</div>
-      </div>
-    );
+    return <Splash color="var(--red)">FAILED TO LOAD</Splash>;
   }
 
   const player = playerQ.data!;
   const today = todayQ.data!;
+  const plan = planQ.data;
 
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {weatherQ.data?.weather && <WeatherCard weather={weatherQ.data.weather} />}
       <PlayerHud player={player} todayXpAvailable={today.xpAvailable} todayXpEarned={today.xpEarned} />
-      <QuestList
+      <QuestPlanner
         today={today}
+        plan={plan}
+        focus={focus}
         onComplete={id => completeQuest.mutate(id)}
+        onProgress={id => progressQuest.mutate(id)}
         onSkip={id => skipQuest.mutate(id)}
+        onJackIn={jackIn}
+        onJackOut={jackOut}
       />
+    </div>
+  );
+}
+
+function Splash({ children, color }: { children: React.ReactNode; color?: string }) {
+  return (
+    <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
+      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
     </div>
   );
 }
@@ -138,7 +166,6 @@ function PlayerHud({
   return (
     <div className="panel hud" style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-        {/* Level badge */}
         <div style={{
           width: 64, height: 64, borderRadius: 16,
           background: 'linear-gradient(135deg, var(--cyan), var(--violet))',
@@ -151,7 +178,6 @@ function PlayerHud({
           </div>
         </div>
 
-        {/* XP bar */}
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span className="kicker">XP</span>
@@ -176,7 +202,14 @@ function PlayerHud({
           </div>
         </div>
 
-        {/* Streak */}
+        <div className="panel-inset" style={{ padding: 12, minWidth: 110, textAlign: 'center' }}>
+          <div className="kicker" style={{ marginBottom: 6 }}>EDDIES</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--amber)', fontFamily: 'var(--font-display)' }}>
+            €$ {player.eddies.toLocaleString()}
+          </div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>SPENDABLE</div>
+        </div>
+
         <div className="panel-inset" style={{ padding: 12, minWidth: 100, textAlign: 'center' }}>
           <div className="kicker" style={{ marginBottom: 6 }}>STREAK</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--lime)', fontFamily: 'var(--font-display)' }}>
@@ -187,168 +220,212 @@ function PlayerHud({
           </div>
         </div>
 
-        {/* Today XP earned/available */}
         <div className="panel-inset" style={{ padding: 12, minWidth: 120, textAlign: 'center' }}>
           <div className="kicker" style={{ marginBottom: 6 }}>TODAY</div>
           <div className="mono" style={{ fontSize: 18, color: 'var(--cyan)', fontWeight: 700 }}>
             +{todayXpEarned} <span style={{ color: 'var(--text-faint)', fontSize: 13 }}>/ +{todayXpAvailable}</span>
           </div>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-            EARNED / AVAILABLE
-          </div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>EARNED / AVAILABLE</div>
         </div>
       </div>
     </div>
   );
 }
 
-function QuestList({
-  today, onComplete, onSkip,
-}: { today: TodayResponse; onComplete: (id: string) => void; onSkip: (id: string) => void }) {
-  const modules = Object.keys(today.byModule);
+function fmtMin(n: number): string {
+  if (n < 60) return `${n}m`;
+  const h = Math.floor(n / 60), m = n % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** The day planner: budget bar + quests split into "in plan" / "later". */
+function QuestPlanner({
+  today, plan, focus, onComplete, onProgress, onSkip, onJackIn, onJackOut,
+}: {
+  today: TodayResponse;
+  plan: DayPlan | undefined;
+  focus: { id: string; start: number } | null;
+  onComplete: (id: string) => void;
+  onProgress: (id: string) => void;
+  onSkip: (id: string) => void;
+  onJackIn: (id: string) => void;
+  onJackOut: () => void;
+}) {
+  const all = Object.values(today.byModule).flat();
+  const flavor = all.find(q => q.meta?.flavor)?.meta?.flavor ?? null;
+  const completed = all.filter(q => q.status === 'completed');
+  const skipped = all.filter(q => q.status === 'skipped');
+
   if (today.totalCount === 0) {
     return (
       <div className="panel hud" style={{ padding: 60, textAlign: 'center', color: 'var(--text-faint)' }}>
         <Icon name="check" size={32} style={{ color: 'var(--lime)', marginBottom: 16 }} />
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-          No quests today
-        </div>
+        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No quests today</div>
         <div className="mono" style={{ fontSize: 13 }}>
-          Add habits or workouts to start generating daily missions.
+          Add habits, projects, media, or vitals to start generating daily missions.
         </div>
       </div>
     );
   }
 
-  // Flatten across modules for a single ordered list.
-  const all = modules.flatMap(k => today.byModule[k]);
-  const pending = all.filter(q => q.status === 'pending');
-  const done = all.filter(q => q.status === 'completed');
-  const flavor = (all.find(q => q.meta?.flavor)?.meta?.flavor) ?? null;
+  // Order pending quests by the planner's ranking; tag inPlan from /plan.
+  const planOrder = new Map((plan?.quests ?? []).map((q, i) => [q.id, i]));
+  const planFlags = new Map((plan?.quests ?? []).map(q => [q.id, q.inPlan]));
+  const pending = all
+    .filter(q => q.status === 'pending')
+    .sort((a, b) => (planOrder.get(a.id) ?? 999) - (planOrder.get(b.id) ?? 999));
+  const inPlan = pending.filter(q => planFlags.get(q.id) !== false);
+  const later = pending.filter(q => planFlags.get(q.id) === false);
+
+  const renderCard = (q: Quest) => (
+    <QuestCard
+      key={q.id} quest={q} focus={focus}
+      onComplete={onComplete} onProgress={onProgress} onSkip={onSkip}
+      onJackIn={onJackIn} onJackOut={onJackOut}
+    />
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header + budget bar */}
       <div className="panel hud" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: flavor ? 8 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: flavor ? 8 : 0, flexWrap: 'wrap' }}>
           <Icon name="target" size={20} style={{ color: 'var(--cyan)' }} />
-          <h2 style={{
-            fontSize: 18, fontWeight: 600, margin: 0,
-            fontFamily: 'var(--font-display)',
-          }}>
-            Today&rsquo;s Missions
+          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
+            Today&rsquo;s Plan
           </h2>
-          <div
-            className="mono"
-            style={{
-              marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-              padding: '4px 8px', background: 'var(--panel-2)',
-              borderRadius: 6, border: '1px solid var(--line)',
-            }}
-          >
-            {done.length} / {all.length} COMPLETE · {today.generator.toUpperCase()}
+          <div className="mono" style={{
+            marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
+            padding: '4px 8px', background: 'var(--panel-2)', borderRadius: 6, border: '1px solid var(--line)',
+          }}>
+            {completed.length} / {all.length} CLEARED · {today.generator.toUpperCase()}
           </div>
         </div>
         {flavor && (
-          <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+          <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: plan ? 12 : 0 }}>
             {flavor}
           </div>
         )}
+        {plan && <BudgetBar plan={plan} />}
       </div>
 
-      {[...pending, ...done].map(q => (
-        <QuestCard key={q.id} quest={q} onComplete={onComplete} onSkip={onSkip} />
-      ))}
+      {inPlan.length > 0 && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="kicker" style={{ paddingLeft: 4 }}>IN THE PLAN · {fmtMin(plan?.plannedMin ?? 0)}</div>
+          {inPlan.map(renderCard)}
+        </section>
+      )}
+
+      {later.length > 0 && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="kicker" style={{ paddingLeft: 4 }}>LATER · OVER BUDGET (OPTIONAL)</div>
+          {later.map(renderCard)}
+        </section>
+      )}
+
+      {(completed.length > 0 || skipped.length > 0) && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="kicker" style={{ paddingLeft: 4 }}>DONE</div>
+          {[...completed, ...skipped].map(renderCard)}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function BudgetBar({ plan }: { plan: DayPlan }) {
+  const pct = plan.budgetMin > 0 ? Math.min(100, Math.round((plan.plannedMin / plan.budgetMin) * 100)) : 0;
+  const over = plan.plannedMin > plan.budgetMin;
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span className="kicker">TIME BUDGET · {plan.isWeekend ? 'WEEKEND' : 'WEEKDAY'}</span>
+        <span className="mono" style={{ fontSize: 12, color: over ? 'var(--amber)' : 'var(--text-dim)' }}>
+          {fmtMin(plan.plannedMin)} / {fmtMin(plan.budgetMin)}
+        </span>
+      </div>
+      <div style={{ height: 8, borderRadius: 4, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden' }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          background: over ? 'var(--amber)' : 'linear-gradient(90deg, var(--lime), var(--teal))',
+          transition: 'width 0.4s ease',
+        }} />
+      </div>
+      {plan.estimatedMissing > 0 && (
+        <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', marginTop: 5 }}>
+          {plan.estimatedMissing} quest{plan.estimatedMissing > 1 ? 's' : ''} missing a time estimate (assumed ~20m each)
+        </div>
+      )}
     </div>
   );
 }
 
 function QuestCard({
-  quest, onComplete, onSkip,
-}: { quest: Quest; onComplete: (id: string) => void; onSkip: (id: string) => void }) {
+  quest, focus, onComplete, onProgress, onSkip, onJackIn, onJackOut,
+}: {
+  quest: Quest;
+  focus: { id: string; start: number } | null;
+  onComplete: (id: string) => void;
+  onProgress: (id: string) => void;
+  onSkip: (id: string) => void;
+  onJackIn: (id: string) => void;
+  onJackOut: () => void;
+}) {
   const isCompleted = quest.status === 'completed';
   const isSkipped = quest.status === 'skipped';
+  const isCounter = quest.targetCount > 1;
   const emoji = quest.meta?.emoji;
+  const focusing = focus?.id === quest.id;
+  const elapsedMin = focusing ? Math.max(0, Math.round((Date.now() - focus!.start) / 60000)) : 0;
 
   const diffColor = quest.difficulty === 'hard' ? 'var(--red)'
-    : quest.difficulty === 'medium' ? 'var(--amber)'
-    : 'var(--lime)';
+    : quest.difficulty === 'medium' ? 'var(--amber)' : 'var(--lime)';
 
   return (
-    <div
-      className="panel"
-      style={{
-        padding: 18,
-        border: isCompleted
-          ? '1px solid var(--lime)'
-          : isSkipped
-          ? '1px solid var(--line)'
-          : '1px solid var(--line)',
-        background: isCompleted
-          ? 'linear-gradient(180deg, rgba(67,255,166,0.06), rgba(67,255,166,0.02))'
-          : undefined,
-        opacity: isSkipped ? 0.5 : 1,
-        position: 'relative',
-      }}
-    >
+    <div className="panel" style={{
+      padding: 18,
+      border: isCompleted ? '1px solid var(--lime)'
+        : quest.mustDo ? '1px solid var(--magenta)' : '1px solid var(--line)',
+      background: isCompleted ? 'linear-gradient(180deg, rgba(67,255,166,0.06), rgba(67,255,166,0.02))' : undefined,
+      opacity: isSkipped ? 0.5 : 1,
+    }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        {/* Emoji / icon */}
-        <div
-          style={{
-            width: 42, height: 42, borderRadius: 10,
-            background: isCompleted
-              ? 'linear-gradient(135deg, var(--lime), var(--teal))'
-              : 'linear-gradient(135deg, var(--cyan), var(--violet))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: isCompleted ? 'var(--glow-lime)' : 'var(--glow-cyan)',
-            fontSize: 20,
-          }}
-        >
+        <div style={{
+          width: 42, height: 42, borderRadius: 10,
+          background: isCompleted ? 'linear-gradient(135deg, var(--lime), var(--teal))'
+            : 'linear-gradient(135deg, var(--cyan), var(--violet))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, boxShadow: isCompleted ? 'var(--glow-lime)' : 'var(--glow-cyan)', fontSize: 20,
+        }}>
           {isCompleted ? <Icon name="check" size={18} style={{ color: 'white' }} /> : (emoji || '•')}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-            <h3 style={{
-              fontSize: 15, fontWeight: 600, margin: 0,
-              color: isCompleted ? 'var(--lime)' : 'var(--text)',
-            }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, color: isCompleted ? 'var(--lime)' : 'var(--text)' }}>
               {quest.title}
             </h3>
-            <span
-              className="mono"
-              style={{
-                fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                color: diffColor,
-                background: `color-mix(in srgb, ${diffColor} 12%, transparent)`,
-                border: `1px solid color-mix(in srgb, ${diffColor} 30%, transparent)`,
-                letterSpacing: '0.08em',
-              }}
-            >
-              {quest.difficulty.toUpperCase()}
-            </span>
+            {quest.mustDo && <Badge color="var(--magenta)">MUST-DO</Badge>}
+            <Badge color={diffColor}>{quest.difficulty.toUpperCase()}</Badge>
             <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
               {quest.module.name.toUpperCase()}
             </span>
-            {quest.meta?.bestWindow && (
-              <span
-                className="mono"
-                title="Best weather window today"
-                style={{
-                  fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                  color: 'var(--cyan)',
-                  background: 'color-mix(in srgb, var(--cyan) 12%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--cyan) 30%, transparent)',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                🌤 {quest.meta.bestWindow}
-              </span>
+            {quest.estMinutes != null && <Badge color="var(--violet)">⏱ {fmtMin(quest.estMinutes)}</Badge>}
+            {quest.carryOver && <Badge color="var(--cyan)">↻ CARRIES</Badge>}
+            {quest.meta?.bestWindow && <Badge color="var(--cyan)">🌤 {quest.meta.bestWindow}</Badge>}
+            {quest.originDate && quest.originDate.slice(0, 10) !== quest.questDate.slice(0, 10) && (
+              <Badge color="var(--amber)">CARRIED</Badge>
             )}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-            {quest.description}
-          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4 }}>{quest.description}</div>
+          {quest.actualMinutes != null && (
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
+              logged {fmtMin(quest.actualMinutes)}{quest.estMinutes != null ? ` of ~${fmtMin(quest.estMinutes)}` : ''}
+            </div>
+          )}
+          {isCounter && (
+            <CounterRing current={quest.currentCount} target={quest.targetCount} />
+          )}
         </div>
 
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -356,24 +433,62 @@ function QuestCard({
             +{quest.xpReward} XP
           </div>
           {!isCompleted && !isSkipped && (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                className="btn btn-ghost"
-                style={{ padding: '6px 10px', fontSize: 11 }}
-                onClick={() => onSkip(quest.id)}
-              >
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {/* Focus timer */}
+              {focusing ? (
+                <button className="btn" style={{ padding: '6px 10px', fontSize: 11, borderColor: 'var(--magenta)', color: 'var(--magenta)' }}
+                  onClick={onJackOut}>
+                  ◼ JACK OUT · {elapsedMin}m
+                </button>
+              ) : (
+                <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => onJackIn(quest.id)} title="Start focus timer">
+                  ▸ JACK IN
+                </button>
+              )}
+              <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => onSkip(quest.id)}>
                 SKIP
               </button>
-              <button
-                className="btn btn-primary"
-                style={{ padding: '6px 12px', fontSize: 11 }}
-                onClick={() => onComplete(quest.id)}
-              >
-                COMPLETE
-              </button>
+              {isCounter ? (
+                <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} onClick={() => onProgress(quest.id)}>
+                  +1
+                </button>
+              ) : (
+                <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} onClick={() => onComplete(quest.id)}>
+                  COMPLETE
+                </button>
+              )}
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function Badge({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <span className="mono" style={{
+      fontSize: 10, padding: '2px 6px', borderRadius: 4, color,
+      background: `color-mix(in srgb, ${color} 12%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+      letterSpacing: '0.06em',
+    }}>
+      {children}
+    </span>
+  );
+}
+
+/** A compact progress meter for check-in counter quests (e.g. 5/8). */
+function CounterRing({ current, target }: { current: number; target: number }) {
+  const pct = Math.min(100, Math.round((current / Math.max(1, target)) * 100));
+  return (
+    <div style={{ marginTop: 8, maxWidth: 240 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span className="kicker">PROGRESS</span>
+        <span className="mono" style={{ fontSize: 11, color: 'var(--cyan)' }}>{current} / {target}</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 3, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, var(--cyan), var(--violet))', transition: 'width 0.3s ease' }} />
       </div>
     </div>
   );

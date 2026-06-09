@@ -1,15 +1,22 @@
 /**
- * GamificationService — the single point of truth for XP, streaks, and
- * level changes. Routes call into this; they never write XP themselves.
+ * GamificationService — the single point of truth for XP, eddies,
+ * streaks, and level changes. Routes call into this; they never write
+ * the economy themselves.
  *
  * Why centralized:
- *   - One place where the XP economy is enforced (the AI quest engine
- *     proposes quests but the server assigns rewards, see QuestEngine).
- *   - Idempotency: completing the same quest twice awards XP once.
- *   - Atomicity: XP + streak + level transitions happen inside a
- *     single $transaction so a crash can't desync them.
- *   - One place to fire socket broadcasts (player-updated,
- *     quest-completed) so the frontend HUD animates without a refetch.
+ *   - One place where the XP/eddie economy is enforced (the AI quest
+ *     engine proposes quests but the server assigns rewards).
+ *   - Idempotency: completing the same quest twice awards once.
+ *   - Atomicity: ledger + cache + streak + level transitions happen
+ *     inside a single $transaction so a crash can't desync them.
+ *   - One place to fire socket broadcasts so the HUD animates.
+ *
+ * Source of truth: the **ledgers are authoritative**. A player's XP/level
+ * and eddie balance are derived from SUM(XpLedger) / SUM(WalletLedger),
+ * not from the cached counters on PlayerProfile. The cached counters are
+ * a denormalization kept in lockstep for convenience, but every read
+ * goes back to the ledger — so an earned grant survives the deletion of
+ * whatever task produced it (roadmap: "level comes from XpLedger always").
  */
 
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -19,8 +26,9 @@ import { isSameLocalDay, isYesterdayLocal, startOfLocalDay } from '../utils/date
 type Tx = Prisma.TransactionClient;
 
 export interface AwardOptions {
-  amount: number;
-  reason: string;     // "quest_complete" | "habit_log" | "workout_log" | "streak_bonus" | "level_up"
+  amount: number;     // XP delta (+ve earn, -ve correction)
+  eddies?: number;    // eddie delta (+ve earn, -ve spend/correction). 0/undefined = none.
+  reason: string;     // "quest_complete" | "habit_log" | "workout_log" | "streak_bonus" | ...
   module?: string;    // e.g. "fitness" for domainXp rollups
   refType?: string;   // "quest" | "habit" | "workout"
   refId?: string;
@@ -33,6 +41,7 @@ export interface PlayerSnapshot {
   xpIntoLevel: number;
   xpForNextLevel: number;
   progress: number;
+  eddies: number;
   currentStreak: number;
   longestStreak: number;
   lastActiveOn: Date | null;
@@ -40,17 +49,6 @@ export interface PlayerSnapshot {
   title: string | null;
   leveledUp?: boolean;
   previousLevel?: number;
-}
-
-/** Parse the JSON-as-String domain rollup safely. */
-function parseDomainXp(raw: string | null | undefined): Record<string, number> {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
-  } catch {
-    return {};
-  }
 }
 
 export class GamificationService {
@@ -73,41 +71,81 @@ export class GamificationService {
     });
   }
 
+  /** SUM(XpLedger.amount) — the authoritative total XP. */
+  private async sumXp(userId: string, db: Tx | PrismaClient): Promise<number> {
+    const agg = await db.xpLedger.aggregate({
+      where: { userId },
+      _sum: { amount: true },
+    });
+    return agg._sum.amount ?? 0;
+  }
+
+  /** SUM(WalletLedger.amount) — the authoritative eddie balance. */
+  private async sumEddies(userId: string, db: Tx | PrismaClient): Promise<number> {
+    const agg = await db.walletLedger.aggregate({
+      where: { userId },
+      _sum: { amount: true },
+    });
+    return agg._sum.amount ?? 0;
+  }
+
+  /** Per-domain XP rollup, derived from the ledger's `module` column. */
+  private async domainXpFromLedger(
+    userId: string,
+    db: Tx | PrismaClient,
+  ): Promise<Record<string, number>> {
+    const rows = await db.xpLedger.groupBy({
+      by: ['module'],
+      where: { userId, module: { not: null } },
+      _sum: { amount: true },
+    });
+    const out: Record<string, number> = {};
+    for (const r of rows) {
+      if (r.module) out[r.module] = r._sum.amount ?? 0;
+    }
+    return out;
+  }
+
   /**
-   * Project the player profile into the shape the API and the
-   * frontend HUD consume. Pure read; safe outside a transaction.
+   * Project the player profile into the shape the API and the frontend
+   * HUD consume. XP/level/eddies/domainXp are derived from the ledgers;
+   * streak/title come from the profile. Pure read; safe outside a tx.
    */
   async getSnapshot(userId: string): Promise<PlayerSnapshot> {
     await this.ensurePlayer(userId);
-    const p = await this.prisma.playerProfile.findUniqueOrThrow({
-      where: { userId },
-    });
-    const info = levelInfo(p.totalXp);
+    const [p, totalXp, eddies, domainXp] = await Promise.all([
+      this.prisma.playerProfile.findUniqueOrThrow({ where: { userId } }),
+      this.sumXp(userId, this.prisma),
+      this.sumEddies(userId, this.prisma),
+      this.domainXpFromLedger(userId, this.prisma),
+    ]);
+    const info = levelInfo(totalXp);
     return {
       level: info.level,
       totalXp: info.totalXp,
       xpIntoLevel: info.xpIntoLevel,
       xpForNextLevel: info.xpForNextLevel,
       progress: info.progress,
+      eddies,
       currentStreak: p.currentStreak,
       longestStreak: p.longestStreak,
       lastActiveOn: p.lastActiveOn,
-      domainXp: parseDomainXp(p.domainXp),
+      domainXp,
       title: p.title,
     };
   }
 
   /**
-   * Award XP, update streak, recompute level. Use this from any
-   * "user did something XP-worthy" path (quest complete, habit check,
-   * workout log). Append-only XpLedger entry for audit.
+   * Award XP (and optionally eddies), update streak, recompute level.
+   * Use from any "user did something rewardable" path. Writes append-only
+   * ledger entries for audit; the ledgers are the source of truth.
    *
    * Streak rule: the global daily-activity streak ticks once per local
    * day. Activity yesterday → +1. Activity today (already counted) →
    * unchanged. Older / never → reset to 1.
    *
-   * Returns a snapshot of the player after the change, with
-   * `leveledUp`/`previousLevel` set when crossing a level boundary.
+   * Returns a snapshot after the change, with `leveledUp`/`previousLevel`
+   * set when crossing a level boundary.
    */
   async awardXp(
     userId: string,
@@ -120,9 +158,16 @@ export class GamificationService {
         where: { userId },
       });
 
-      const previousLevel = levelFromXp(before.totalXp);
-      const nextTotal = before.totalXp + opts.amount;
-      const nextLevel = levelFromXp(nextTotal);
+      // Derive prior totals from the ledgers (authoritative), then apply
+      // this award's deltas.
+      const prevTotalXp = await this.sumXp(userId, t);
+      const prevEddies = await this.sumEddies(userId, t);
+      const eddiesDelta = opts.eddies ?? 0;
+
+      const previousLevel = levelFromXp(prevTotalXp);
+      const nextTotalXp = prevTotalXp + opts.amount;
+      const nextEddies = prevEddies + eddiesDelta;
+      const nextLevel = levelFromXp(nextTotalXp);
 
       // Streak math (against local day, server tz).
       const today = startOfLocalDay();
@@ -140,13 +185,7 @@ export class GamificationService {
       }
       if (currentStreak > longestStreak) longestStreak = currentStreak;
 
-      // Domain rollup.
-      const domainXp = parseDomainXp(before.domainXp);
-      if (opts.module) {
-        domainXp[opts.module] = (domainXp[opts.module] ?? 0) + opts.amount;
-      }
-
-      // Append the ledger entry FIRST so a partial write at least
+      // Append the XP ledger entry FIRST so a partial write at least
       // leaves an audit trail that can be replayed.
       await t.xpLedger.create({
         data: {
@@ -160,12 +199,30 @@ export class GamificationService {
         },
       });
 
-      const updated = await t.playerProfile.update({
+      // Parallel eddie ledger entry, when this award moves the wallet.
+      if (eddiesDelta !== 0) {
+        await t.walletLedger.create({
+          data: {
+            userId,
+            amount: eddiesDelta,
+            reason: opts.reason,
+            module: opts.module ?? null,
+            refType: opts.refType ?? null,
+            refId: opts.refId ?? null,
+            meta: opts.meta ? JSON.stringify(opts.meta) : null,
+          },
+        });
+      }
+
+      // Keep the cached counters in lockstep with the ledgers.
+      const domainXp = await this.domainXpFromLedger(userId, t);
+      await t.playerProfile.update({
         where: { userId },
         data: {
-          totalXp: nextTotal,
+          totalXp: nextTotalXp,
           level: nextLevel,
-          xpIntoLevel: levelInfo(nextTotal).xpIntoLevel,
+          xpIntoLevel: levelInfo(nextTotalXp).xpIntoLevel,
+          eddies: nextEddies,
           currentStreak,
           longestStreak,
           lastActiveOn: today,
@@ -185,18 +242,19 @@ export class GamificationService {
         });
       }
 
-      const info = levelInfo(updated.totalXp);
+      const info = levelInfo(nextTotalXp);
       return {
         level: info.level,
         totalXp: info.totalXp,
         xpIntoLevel: info.xpIntoLevel,
         xpForNextLevel: info.xpForNextLevel,
         progress: info.progress,
-        currentStreak: updated.currentStreak,
-        longestStreak: updated.longestStreak,
-        lastActiveOn: updated.lastActiveOn,
-        domainXp: parseDomainXp(updated.domainXp),
-        title: updated.title,
+        eddies: nextEddies,
+        currentStreak,
+        longestStreak,
+        lastActiveOn: today,
+        domainXp,
+        title: before.title,
         leveledUp: nextLevel > previousLevel,
         previousLevel,
       } satisfies PlayerSnapshot;

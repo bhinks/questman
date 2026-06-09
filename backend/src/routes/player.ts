@@ -1,4 +1,5 @@
 import express from 'express';
+import { z } from 'zod';
 import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -76,6 +77,57 @@ router.get('/stats', asyncHandler(async (req: AuthRequest, res) => {
       createdAt: r.createdAt,
     })),
   });
+}));
+
+/**
+ * GET /api/player/ledger?currency=xp|eddies|all&domain=&limit=
+ *
+ * Backs the Progress page (roadmap §8): the full chronological "data-shard
+ * log" of every XP grant and eddie movement. Each row is the immutable
+ * record of something earned/spent — it survives the deletion of whatever
+ * task produced it, which is the whole point of the ledger-as-source-of-
+ * truth model. Returns both ledgers tagged with a `currency` field so the
+ * UI can render one combined feed or filter to one currency.
+ */
+router.get('/ledger', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const q = z.object({
+    currency: z.enum(['xp', 'eddies', 'all']).default('all'),
+    domain:   z.string().optional(),
+    limit:    z.string().transform(Number).pipe(z.number().int().positive().max(1000)).default('200'),
+  }).parse(req.query);
+
+  const where = {
+    userId,
+    ...(q.domain ? { module: q.domain } : {}),
+  };
+
+  const [xp, wallet] = await Promise.all([
+    q.currency === 'eddies'
+      ? Promise.resolve([])
+      : prisma.xpLedger.findMany({ where, orderBy: { createdAt: 'desc' }, take: q.limit }),
+    q.currency === 'xp'
+      ? Promise.resolve([])
+      : prisma.walletLedger.findMany({ where, orderBy: { createdAt: 'desc' }, take: q.limit }),
+  ]);
+
+  const tag = (currency: 'xp' | 'eddies') => (r: any) => ({
+    id: r.id,
+    currency,
+    amount: r.amount,
+    reason: r.reason,
+    module: r.module,
+    refType: r.refType,
+    refId: r.refId,
+    createdAt: r.createdAt,
+  });
+
+  // Merge into one feed, newest first, capped at `limit`.
+  const entries = [...xp.map(tag('xp')), ...wallet.map(tag('eddies'))]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, q.limit);
+
+  res.json({ entries });
 }));
 
 export default router;

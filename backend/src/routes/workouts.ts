@@ -4,6 +4,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
+import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
@@ -159,6 +160,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
 
     player = await game().awardXp(userId, {
       amount: xp,
+      eddies: eddiesForReward(xp),
       reason: 'workout_log',
       module: 'fitness',
       refType: 'workout',
@@ -233,24 +235,24 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
   });
 }));
 
-/** DELETE /api/workouts/:id — writes a compensating XP entry. */
+/**
+ * DELETE /api/workouts/:id
+ *
+ * XP-integrity rule (roadmap §8): earned XP/eddies PERSIST when the
+ * source is deleted. Deleting a workout removes the session record only
+ * — it does NOT reverse the grant. The ledger entry stays, so the
+ * player's level and wallet are unchanged. (The only legitimate reversal
+ * is "undo completion", which workouts don't have — logging is the act.)
+ * Typical reason to delete is to re-log a corrected session.
+ */
 router.delete('/:id', asyncHandler(async (req: AuthRequest, res) => {
   const existing = await prisma.workoutSession.findFirst({
     where: { id: req.params.id, userId: req.user!.id },
+    select: { id: true },
   });
   if (!existing) throw new AppError('Workout not found', 404);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.workoutSession.delete({ where: { id: existing.id } });
-    if (existing.xpAwarded > 0) {
-      await game().awardXp(req.user!.id, {
-        amount: -existing.xpAwarded,
-        reason: 'workout_log_undo',
-        module: 'fitness',
-        refType: 'workout', refId: existing.id,
-      }, tx);
-    }
-  });
+  await prisma.workoutSession.delete({ where: { id: existing.id } });
 
   res.status(204).end();
 }));

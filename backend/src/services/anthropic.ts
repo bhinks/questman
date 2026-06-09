@@ -25,9 +25,9 @@ import { logger } from '../utils/logger';
 export interface QuestCandidate {
   /** Stable id Claude must echo back. We synthesize this per-batch. */
   candidateId: string;
-  source: 'habit' | 'goal' | 'workout' | 'finance';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals';
   sourceId: string | null;
-  moduleKey: string;        // "habits" | "fitness" | "chores" | "finance"
+  moduleKey: string;        // "habits"|"fitness"|"chores"|"finance"|"projects"|"media"|"social"|"vitals"
   baseTitle: string;
   difficulty: 'easy' | 'medium' | 'hard';
   /** Server-assigned. Surfaced to the model only as context; the model
@@ -37,6 +37,15 @@ export interface QuestCandidate {
   context?: string;
   /** Best weather window for outdoor habits, e.g. "1–3pm". Themable. */
   bestWindow?: string;
+  // --- Planner attributes (roadmap §5), persisted onto the Quest ---
+  /** Estimated minutes to complete; feeds the day-planner time budget. */
+  estMinutes?: number;
+  /** Check-in counter target (e.g. 8 glasses of water). Default 1 = one-shot. */
+  targetCount?: number;
+  /** Priority tier — must-do quests rank first and always carry over. */
+  mustDo?: boolean;
+  /** Whether an incomplete quest rolls to tomorrow instead of expiring. */
+  carryOver?: boolean;
 }
 
 /**

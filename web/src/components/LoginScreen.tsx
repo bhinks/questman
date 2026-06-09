@@ -13,6 +13,7 @@ export function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export function LoginScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, remember);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed';
       setError(msg);
@@ -86,6 +87,21 @@ export function LoginScreen() {
               style={inputStyle}
               placeholder="••••••••"
             />
+          </label>
+
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            cursor: 'pointer', marginTop: 2,
+          }}>
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              style={{ accentColor: 'var(--cyan)', width: 15, height: 15 }}
+            />
+            <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>
+              Keep me jacked in on this device
+            </span>
           </label>
 
           {error && (

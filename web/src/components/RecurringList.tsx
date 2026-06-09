@@ -17,6 +17,8 @@ interface Props {
 export function RecurringList({ kind }: Props) {
   const qc = useQueryClient();
   const [pendingDelete, setPendingDelete] = useState<Habit | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const habitsQ = useQuery({
     queryKey: ['habits', kind],
@@ -62,35 +64,41 @@ export function RecurringList({ kind }: Props) {
   const dueToday = habits.filter(h => h.isDueToday);
   const notDue = habits.filter(h => !h.isDueToday);
 
+  // A row in edit mode swaps to the inline form; otherwise the normal Row.
+  const renderRow = (h: Habit) =>
+    editingId === h.id
+      ? <HabitForm key={h.id} kind={kind} moduleId={h.moduleId} habit={h} onClose={() => setEditingId(null)} />
+      : <Row key={h.id} habit={h}
+          onCheck={() => check.mutate(h.id)}
+          onUncheck={() => uncheck.mutate(h.id)}
+          onEdit={() => setEditingId(h.id)}
+          onDelete={() => setPendingDelete(h)}
+        />;
+
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <Header kind={kind} count={habits.length} dueCount={dueToday.length} />
 
-      {moduleId && <NewHabitForm kind={kind} moduleId={moduleId} />}
+      {moduleId && (creating
+        ? <HabitForm kind={kind} moduleId={moduleId} onClose={() => setCreating(false)} />
+        : (
+          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setCreating(true)}>
+            + NEW {kind.toUpperCase()}
+          </button>
+        )
+      )}
 
       {dueToday.length > 0 && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SectionLabel>DUE TODAY</SectionLabel>
-          {dueToday.map(h => (
-            <Row key={h.id} habit={h}
-              onCheck={() => check.mutate(h.id)}
-              onUncheck={() => uncheck.mutate(h.id)}
-              onDelete={() => setPendingDelete(h)}
-            />
-          ))}
+          {dueToday.map(renderRow)}
         </section>
       )}
 
       {notDue.length > 0 && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SectionLabel>NOT DUE TODAY</SectionLabel>
-          {notDue.map(h => (
-            <Row key={h.id} habit={h}
-              onCheck={() => check.mutate(h.id)}
-              onUncheck={() => uncheck.mutate(h.id)}
-              onDelete={() => setPendingDelete(h)}
-            />
-          ))}
+          {notDue.map(renderRow)}
         </section>
       )}
 
@@ -139,8 +147,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function Row({
-  habit, onCheck, onUncheck, onDelete,
-}: { habit: Habit; onCheck: () => void; onUncheck: () => void; onDelete: () => void }) {
+  habit, onCheck, onUncheck, onEdit, onDelete,
+}: { habit: Habit; onCheck: () => void; onUncheck: () => void; onEdit: () => void; onDelete: () => void }) {
   const done = habit.isCompletedToday;
   return (
     <div
@@ -207,6 +215,23 @@ function Row({
         </div>
       )}
 
+      {habit.estMinutes != null && (
+        <div
+          className="mono"
+          title="Estimated time to complete"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: 'var(--violet)',
+            padding: '4px 8px',
+            background: 'color-mix(in srgb, var(--violet) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--violet) 30%, transparent)',
+            borderRadius: 6,
+          }}
+        >
+          ⏱ {habit.estMinutes}m
+        </div>
+      )}
+
       {habit.currentStreak > 0 && (
         <div
           className="mono"
@@ -233,6 +258,16 @@ function Row({
       >
         +{habit.baseXp}
       </div>
+
+      <button
+        onClick={onEdit}
+        className="btn btn-ghost"
+        style={{ padding: '6px 8px', fontSize: 11 }}
+        aria-label={`Edit ${habit.title}`}
+        title="Edit"
+      >
+        <Icon name="edit" size={14} />
+      </button>
 
       <button
         onClick={onDelete}
@@ -264,30 +299,43 @@ const XP_DEFAULTS: Record<'easy' | 'medium' | 'hard', number> = {
 };
 const XP_DEFAULT_VALUES = new Set(Object.values(XP_DEFAULTS));
 
-function NewHabitForm({ kind, moduleId }: { kind: 'habit' | 'chore'; moduleId: string }) {
+/**
+ * Create/edit form for a habit or chore. When `habit` is passed it runs
+ * in edit mode (prefilled, PUT, "SAVE"); otherwise create mode (POST,
+ * "CREATE"). One component so create and edit stay at exact parity —
+ * cadence + day picker, difficulty→XP auto-fill, est-minutes, interval
+ * throttle, and weather gating are all available in both.
+ */
+function HabitForm({
+  kind, moduleId, habit, onClose,
+}: { kind: 'habit' | 'chore'; moduleId: string; habit?: Habit; onClose: () => void }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [baseXp, setBaseXp] = useState<number>(XP_DEFAULTS.easy);
+  const isEdit = !!habit;
+
+  const [title, setTitle] = useState(habit?.title ?? '');
+  const [baseXp, setBaseXp] = useState<number>(habit?.baseXp ?? XP_DEFAULTS.easy);
   const [cadence, setCadence] = useState<'daily' | 'weekly' | 'custom' | 'once'>(
-    kind === 'chore' ? 'weekly' : 'daily',
+    habit?.cadence ?? (kind === 'chore' ? 'weekly' : 'daily'),
   );
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>(habit?.difficulty ?? 'easy');
   // daysOfWeek: 0=Sun .. 6=Sat (matches JS Date.getDay()). Used when
   // cadence is "weekly" or "custom". The backend stores schedule as
   // {daysOfWeek: number[]}.
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1]); // default Mon
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(
+    (habit?.schedule as { daysOfWeek?: number[] } | null)?.daysOfWeek ?? [1],
+  );
+  // Estimated time-to-complete (blank = unknown). Feeds the day planner.
+  const [estMinutes, setEstMinutes] = useState<number | ''>(habit?.estMinutes ?? '');
   // Min days between completions (blank = no throttle).
-  const [minIntervalDays, setMinIntervalDays] = useState<number | ''>('');
-  // Outdoor (weather-aware) gating. Defaults are sensible for a typical
-  // outdoor chore like mowing/washing the car.
-  const [outdoor, setOutdoor] = useState(false);
+  const [minIntervalDays, setMinIntervalDays] = useState<number | ''>(habit?.minIntervalDays ?? '');
+  // Outdoor (weather-aware) gating.
+  const [outdoor, setOutdoor] = useState(!!habit?.weatherRule?.outdoor);
   const [weather, setWeather] = useState({
-    dryDaysRequired: 1,
-    maxRainTodayIn: 0.1,
-    minTempF: 40,
-    maxTempF: 90,
-    maxWindMph: 20,
+    dryDaysRequired: habit?.weatherRule?.dryDaysRequired ?? 1,
+    maxRainTodayIn: habit?.weatherRule?.maxRainTodayIn ?? 0.1,
+    minTempF: habit?.weatherRule?.minTempF ?? 40,
+    maxTempF: habit?.weatherRule?.maxTempF ?? 90,
+    maxWindMph: habit?.weatherRule?.maxWindMph ?? 20,
   });
 
   const handleDifficulty = (next: 'easy' | 'medium' | 'hard') => {
@@ -298,49 +346,30 @@ function NewHabitForm({ kind, moduleId }: { kind: 'habit' | 'chore'; moduleId: s
     }
   };
 
-  const reset = () => {
-    setTitle('');
-    setBaseXp(XP_DEFAULTS.easy);
-    setCadence(kind === 'chore' ? 'weekly' : 'daily');
-    setDifficulty('easy');
-    setDaysOfWeek([1]);
-    setMinIntervalDays('');
-    setOutdoor(false);
-    setWeather({ dryDaysRequired: 1, maxRainTodayIn: 0.1, minTempF: 40, maxTempF: 90, maxWindMph: 20 });
-  };
-
   const needsDayPicker = cadence === 'weekly' || cadence === 'custom';
 
-  const create = useMutation({
-    mutationFn: () => api.post('/api/habits', {
-      moduleId, kind, title: title.trim(),
-      baseXp, cadence, difficulty,
-      // Schedule is only meaningful for weekly/custom. Send null
-      // otherwise so the backend doesn't store stale day data.
-      schedule: needsDayPicker
-        ? { daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : [1] }
-        : null,
-      minIntervalDays: minIntervalDays === '' ? null : minIntervalDays,
-      weatherRule: outdoor ? { outdoor: true, ...weather } : null,
-    }),
-    onSuccess: () => {
-      reset();
-      setOpen(false);
-      qc.invalidateQueries({ queryKey: ['habits', kind] });
-    },
+  const buildPayload = () => ({
+    moduleId, kind, title: title.trim(),
+    baseXp, cadence, difficulty,
+    estMinutes: estMinutes === '' ? null : estMinutes,
+    // Schedule is only meaningful for weekly/custom. Send null otherwise
+    // so the backend doesn't store stale day data.
+    schedule: needsDayPicker
+      ? { daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : [1] }
+      : null,
+    minIntervalDays: minIntervalDays === '' ? null : minIntervalDays,
+    weatherRule: outdoor ? { outdoor: true, ...weather } : null,
   });
 
-  if (!open) {
-    return (
-      <button
-        className="btn"
-        style={{ alignSelf: 'flex-start' }}
-        onClick={() => setOpen(true)}
-      >
-        + NEW {kind.toUpperCase()}
-      </button>
-    );
-  }
+  const save = useMutation({
+    mutationFn: () => isEdit
+      ? api.put(`/api/habits/${habit!.id}`, buildPayload())
+      : api.post('/api/habits', buildPayload()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['habits', kind] });
+      onClose();
+    },
+  });
 
   return (
     <div className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -376,6 +405,18 @@ function NewHabitForm({ kind, moduleId }: { kind: 'habit' | 'chore'; moduleId: s
             value={baseXp}
             onChange={e => setBaseXp(Math.max(1, Math.min(500, Number(e.target.value))))}
             style={{ ...inputStyle, width: 80 }}
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className="kicker">EST. MINUTES</span>
+          <input
+            type="number"
+            min={1}
+            max={1440}
+            placeholder="—"
+            value={estMinutes}
+            onChange={e => setEstMinutes(e.target.value === '' ? '' : Math.max(1, Math.min(1440, Number(e.target.value))))}
+            style={{ ...inputStyle, width: 100 }}
           />
         </label>
       </div>
@@ -417,13 +458,13 @@ function NewHabitForm({ kind, moduleId }: { kind: 'habit' | 'chore'; moduleId: s
       )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button className="btn btn-ghost" onClick={() => { setOpen(false); reset(); }}>CANCEL</button>
+        <button className="btn btn-ghost" onClick={onClose}>CANCEL</button>
         <button
           className="btn btn-primary"
-          disabled={!title.trim() || create.isPending}
-          onClick={() => create.mutate()}
+          disabled={!title.trim() || save.isPending}
+          onClick={() => save.mutate()}
         >
-          {create.isPending ? 'CREATING…' : 'CREATE'}
+          {save.isPending ? (isEdit ? 'SAVING…' : 'CREATING…') : (isEdit ? 'SAVE' : 'CREATE')}
         </button>
       </div>
     </div>

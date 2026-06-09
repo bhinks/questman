@@ -22,6 +22,11 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'habits', label: 'Habits', icon: 'check' },
   { id: 'chores', label: 'Chores', icon: 'list' },
   { id: 'workouts', label: 'Workouts', icon: 'spark' },
+  { id: 'projects', label: 'Projects', icon: 'grid' },
+  { id: 'media', label: 'Media', icon: 'play' },
+  { id: 'vitals', label: 'Vitals', icon: 'heart' },
+  { id: 'social', label: 'Social', icon: 'flag' },
+  { id: 'progress', label: 'Progress', icon: 'layers' },
   // Finance group (existing dashboard)
   { id: 'overview', label: 'Finance', icon: 'grid' },
   { id: 'categories', label: 'Categories', icon: 'layers' },

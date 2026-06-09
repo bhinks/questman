@@ -40,11 +40,9 @@ export function WorkoutLogger() {
     mutationFn: (id: string) => api.del(`/api/workouts/${id}`),
     onSuccess: () => {
       setPendingDelete(null);
-      // Deleting reverses the workout's XP server-side, so refresh the
-      // HUD and today's quests too.
+      // Earned XP/eddies persist on delete (the ledger keeps the grant),
+      // so the HUD is unaffected — only the workout list needs a refresh.
       qc.invalidateQueries({ queryKey: ['workouts', 'recent'] });
-      qc.invalidateQueries({ queryKey: ['player'] });
-      qc.invalidateQueries({ queryKey: ['quests', 'today'] });
     },
   });
 
@@ -142,7 +140,7 @@ export function WorkoutLogger() {
         message={pendingDelete && (
           <>This removes <strong style={{ color: 'var(--text)' }}>
             {pendingDelete.title ?? `${pendingDelete.type} session`}
-          </strong>{pendingDelete.xpAwarded ? <> and refunds its <strong style={{ color: 'var(--text)' }}>+{pendingDelete.xpAwarded} XP</strong></> : null}. This can&rsquo;t be undone.</>
+          </strong> from your log. The <strong style={{ color: 'var(--text)' }}>+{pendingDelete.xpAwarded} XP</strong> you earned stays banked. This can&rsquo;t be undone.</>
         )}
         confirmLabel="DELETE"
         busy={del.isPending}
@@ -245,6 +243,8 @@ function SetsEditor({ ex, onChange }: { ex: ExerciseRow; onChange: (x: ExerciseR
 }
 
 function RecentList({ workouts, loading, onDelete }: { workouts: Workout[]; loading: boolean; onDelete: (w: Workout) => void }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (loading) {
     return <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: 'var(--text-faint)' }}><div className="mono" style={{ fontSize: 13 }}>LOADING…</div></div>;
   }
@@ -255,47 +255,144 @@ function RecentList({ workouts, loading, onDelete }: { workouts: Workout[]; load
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="kicker" style={{ paddingLeft: 4 }}>RECENT</div>
-      {workouts.map(w => {
-        const when = new Date(w.performedAt);
-        const dateStr = when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        const timeStr = when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-        return (
-          <div key={w.id} className="panel" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              width: 38, height: 38, flexShrink: 0,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, var(--cyan), var(--violet))',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.02em',
-            }}>
-              {w.type.slice(0, 3).toUpperCase()}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>
-                {w.title ?? `${w.type[0].toUpperCase()}${w.type.slice(1)} session`}
-              </div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                {dateStr} · {timeStr}
-                {w.durationMin ? ` · ${w.durationMin} min` : ''}
-                {w.intensity ? ` · ${w.intensity}` : ''}
-                {w.exercises?.length ? ` · ${w.exercises.length} exercise${w.exercises.length > 1 ? 's' : ''}` : ''}
-              </div>
-            </div>
-            <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--lime)' }}>
-              +{w.xpAwarded}
-            </div>
-            <button
-              onClick={() => onDelete(w)}
-              className="btn btn-ghost"
-              style={{ padding: '6px 8px', fontSize: 11 }}
-              aria-label="Delete workout"
-              title="Delete workout"
-            >
-              <Icon name="close" size={14} />
-            </button>
+      {workouts.map(w => (
+        <WorkoutRow
+          key={w.id}
+          workout={w}
+          expanded={expandedId === w.id}
+          onToggle={() => setExpandedId(id => id === w.id ? null : w.id)}
+          onDelete={() => onDelete(w)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One recent-workout row. Collapsed by default; clicking the card expands
+ * it to show full details (duration/intensity/calories, the exercise +
+ * set breakdown, and editable notes). Editing notes is the gentle path
+ * that means you rarely need to delete-and-re-log to correct a session.
+ */
+function WorkoutRow({
+  workout: w, expanded, onToggle, onDelete,
+}: { workout: Workout; expanded: boolean; onToggle: () => void; onDelete: () => void }) {
+  const qc = useQueryClient();
+  const [notes, setNotes] = useState(w.notes ?? '');
+  const dirty = notes !== (w.notes ?? '');
+
+  const saveNotes = useMutation({
+    mutationFn: () => api.put(`/api/workouts/${w.id}`, { notes: notes.trim() || null }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workouts', 'recent'] }),
+  });
+
+  const when = new Date(w.performedAt);
+  const dateStr = when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const timeStr = when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Header row — click to expand */}
+      <div
+        onClick={onToggle}
+        style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+      >
+        <div style={{
+          width: 38, height: 38, flexShrink: 0,
+          borderRadius: 8,
+          background: 'linear-gradient(135deg, var(--cyan), var(--violet))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.02em',
+        }}>
+          {w.type.slice(0, 3).toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>
+            {w.title ?? `${w.type[0].toUpperCase()}${w.type.slice(1)} session`}
           </div>
-        );
-      })}
+          <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            {dateStr} · {timeStr}
+            {w.durationMin ? ` · ${w.durationMin} min` : ''}
+            {w.intensity ? ` · ${w.intensity}` : ''}
+            {w.exercises?.length ? ` · ${w.exercises.length} exercise${w.exercises.length > 1 ? 's' : ''}` : ''}
+          </div>
+        </div>
+        <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--lime)' }}>
+          +{w.xpAwarded}
+        </div>
+        <Icon name="chevD" size={14} style={{ color: 'var(--text-faint)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 12 }}>
+            <Detail label="TYPE" value={w.type} />
+            {w.durationMin != null && <Detail label="DURATION" value={`${w.durationMin} min`} />}
+            {w.intensity && <Detail label="INTENSITY" value={w.intensity} />}
+            {w.caloriesEst != null && <Detail label="CALORIES" value={`~${w.caloriesEst}`} />}
+          </div>
+
+          {w.exercises && w.exercises.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="kicker">EXERCISES</span>
+              {w.exercises.map((ex: any, i: number) => (
+                <div key={i} className="panel-inset" style={{ padding: '8px 10px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: ex.sets?.length ? 4 : 0 }}>{ex.exercise}</div>
+                  {ex.sets?.length > 0 && (
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                      {ex.sets.map((s: any) =>
+                        [s.reps != null ? `${s.reps} reps` : null, s.weight != null ? `${s.weight} kg` : null]
+                          .filter(Boolean).join(' × ') || 'set'
+                      ).join('  ·  ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className="kicker">NOTES</span>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Add notes about this session…"
+              style={{ ...inputStyle, resize: 'vertical' }}
+            />
+          </label>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={onDelete}
+              className="btn btn-ghost"
+              style={{ padding: '6px 10px', fontSize: 11, color: 'var(--red)' }}
+            >
+              <Icon name="close" size={13} style={{ marginRight: 4 }} /> DELETE
+            </button>
+            {dirty && (
+              <button
+                onClick={() => saveNotes.mutate()}
+                className="btn btn-primary"
+                style={{ padding: '6px 12px', fontSize: 11 }}
+                disabled={saveNotes.isPending}
+              >
+                {saveNotes.isPending ? 'SAVING…' : 'SAVE NOTES'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="panel-inset" style={{ padding: '6px 10px', minWidth: 70 }}>
+      <div className="kicker" style={{ fontSize: 9, marginBottom: 2 }}>{label}</div>
+      <div className="mono" style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, textTransform: 'capitalize' }}>{value}</div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
+import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
@@ -45,6 +46,7 @@ const createSchema = z.object({
   targetPerDay: z.number().int().min(1).max(20).default(1),
   baseXp:       z.number().int().min(0).max(500).default(10),
   difficulty:   DIFFICULTY.default('easy'),
+  estMinutes:   z.number().int().min(1).max(1440).nullable().optional(),
   minIntervalDays: z.number().int().min(1).max(365).nullable().optional(),
   weatherRule:  WEATHER_RULE.nullable().optional(),
 });
@@ -175,6 +177,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
       targetPerDay: data.targetPerDay,
       baseXp: data.baseXp,
       difficulty: data.difficulty,
+      estMinutes: data.estMinutes ?? null,
       minIntervalDays: data.minIntervalDays ?? null,
       weatherRule: data.weatherRule ? JSON.stringify(data.weatherRule) : null,
     },
@@ -274,6 +277,7 @@ router.post('/:id/check', asyncHandler(async (req: AuthRequest, res) => {
       });
       const snap = await game().awardXp(userId, {
         amount: habit.baseXp,
+        eddies: eddiesForReward(habit.baseXp, habit.difficulty),
         reason: 'habit_log',
         module: moduleKey?.key,
         refType: 'habit',
@@ -365,8 +369,12 @@ router.delete('/:id/check', asyncHandler(async (req: AuthRequest, res) => {
       where: { id: habit.moduleId }, select: { key: true },
     });
     if (completion.xpAwarded > 0) {
+      // Un-checking is a legitimate "undo completion" — reverse both the
+      // XP and the eddies that the check granted (roadmap: undo reverses;
+      // deleting the task definition does not).
       await game().awardXp(userId, {
         amount: -completion.xpAwarded,
+        eddies: -eddiesForReward(completion.xpAwarded, habit.difficulty),
         reason: 'habit_log_undo',
         module: moduleKey?.key,
         refType: 'habit', refId: habit.id,

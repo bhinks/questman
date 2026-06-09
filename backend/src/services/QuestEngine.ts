@@ -24,6 +24,12 @@ import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { generateThemedQuests, QuestCandidate, ThemedQuest } from './anthropic';
 import { WeatherService, WeatherSnapshot } from './WeatherService';
 import { isHabitDueToday } from '../routes/habits';
+// Pluggable per-pool candidate builders (phase 2). Each is owned by its
+// domain route; the engine just concatenates their output.
+import { buildProjectCandidates } from '../routes/projects';
+import { buildMediaCandidates } from '../routes/media';
+import { buildVitalsCandidates } from '../routes/metrics';
+import { buildNpcCandidates } from '../routes/npcs';
 
 type Tx = Prisma.TransactionClient;
 
@@ -80,8 +86,20 @@ export class QuestEngine {
       throw err;
     }
 
-    // Yesterday's pending quests → expired.
+    // Carry-over + expiry of yesterday's pending quests (roadmap §5).
+    // Quests flagged carryOver (or mustDo, which always carries) roll
+    // forward to today by moving their questDate; everything else
+    // expires. Carrying happens BEFORE generation so today's fresh
+    // candidates that dup a carried source get skipped by the Quest
+    // @@unique([userId, questDate, source, sourceId]) guard.
     const yesterday = daysAgoLocal(1);
+    await this.prisma.quest.updateMany({
+      where: {
+        userId, questDate: yesterday, status: 'pending',
+        OR: [{ carryOver: true }, { mustDo: true }],
+      },
+      data: { questDate: today },
+    });
     await this.prisma.quest.updateMany({
       where: { userId, questDate: yesterday, status: 'pending' },
       data: { status: 'expired' },
@@ -142,6 +160,13 @@ export class QuestEngine {
               progress: 0,
               isAiThemed: !!theme,
               meta: this.buildMeta(candidate, theme, themed?.flavor),
+              // Planner fields (roadmap §5).
+              estMinutes: candidate.estMinutes ?? null,
+              targetCount: candidate.targetCount ?? 1,
+              currentCount: 0,
+              carryOver: candidate.carryOver ?? false,
+              mustDo: candidate.mustDo ?? false,
+              originDate: today,
             },
           });
         } catch (err: any) {
@@ -229,40 +254,34 @@ export class QuestEngine {
           ? `${h.currentStreak}-day streak at risk`
           : undefined,
         bestWindow,
+        // Planner attributes: time estimate + per-day target as a check-in
+        // counter. Chores are punt-able (carry over); daily habits aren't
+        // (a missed day is a missed day).
+        estMinutes: h.estMinutes ?? undefined,
+        targetCount: h.targetPerDay > 1 ? h.targetPerDay : undefined,
+        carryOver: h.kind === 'chore',
       });
     }
 
-    // --- Active goals matching today's period ---
-    const goals = await this.prisma.goal.findMany({
-      where: { userId, status: 'active' },
-      include: { module: { select: { key: true } } },
-    });
-    for (const g of goals) {
-      const periodMatches =
-        g.period === 'ongoing' ||
-        g.period === 'daily' ||
-        (g.period === 'weekly') ||
-        (g.period === 'monthly');
-      if (!periodMatches) continue;
+    // Goals are retired (Brent chose: Projects supersede Goals). The Goal
+    // table is kept for data safety but no longer generates candidates.
 
-      // Skip if target already met.
-      if (g.targetValue !== null && g.currentValue >= g.targetValue) continue;
-
-      const diff: 'easy' | 'medium' | 'hard' =
-        g.period === 'daily' ? 'easy' :
-        g.period === 'weekly' ? 'medium' : 'medium';
-      out.push({
-        candidateId: nextId(),
-        source: 'goal',
-        sourceId: g.id,
-        moduleKey: g.module.key,
-        baseTitle: `Make progress on: ${g.title}`,
-        difficulty: diff,
-        xpReward: XP_BY_DIFFICULTY[diff],
-        context: g.targetValue !== null
-          ? `${g.currentValue}/${g.targetValue} ${g.unit ?? ''}`.trim()
-          : undefined,
-      });
+    // --- New quest pools (phase 2): projects, media, vitals, social. ---
+    // Each builder is owned by its domain route; the engine just merges.
+    const poolBuilders = [
+      buildProjectCandidates,
+      buildMediaCandidates,
+      buildVitalsCandidates,
+      buildNpcCandidates,
+    ];
+    for (const build of poolBuilders) {
+      try {
+        const poolCands = await build(this.prisma, userId, date, nextId);
+        out.push(...poolCands);
+      } catch (err: any) {
+        // A misbehaving pool builder must never block quest generation.
+        logger.warn(`[QuestEngine] pool builder failed: ${err?.message ?? err}`);
+      }
     }
 
     // --- Fitness: "log a workout today" if none yet ---
@@ -334,19 +353,45 @@ export class QuestEngine {
   // -------------------------------------------------------------------
 
   /**
-   * Fallback ranking when the AI path is unavailable.
-   * Priority: streak-at-risk habits → other habits → goals → workout →
-   * finance. Cap at 5.
+   * Fallback selection when the AI path is unavailable. Picks for
+   * VARIETY: round-robin across modules so no single domain (projects,
+   * media, vitals, social, …) gets starved by the cap — the bug the old
+   * flat "score then slice(0,5)" had once we added pools. Within a
+   * module, streak-at-risk and must-do candidates come first. Must-do
+   * candidates are always included, even past the cap.
    */
   private pickFallback(cands: QuestCandidate[]): QuestCandidate[] {
-    const score = (c: QuestCandidate): number => {
+    const CAP = 8;
+    const within = (c: QuestCandidate): number => {
+      if (c.mustDo) return 0;
       if (c.source === 'habit' && c.context?.includes('streak at risk')) return 0;
-      if (c.source === 'habit') return 1;
-      if (c.source === 'goal') return 2;
-      if (c.source === 'workout') return 3;
-      return 4; // finance
+      return 1;
     };
-    return [...cands].sort((a, b) => score(a) - score(b)).slice(0, 5);
+
+    // Group by module, ordered within each module by priority.
+    const byModule = new Map<string, QuestCandidate[]>();
+    for (const c of cands) {
+      const arr = byModule.get(c.moduleKey) ?? [];
+      arr.push(c);
+      byModule.set(c.moduleKey, arr);
+    }
+    for (const arr of byModule.values()) arr.sort((a, b) => within(a) - within(b));
+
+    // Round-robin one per module until the cap is reached.
+    const queues = [...byModule.values()];
+    const out: QuestCandidate[] = [];
+    let i = 0;
+    while (out.length < CAP && queues.some(q => q.length > 0)) {
+      const q = queues[i % queues.length];
+      if (q.length > 0) out.push(q.shift()!);
+      i++;
+    }
+
+    // Guarantee must-do candidates make the cut.
+    for (const c of cands) {
+      if (c.mustDo && !out.includes(c)) out.push(c);
+    }
+    return out;
   }
 
   /**

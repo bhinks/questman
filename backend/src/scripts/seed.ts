@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
+import { provisionLifeHub } from '../utils/provision';
 
 const prisma = new PrismaClient();
 
@@ -291,32 +292,10 @@ async function main() {
     }
   }
 
-  const moduleSeeds = [
-    { key: 'finance', name: 'Finance',  icon: 'layers', color: 'var(--cyan)',    sortOrder: 0 },
-    { key: 'fitness', name: 'Fitness',  icon: 'target', color: 'var(--lime)',    sortOrder: 1 },
-    { key: 'habits',  name: 'Habits',   icon: 'check',  color: 'var(--violet)',  sortOrder: 2 },
-    { key: 'chores',  name: 'Chores',   icon: 'list',   color: 'var(--magenta)', sortOrder: 3 },
-  ];
-
   for (const u of usersToProvision) {
-    // Modules
-    const modules: Record<string, { id: string }> = {};
-    for (const m of moduleSeeds) {
-      const mod = await prisma.module.upsert({
-        where: { userId_key: { userId: u.id, key: m.key } },
-        update: {},
-        create: { userId: u.id, ...m },
-        select: { id: true, key: true },
-      });
-      modules[mod.key] = mod;
-    }
-
-    // Player profile
-    await prisma.playerProfile.upsert({
-      where: { userId: u.id },
-      update: {},
-      create: { userId: u.id },
-    });
+    // Modules + player profile + default vitals metric set (shared with
+    // the /register route via provisionLifeHub — keeps the two in sync).
+    const modules = await provisionLifeHub(prisma, u.id);
 
     // Demo habits + chores + a workout. Only seed if the user has no
     // habits yet, so re-runs don't double up after the user has built

@@ -17,6 +17,11 @@ import { LoginScreen } from './components/LoginScreen';
 import { TodayView } from './components/TodayView';
 import { RecurringList } from './components/RecurringList';
 import { WorkoutLogger } from './components/WorkoutLogger';
+import { ProgressView } from './components/ProgressView';
+import { ProjectsView } from './components/ProjectsView';
+import { MediaView } from './components/MediaView';
+import { VitalsView } from './components/VitalsView';
+import { NpcsView } from './components/NpcsView';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -238,6 +243,21 @@ function HubApp() {
 
       case 'workouts':
         return <WorkoutLogger />;
+
+      case 'projects':
+        return <ProjectsView />;
+
+      case 'media':
+        return <MediaView />;
+
+      case 'vitals':
+        return <VitalsView />;
+
+      case 'social':
+        return <NpcsView />;
+
+      case 'progress':
+        return <ProgressView />;
 
       // --- Existing finance tabs (still local-CSV mode for now) ---
       case 'overview':

@@ -6,6 +6,7 @@ import { prisma } from '../server';
 import { config } from '../config';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { provisionLifeHub } from '../utils/provision';
 
 const router = express.Router();
 
@@ -18,15 +19,22 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required')
+  password: z.string().min(1, 'Password is required'),
+  // "Remember me": issue a long-lived token so the hub stays signed in
+  // across restarts. Fine for a single-user self-hosted LAN app.
+  remember: z.boolean().optional()
 });
 
+// How long a token lives. The default is the config value; "remember me"
+// extends it so the session survives browser/app restarts comfortably.
+const REMEMBER_EXPIRES_IN = '30d';
+
 // Generate JWT token
-const generateToken = (userId: string, email: string) => {
+const generateToken = (userId: string, email: string, expiresIn?: string) => {
   return jwt.sign(
     { id: userId, email },
     config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    { expiresIn: expiresIn ?? config.jwt.expiresIn } as jwt.SignOptions
   );
 };
 
@@ -78,6 +86,11 @@ router.post('/register', asyncHandler(async (req, res) => {
   // Create default categories
   await createDefaultCategories(user.id);
 
+  // Provision the life-hub: modules + player profile + vitals metric set.
+  // Without modules, quest generation (moduleIdFor) would throw for this
+  // user. Shared with the seed via provisionLifeHub.
+  await provisionLifeHub(prisma, user.id);
+
   // Generate token
   const token = generateToken(user.id, user.email);
 
@@ -90,7 +103,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
 // Login user
 router.post('/login', asyncHandler(async (req, res) => {
-  const { email, password } = loginSchema.parse(req.body);
+  const { email, password, remember } = loginSchema.parse(req.body);
 
   // Find user
   const user = await prisma.user.findUnique({
@@ -108,8 +121,8 @@ router.post('/login', asyncHandler(async (req, res) => {
     throw new AppError('Invalid email or password', 401);
   }
 
-  // Generate token
-  const token = generateToken(user.id, user.email);
+  // Generate token — long-lived when "remember me" is checked.
+  const token = generateToken(user.id, user.email, remember ? REMEMBER_EXPIRES_IN : undefined);
 
   // Remove password from response
   const { password: _, ...userWithoutPassword } = user;
