@@ -9,6 +9,7 @@ import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
 import { advanceChainAfterComplete } from '../routes/chains';
+import { markBillPaid } from '../routes/recurring';
 
 const router = express.Router();
 let _engine: QuestEngine | null = null;
@@ -158,6 +159,11 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
     // done, unlock the next / finish the chain) inside the same tx.
     if (quest.source === 'chain' && quest.sourceId) {
       await advanceChainAfterComplete(tx, userId, quest.sourceId);
+    }
+
+    // If this quest is a recurring-bill reminder, stamp the bill paid.
+    if (quest.source === 'bill' && quest.sourceId) {
+      await markBillPaid(tx, userId, quest.sourceId);
     }
 
     // Award XP via central service.
@@ -362,6 +368,13 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
           if (err?.code !== 'P2002') throw err;
         }
         await game().bumpHabitStreak(quest.sourceId, today, tx);
+      }
+      // Mirror the chain + bill side effects from /complete on the completing tick.
+      if (quest.source === 'chain' && quest.sourceId) {
+        await advanceChainAfterComplete(tx, userId, quest.sourceId);
+      }
+      if (quest.source === 'bill' && quest.sourceId) {
+        await markBillPaid(tx, userId, quest.sourceId);
       }
     }
 

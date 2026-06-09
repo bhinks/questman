@@ -25,7 +25,7 @@ import { logger } from '../utils/logger';
 export interface QuestCandidate {
   /** Stable id Claude must echo back. We synthesize this per-batch. */
   candidateId: string;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'bill';
   sourceId: string | null;
   moduleKey: string;        // "habits"|"fitness"|"chores"|"finance"|"projects"|"media"|"social"|"vitals"
   baseTitle: string;

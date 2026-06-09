@@ -167,7 +167,7 @@ export async function buildWeeklyDigest(db: Db, userId: string, weekStart: Date,
     db.bossLog.count({ where: { userId, createdAt: range } }),
     db.boss.count({ where: { userId, status: 'defeated', defeatedAt: range } }),
     db.userAchievement.count({ where: { userId, unlockedAt: range } }),
-    db.transaction.findMany({ where: { userId, date: range, amount: { lt: 0 } }, select: { amount: true, category: { select: { name: true } } } }),
+    db.transaction.findMany({ where: { userId, date: range, amount: { lt: 0 }, excluded: false }, select: { amount: true, category: { select: { name: true } } } }),
     db.dailyMetric.findMany({ where: { userId, date: range, key: { in: ['sleepHours', 'mood', 'weight'] } }, select: { key: true, value: true, date: true } }),
     db.playerProfile.findUnique({ where: { userId }, select: { currentStreak: true, overclockStreak: true } }),
   ]);
@@ -260,7 +260,7 @@ export async function computeCorrelations(db: Db, userId: string, windowDays = 2
 
   const [metrics, txns, workouts, categories, npcs] = await Promise.all([
     db.dailyMetric.findMany({ where: { userId, date: { gte: since }, key: { in: ['sleepHours', 'mood'] } }, select: { key: true, value: true, date: true } }),
-    db.transaction.findMany({ where: { userId, date: { gte: since }, amount: { lt: 0 } }, select: { amount: true, date: true } }),
+    db.transaction.findMany({ where: { userId, date: { gte: since }, amount: { lt: 0 }, excluded: false }, select: { amount: true, date: true } }),
     db.workoutSession.findMany({ where: { userId, performedAt: { gte: since } }, select: { performedAt: true } }),
     db.category.findMany({ where: { userId, budget: { not: null } }, select: { name: true, budget: true } }),
     db.npc.findMany({ where: { userId }, select: { name: true, lastContactOn: true, cadenceDays: true } }),
@@ -354,7 +354,7 @@ export async function computeCorrelations(db: Db, userId: string, windowDays = 2
   {
     const spentThisMonth = await db.transaction.groupBy({
       by: ['categoryId'],
-      where: { userId, date: { gte: monthStart }, amount: { lt: 0 } },
+      where: { userId, date: { gte: monthStart }, amount: { lt: 0 }, excluded: false },
       _sum: { amount: true },
     }).catch(() => [] as any[]);
     const byCatId = new Map<string, number>();

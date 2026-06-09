@@ -275,7 +275,7 @@ export interface Quest {
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
   xpReward: number;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'chain' | 'insight';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'chain' | 'insight' | 'bill';
   sourceId: string | null;
   status: 'pending' | 'completed' | 'skipped' | 'expired';
   target: number;
@@ -466,6 +466,12 @@ export interface ApiTransaction {
   categoryId: string | null;
   category: { id: string; name: string; color: string | null; icon: string | null } | null;
   vendor: { id: string; name: string } | null;
+  // Finance depth: exclusion + chore/project links.
+  excluded: boolean;
+  projectId: string | null;
+  choreId: string | null;
+  project: { id: string; name: string } | null;
+  chore: { id: string; title: string } | null;
   isWasteful: boolean;
   notes: string | null;
 }
@@ -663,6 +669,94 @@ export interface WeeklyReview {
 }
 export interface DebriefLatestResponse { review: WeeklyReview | null; }
 export interface DebriefListResponse { reviews: WeeklyReview[]; }
+
+// ---- finance depth (phase 7): categories, budgets, bills ------------
+
+/** A spending category (with optional monthly budget cap). */
+export interface FinanceCategory {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  budget: number | null;
+  parentId: string | null;
+  isSystem: boolean;
+  isActive: boolean;
+  transactionCount?: number;
+}
+export interface CategoriesResponse { categories: FinanceCategory[]; }
+
+export type BudgetStatus = 'ok' | 'warn' | 'over';
+export interface BudgetItem {
+  categoryId: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  cap: number;
+  spent: number;
+  remaining: number;
+  pct: number;
+  status: BudgetStatus;
+}
+export interface BudgetOverview {
+  month: string;                 // "YYYY-MM"
+  budgets: BudgetItem[];         // sorted most-under-budget first (the leaderboard)
+  totals: { totalCap: number; totalSpent: number; totalRemaining: number };
+  overCount: number;
+  warnCount: number;
+  unbudgetedCount: number;
+  suggestion: string | null;     // leftover-surplus nudge near month-end
+}
+export interface BudgetHistoryCell { month: string; spent: number; cap: number; under: boolean; pct: number; }
+export interface BudgetHistoryCategory {
+  categoryId: string;
+  name: string;
+  color: string | null;
+  cap: number;
+  cells: BudgetHistoryCell[];
+  underRate: number | null;      // % of complete months under cap
+}
+export interface BudgetHistory { months: string[]; categories: BudgetHistoryCategory[]; }
+
+export type Cadence = 'weekly' | 'monthly' | 'yearly';
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  amount: number;
+  cadence: Cadence;
+  dueDay: number | null;
+  categoryId: string | null;
+  category?: { id: string; name: string; color: string | null } | null;
+  active: boolean;
+  isSubscription: boolean;
+  source: 'manual' | 'detected';
+  lastPaidOn: string | null;
+  notes: string | null;
+  // Server-decorated:
+  monthlyEquivalent: number;
+  nextDueDate: string | null;
+  dueInDays: number | null;
+  createdAt: string;
+}
+export interface RecurringListResponse { recurring: RecurringExpense[]; monthlyTotal: number; }
+export interface RecurringCandidate {
+  name: string;
+  key: string;
+  amount: number;
+  cadence: Cadence;
+  dueDay: number | null;
+  categoryId: string | null;
+  isSubscription: boolean;
+  matchCount: number;
+  lastChargedOn: string;
+}
+export interface DetectResponse { candidates: RecurringCandidate[]; }
+export interface SubscriptionAudit {
+  subscriptions: RecurringExpense[];
+  count: number;
+  monthlySubCost: number;
+  annualSubCost: number;
+}
 
 /** An anti-goal ("ICE") — a Habit with polarity:"avoid". You log only slips. */
 export interface AntiGoal {

@@ -14,8 +14,12 @@ import {
 } from 'date-fns';
 
 export function analyzeSpending(transactions: Transaction[], filters?: FilterOptions): SpendingAnalysis {
-  const filteredTransactions = applyFilters(transactions, filters);
-  
+  // Finance depth: excluded rows (transfers etc.) drop out of EVERY total,
+  // chart, and pattern — filtered once here at the top so nothing downstream
+  // double-counts them.
+  const included = transactions.filter(t => !t.excluded);
+  const filteredTransactions = applyFilters(included, filters);
+
   const expenses = filteredTransactions.filter(t => t.amount < 0);
   const income = filteredTransactions.filter(t => t.amount > 0);
   

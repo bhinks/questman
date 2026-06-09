@@ -61,6 +61,9 @@ model User {
   insights             Insight[]
   weeklyReviews        WeeklyReview[]
 
+  // Finance depth (phase 7): recurring bills / subscription audit
+  recurringExpenses    RecurringExpense[]
+
   @@map("users")
 }
 
@@ -124,7 +127,20 @@ model Transaction {
   // Analysis flags
   isWasteful  Boolean   @default(false)
   isSuspicious Boolean  @default(false)
-  
+
+  // Finance depth: exclude this row from ALL totals/charts/insights — for
+  // inter-account transfers and other noise. Reversible + non-destructive
+  // (the row stays visible, greyed); the analyzer/analytics/digest skip it.
+  excluded    Boolean   @default(false)
+
+  // Optional links: the project and/or chore this spend belongs to (one each,
+  // per Brent). Enables per-project / per-chore spend rollups. SetNull so
+  // deleting the project/chore doesn't delete the transaction history.
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  choreId     String?
+  chore       Habit?    @relation("ChoreTransactions", fields: [choreId], references: [id], onDelete: SetNull)
+
   // Import tracking
   importId    String?
   import      Import?   @relation(fields: [importId], references: [id])
@@ -140,6 +156,9 @@ model Transaction {
   @@index([userId, date])
   @@index([userId, categoryId])
   @@index([userId, amount])
+  @@index([userId, excluded])
+  @@index([projectId])
+  @@index([choreId])
 }
 
 model Category {
@@ -164,7 +183,8 @@ model Category {
   // Relations
   transactions Transaction[]
   rules        CategoryRule[]
-  
+  recurringExpenses RecurringExpense[]
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -431,6 +451,7 @@ model Habit {
 
   completions     HabitCompletion[]
   quests          Quest[]
+  choreTransactions Transaction[] @relation("ChoreTransactions") // finance depth: spend linked to this chore
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -714,6 +735,7 @@ model Project {
   tasks       ProjectTask[]
   milestones  Milestone[]
   bosses      Boss[]   // bosses whose HP is linked to this project's progress
+  transactions Transaction[] // finance depth: spend linked to this project
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1120,4 +1142,39 @@ model WeeklyReview {
   @@unique([userId, weekOf])
   @@index([userId, weekOf])
   @@map("weekly_reviews")
+}
+
+// ============================================================
+// Finance depth (phase 7) — recurring bills & subscription audit.
+//
+// A tracked recurring money drain ("leech process") distinct from the
+// behavioral RecurringList/Habit. Seeded by auto-detection over transaction
+// history (source:"detected") and confirmed by the user, or added manually.
+// dueDay drives "pay <bill>" reminder quests; the subscription audit lists
+// active ones for a keep/cancel pass. No account access — amounts come from
+// imported history or are typed.
+// ============================================================
+model RecurringExpense {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  amount      Float                 // typical charge magnitude (positive)
+  cadence     String   @default("monthly") // "monthly"|"weekly"|"yearly"
+  dueDay      Int?                  // day-of-month the charge lands (monthly)
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  active      Boolean  @default(true)
+  isSubscription Boolean @default(false) // surfaced in the subscription audit
+  source      String   @default("manual") // "manual"|"detected"
+  lastPaidOn  DateTime?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, active])
+  @@map("recurring_expenses")
 }

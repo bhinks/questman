@@ -29,6 +29,9 @@ import { ChainsView } from './components/ChainsView';
 import { IceView } from './components/IceView';
 import { NetView } from './components/NetView';
 import { DebriefView } from './components/DebriefView';
+import { BudgetsView } from './components/BudgetsView';
+import { BillsView } from './components/BillsView';
+import { TransactionsView } from './components/TransactionsView';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -57,9 +60,15 @@ function mapApiTransaction(t: ApiTransaction): Transaction {
     description: t.description,
     amount: t.amount,
     category: t.category?.name ?? undefined,
+    categoryId: t.categoryId ?? t.category?.id ?? undefined,
     vendor: t.vendor?.name ?? undefined,
     isWasteful: t.isWasteful,
     notes: t.notes ?? undefined,
+    excluded: t.excluded ?? false,
+    projectId: t.projectId ?? undefined,
+    choreId: t.choreId ?? undefined,
+    projectName: t.project?.name ?? undefined,
+    choreName: t.chore?.title ?? undefined,
   };
 }
 
@@ -140,8 +149,18 @@ function HubApp() {
         date: t.date.toISOString(),
         notes: t.notes ?? null,
         isWasteful: t.isWasteful ?? false,
+        // Finance depth: these now persist (manual re-categorize, exclude, links).
+        categoryId: t.categoryId ?? null,
+        excluded: t.excluded ?? false,
+        projectId: t.projectId ?? null,
+        choreId: t.choreId ?? null,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['transactions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      // A category/exclude/link change shifts budget math too.
+      qc.invalidateQueries({ queryKey: ['budgets'] });
+      qc.invalidateQueries({ queryKey: ['budgets', 'history'] });
+    },
     onError: (err: any) => setErrors([err?.message ?? 'Save failed']),
   });
 
@@ -150,17 +169,24 @@ function HubApp() {
     [transactions]
   );
 
+  // Finance depth: excluded rows (transfers) drop out of the charts + category
+  // drill-downs. analyzeSpending already filters them internally; chartData and
+  // CategoryTransactions read the transaction list directly, so filter here too.
+  // The Transactions tab keeps the FULL list (it greys excluded rows in place).
+  const includedTransactions = useMemo(
+    () => categorizedTransactions.filter(t => !t.excluded),
+    [categorizedTransactions],
+  );
+
   const analysis: SpendingAnalysis = useMemo(() => 
     analyzeSpending(categorizedTransactions), 
     [categorizedTransactions]
   );
 
-  // Prepare chart data
+  // Prepare chart data (excluded transactions already filtered out)
   const chartData = useMemo(() => {
-    console.log('Preparing chart data for', categorizedTransactions.length, 'transactions');
-    
-    const expenses = categorizedTransactions.filter(t => t.amount < 0);
-    const income = categorizedTransactions.filter(t => t.amount > 0);
+    const expenses = includedTransactions.filter(t => t.amount < 0);
+    const income = includedTransactions.filter(t => t.amount > 0);
     
     console.log('Filtered:', { expenses: expenses.length, income: income.length });
     
@@ -206,9 +232,8 @@ function HubApp() {
       daily: Object.values(dailyData).sort((a: any, b: any) => a.date.localeCompare(b.date))
     };
     
-    console.log('Chart data prepared:', result);
     return result;
-  }, [categorizedTransactions]);
+  }, [includedTransactions]);
 
   // Topbar upload button → open the OS file picker. The hidden input's
   // onChange kicks off the import mutation.
@@ -305,6 +330,12 @@ function HubApp() {
       case 'debrief':
         return <DebriefView />;
 
+      case 'budgets':
+        return <BudgetsView />;
+
+      case 'bills':
+        return <BillsView />;
+
       // --- Existing finance tabs (still local-CSV mode for now) ---
       case 'overview':
         return (
@@ -333,7 +364,7 @@ function HubApp() {
             {selectedCategory && (
               <CategoryTransactions
                 category={selectedCategory}
-                transactions={categorizedTransactions}
+                transactions={includedTransactions}
                 onClose={() => setSelectedCategory(null)}
               />
             )}
@@ -360,7 +391,7 @@ function HubApp() {
             {selectedCategory && (
               <CategoryTransactions
                 category={selectedCategory}
-                transactions={categorizedTransactions}
+                transactions={includedTransactions}
                 onClose={() => setSelectedCategory(null)}
               />
             )}
@@ -376,178 +407,12 @@ function HubApp() {
       
       case 'transactions':
         return (
-          <div className="fade-up">
-            <div className="panel hud" style={{ padding: 24 }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 12, 
-                marginBottom: 20 
-              }}>
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: 'linear-gradient(135deg, var(--lime), var(--cyan))',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <span style={{ color: 'white', fontSize: 16, fontWeight: 600 }}>📊</span>
-                </div>
-                <h3 style={{
-                  fontSize: 18, 
-                  fontWeight: 600, 
-                  margin: 0,
-                  color: 'var(--text)',
-                  fontFamily: 'var(--font-display)'
-                }}>
-                  Transaction Log
-                </h3>
-                <div 
-                  className="mono"
-                  style={{ 
-                    marginLeft: 'auto',
-                    fontSize: 11,
-                    color: 'var(--text-dim)',
-                    padding: '4px 8px',
-                    background: 'var(--panel-2)',
-                    borderRadius: 6,
-                    border: '1px solid var(--line)'
-                  }}
-                >
-                  {categorizedTransactions.length} RECORDS
-                </div>
-              </div>
-              
-              {categorizedTransactions.length > 0 ? (
-                <div style={{ 
-                  maxHeight: 400, 
-                  overflow: 'auto',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r)'
-                }}>
-                  <div style={{ 
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 2fr 1fr 1fr 40px',
-                    gap: 12,
-                    padding: 12,
-                    background: 'var(--panel-2)',
-                    borderBottom: '1px solid var(--line)',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--text-dim)',
-                    fontWeight: 600,
-                    letterSpacing: '0.05em'
-                  }}>
-                    <div>DATE</div>
-                    <div>DESCRIPTION</div>
-                    <div>CATEGORY</div>
-                    <div style={{ textAlign: 'right' }}>AMOUNT</div>
-                    <div></div>
-                  </div>
-                  {categorizedTransactions.slice(0, 50).map((transaction, index) => (
-                    <div 
-                      key={transaction.id || index}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 2fr 1fr 1fr 40px',
-                        gap: 12,
-                        padding: 12,
-                        borderBottom: index < 49 ? '1px solid var(--line)' : 'none',
-                        fontSize: 13,
-                        color: 'var(--text)',
-                        transition: 'background 0.15s ease',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.target as HTMLElement).style.background = 'var(--panel-2)';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.target as HTMLElement).style.background = 'transparent';
-                      }}
-                    >
-                      <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                        {transaction.date.toLocaleDateString()}
-                      </div>
-                      <div style={{ 
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {transaction.description}
-                      </div>
-                      <div style={{ 
-                        fontSize: 11,
-                        color: 'var(--text-faint)',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {transaction.category || 'Other'}
-                      </div>
-                      <div 
-                        className="mono"
-                        style={{ 
-                          textAlign: 'right',
-                          fontWeight: 600,
-                          color: transaction.amount >= 0 ? 'var(--lime)' : 'var(--text)'
-                        }}
-                      >
-                        {transaction.amount >= 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditTransaction(transaction);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--text-dim)',
-                          cursor: 'pointer',
-                          padding: 4,
-                          borderRadius: 4,
-                          transition: 'color 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.target as HTMLElement).style.color = 'var(--cyan)';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.target as HTMLElement).style.color = 'var(--text-dim)';
-                        }}
-                      >
-                        <Icon name="edit" size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  {categorizedTransactions.length > 50 && (
-                    <div style={{
-                      padding: 16,
-                      textAlign: 'center',
-                      color: 'var(--text-faint)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
-                      borderTop: '1px solid var(--line)',
-                      background: 'var(--panel-2)'
-                    }}>
-                      SHOWING FIRST 50 OF {categorizedTransactions.length} TRANSACTIONS
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ 
-                  padding: 40, 
-                  textAlign: 'center', 
-                  color: 'var(--text-faint)' 
-                }}>
-                  <div className="mono" style={{ fontSize: 13 }}>NO TRANSACTIONS LOADED</div>
-                </div>
-              )}
-            </div>
-          </div>
+          <TransactionsView
+            transactions={categorizedTransactions}
+            onEdit={handleEditTransaction}
+          />
         );
-      
+
       default:
         return null;
     }

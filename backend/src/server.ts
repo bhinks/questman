@@ -37,6 +37,8 @@ import antigoalRoutes from './routes/antigoals';
 import handlerRoutes from './routes/handler';
 import insightRoutes from './routes/insights';
 import debriefRoutes from './routes/debrief';
+import budgetRoutes from './routes/budgets';
+import recurringRoutes from './routes/recurring';
 
 const app = express();
 const server = createServer(app);
@@ -97,6 +99,8 @@ app.use('/api/antigoals', authMiddleware, antigoalRoutes);
 app.use('/api/handler', authMiddleware, handlerRoutes);
 app.use('/api/insights', authMiddleware, insightRoutes);
 app.use('/api/debrief', authMiddleware, debriefRoutes);
+app.use('/api/budgets', authMiddleware, budgetRoutes);
+app.use('/api/recurring', authMiddleware, recurringRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

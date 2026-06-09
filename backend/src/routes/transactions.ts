@@ -13,10 +13,16 @@ const createTransactionSchema = z.object({
   date: z.string().datetime(),
   description: z.string().min(1, 'Description is required'),
   amount: z.number(),
-  categoryId: z.string().optional(),
-  vendorId: z.string().optional(),
-  notes: z.string().optional(),
-  tags: z.array(z.string()).optional()
+  categoryId: z.string().nullable().optional(),
+  vendorId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
+  // Finance depth: edit flags + links persist through the PUT now. nullable so
+  // the editor can UNlink a project/chore by sending null.
+  isWasteful: z.boolean().optional(),
+  excluded: z.boolean().optional(),
+  projectId: z.string().nullable().optional(),
+  choreId: z.string().nullable().optional()
 });
 
 const updateTransactionSchema = createTransactionSchema.partial();
@@ -32,15 +38,24 @@ const querySchema = z.object({
   minAmount: z.string().transform(Number).optional(),
   maxAmount: z.string().transform(Number).optional(),
   search: z.string().optional(),
-  isWasteful: z.enum(['true', 'false']).transform(Boolean).optional()
+  isWasteful: z.enum(['true', 'false']).transform(Boolean).optional(),
+  // Finance depth: filter by exclusion state ("true" = only excluded,
+  // "false" = only included). Omit to get everything (the client greys
+  // excluded rows in-place).
+  excluded: z.enum(['true', 'false']).transform(v => v === 'true').optional(),
+  projectId: z.string().optional(),
+  choreId: z.string().optional()
 });
 
 const bulkOperationSchema = z.object({
   transactionIds: z.array(z.string()).min(1, 'At least one transaction ID required'),
-  operation: z.enum(['delete', 'categorize', 'tag']),
+  operation: z.enum(['delete', 'categorize', 'tag', 'exclude', 'link']),
   data: z.object({
     categoryId: z.string().optional(),
-    tags: z.array(z.string()).optional()
+    tags: z.array(z.string()).optional(),
+    excluded: z.boolean().optional(),
+    projectId: z.string().nullable().optional(),
+    choreId: z.string().nullable().optional()
   }).optional()
 });
 
@@ -57,7 +72,10 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     minAmount,
     maxAmount,
     search,
-    isWasteful
+    isWasteful,
+    excluded,
+    projectId,
+    choreId
   } = querySchema.parse(req.query);
 
   const offset = (page - 1) * limit;
@@ -77,6 +95,9 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   if (minAmount !== undefined) where.amount = { ...where.amount, gte: minAmount };
   if (maxAmount !== undefined) where.amount = { ...where.amount, lte: maxAmount };
   if (isWasteful !== undefined) where.isWasteful = isWasteful;
+  if (excluded !== undefined) where.excluded = excluded;
+  if (projectId) where.projectId = projectId;
+  if (choreId) where.choreId = choreId;
 
   if (search) {
     // SQLite has no `mode: 'insensitive'` (Postgres-only); `contains`
@@ -98,6 +119,8 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
       include: {
         category: { select: { id: true, name: true, color: true, icon: true } },
         vendor: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true } },
+        chore: { select: { id: true, title: true } },
         import: { select: { id: true, filename: true } }
       }
     }),
@@ -129,6 +152,8 @@ router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
     include: {
       category: true,
       vendor: true,
+      project: { select: { id: true, name: true } },
+      chore: { select: { id: true, title: true } },
       import: true
     }
   });
@@ -313,7 +338,7 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res) => {
       if (!data?.tags) {
         throw new AppError('Tags are required for tag operation', 400);
       }
-      
+
       result = await prisma.transaction.updateMany({
         where: {
           id: { in: transactionIds },
@@ -324,6 +349,27 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res) => {
           isManual: true
         }
       });
+      break;
+
+    // Finance depth: mark a batch excluded/included (e.g. transfers). Reversible.
+    case 'exclude':
+      result = await prisma.transaction.updateMany({
+        where: { id: { in: transactionIds }, userId: req.user!.id },
+        data: { excluded: data?.excluded ?? true }
+      });
+      global.io.to(`user-${req.user!.id}`).emit('transactions-updated', { ids: transactionIds });
+      break;
+
+    // Finance depth: link a batch to a project and/or chore (null to unlink).
+    case 'link':
+      result = await prisma.transaction.updateMany({
+        where: { id: { in: transactionIds }, userId: req.user!.id },
+        data: {
+          ...(data && 'projectId' in data ? { projectId: data.projectId ?? null } : {}),
+          ...(data && 'choreId' in data ? { choreId: data.choreId ?? null } : {})
+        }
+      });
+      global.io.to(`user-${req.user!.id}`).emit('transactions-updated', { ids: transactionIds });
       break;
 
     default:

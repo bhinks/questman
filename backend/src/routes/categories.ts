@@ -56,7 +56,10 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     ]
   });
 
-  res.json({ categories });
+  // Surface the transaction count under the name the client reads.
+  res.json({
+    categories: categories.map(c => ({ ...c, transactionCount: c._count?.transactions ?? 0 })),
+  });
 }));
 
 // Get category by ID with transactions
@@ -151,7 +154,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
     data: {
       ...data,
       userId: req.user!.id,
-      color: data.color || this.generateRandomColor()
+      color: data.color || generateRandomColor()
     },
     include: {
       parent: true,
@@ -214,7 +217,7 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
     }
 
     // Prevent circular references
-    if (await this.wouldCreateCircularReference(req.params.id, data.parentId)) {
+    if (await wouldCreateCircularReference(req.params.id, data.parentId)) {
       throw new AppError('Cannot set parent: would create circular reference', 400);
     }
   }

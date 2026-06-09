@@ -37,6 +37,8 @@ const NAV_ITEMS: NavItem[] = [
   // Finance group (existing dashboard)
   { id: 'overview', label: 'Finance', icon: 'grid' },
   { id: 'categories', label: 'Categories', icon: 'layers' },
+  { id: 'budgets', label: 'Budgets', icon: 'wallet' },
+  { id: 'bills', label: 'Bills', icon: 'clock' },
   { id: 'savings', label: 'Savings', icon: 'target' },
   { id: 'transactions', label: 'Transactions', icon: 'list' },
 ];

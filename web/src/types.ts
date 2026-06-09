@@ -4,10 +4,17 @@ export interface Transaction {
   description: string;
   amount: number;
   category?: string;
+  categoryId?: string;        // finance depth: id for server-side re-categorize
   subcategory?: string;
   vendor?: string;
   isWasteful?: boolean;
   notes?: string;
+  // Finance depth: exclusion (transfers) + chore/project links.
+  excluded?: boolean;
+  projectId?: string;
+  choreId?: string;
+  projectName?: string;
+  choreName?: string;
 }
 
 export interface CategoryRule {

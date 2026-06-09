@@ -39,6 +39,8 @@ import { buildMediaCandidates } from '../routes/media';
 import { buildChainCandidates } from '../routes/chains';
 import { buildVitalsCandidates } from '../routes/metrics';
 import { buildNpcCandidates } from '../routes/npcs';
+import { buildBudgetCandidates } from '../routes/budgets';
+import { buildBillCandidates } from '../routes/recurring';
 
 type Tx = Prisma.TransactionClient;
 
@@ -625,7 +627,9 @@ export class QuestEngine {
       buildMediaCandidates,
       buildVitalsCandidates,
       buildNpcCandidates,
-      buildChainCandidates, // phase 5: linear questlines
+      buildChainCandidates,   // phase 5: linear questlines
+      buildBudgetCandidates,  // phase 7: budget-breach reminders
+      buildBillCandidates,    // phase 7: recurring-bill reminders
     ];
     for (const build of poolBuilders) {
       try {
