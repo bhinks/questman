@@ -8,6 +8,7 @@ import { GamificationService } from '../services/GamificationService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
+import { advanceChainAfterComplete } from '../routes/chains';
 
 const router = express.Router();
 let _engine: QuestEngine | null = null;
@@ -144,6 +145,12 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
         if (err?.code !== 'P2002') throw err; // already completed today; fine.
       }
       await game().bumpHabitStreak(quest.sourceId, today, tx);
+    }
+
+    // If this quest is a chain step, advance the questline (mark the step
+    // done, unlock the next / finish the chain) inside the same tx.
+    if (quest.source === 'chain' && quest.sourceId) {
+      await advanceChainAfterComplete(tx, userId, quest.sourceId);
     }
 
     // Award XP via central service.

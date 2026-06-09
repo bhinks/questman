@@ -157,6 +157,13 @@ export interface PlayerSnapshot {
   rrCredits: number;             // R&R downtime credits (activate backlog media)
   cosmetics: string[];           // owned cosmetic theme keys
   equippedTheme: string | null;  // active cosmetic theme key
+  // World mechanics: daily energy/battery (only present on GET /api/player).
+  energy?: {
+    tier: 'low' | 'med' | 'high';
+    pct: number;                 // 0–100 battery bar
+    source: 'override' | 'sleep' | 'default';
+    sleepHours: number | null;
+  };
   leveledUp?: boolean;
   previousLevel?: number;
   /** Set on an awardXp response when the overclock multiplier boosted the eddie earn. */
@@ -268,7 +275,7 @@ export interface Quest {
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
   xpReward: number;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'chain';
   sourceId: string | null;
   status: 'pending' | 'completed' | 'skipped' | 'expired';
   target: number;
@@ -428,6 +435,7 @@ export interface Habit {
   id: string;
   moduleId: string;
   kind: 'habit' | 'chore';
+  polarity: 'do' | 'avoid';   // "avoid" = anti-goal / ICE
   title: string;
   description: string | null;
   icon: string | null;
@@ -509,4 +517,81 @@ export interface Workout {
   exercises: any[] | null;
   metrics: Record<string, unknown> | null;
   xpAwarded: number;
+}
+
+// ---- World mechanics (phase 5) -------------------------------------
+
+export type BossKind = 'debt' | 'savings' | 'project' | 'challenge' | 'custom';
+export type BossDirection = 'grind_down' | 'charge_up';
+export interface BossLog {
+  id: string;
+  amount: number;
+  note: string | null;
+  source: 'manual' | 'project_milestone';
+  createdAt: string;
+}
+export interface Boss {
+  id: string;
+  name: string;
+  kind: BossKind;
+  direction: BossDirection;
+  targetValue: number;
+  currentValue: number;
+  unit: string | null;
+  color: string | null;
+  status: 'active' | 'defeated' | 'abandoned';
+  linkedProjectId: string | null;
+  xpReward: number;
+  eddieReward: number;
+  createdAt: string;
+  defeatedAt: string | null;
+  // Server-computed convenience for the HP bar:
+  pct: number;          // 0–100 toward defeat
+  remaining: number;    // grind_down: HP left; charge_up: amount still to charge
+  logs?: BossLog[];
+}
+/** Result of POST /api/bosses/:id/hit — updated boss + (on defeat) the reward. */
+export interface BossHitResponse {
+  boss: Boss;
+  defeated: boolean;
+  player?: PlayerSnapshot;  // present only when this hit defeated the boss
+}
+
+export interface ChainStep {
+  id: string;
+  order: number;
+  title: string;
+  description: string | null;
+  difficulty: 'easy' | 'medium' | 'hard';
+  xpReward: number;
+  estMinutes: number | null;
+  status: 'locked' | 'available' | 'done';
+  questId: string | null;
+  completedAt: string | null;
+}
+export interface QuestChain {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'active' | 'done' | 'abandoned';
+  color: string | null;
+  steps: ChainStep[];
+  createdAt: string;
+}
+
+/** An anti-goal ("ICE") — a Habit with polarity:"avoid". You log only slips. */
+export interface AntiGoal {
+  id: string;
+  moduleId: string;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  baseXp: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  isActive: boolean;
+  currentStreak: number;          // avoidance streak (clean days)
+  longestStreak: number;
+  breachedToday: boolean;         // a slip logged today
+  lastCompletedOn: string | null; // last clean day credited at roll-over
 }

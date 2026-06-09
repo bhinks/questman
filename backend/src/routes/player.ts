@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
 import { evaluateAchievements } from '../services/achievements';
-import { daysAgoLocal } from '../utils/dates';
+import { daysAgoLocal, startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
 
@@ -35,6 +35,25 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const newAchievements = await evaluateAchievements(prisma, game(), userId);
   const snapshot = await game().getSnapshot(userId);
   res.json({ player: snapshot, newAchievements });
+}));
+
+/**
+ * POST /api/player/energy  { tier: "low"|"med"|"high" }
+ *
+ * Manually override today's energy/battery tier (World Mechanics). The
+ * override is pinned to the local day and ignored once the day rolls over,
+ * after which the tier is derived from the logged sleep again.
+ */
+router.post('/energy', asyncHandler(async (req: AuthRequest, res) => {
+  const { tier } = z.object({ tier: z.enum(['low', 'med', 'high']) }).parse(req.body);
+  const userId = req.user!.id;
+  await game().ensurePlayer(userId);
+  await prisma.playerProfile.update({
+    where: { userId },
+    data: { energyOverride: tier, energyOverrideOn: startOfLocalDay() },
+  });
+  const snapshot = await game().getSnapshot(userId);
+  res.json({ player: snapshot });
 }));
 
 /**

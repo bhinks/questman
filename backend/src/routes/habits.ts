@@ -113,6 +113,8 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const habits = await prisma.habit.findMany({
     where: {
       userId: req.user!.id,
+      // Anti-goals (polarity:"avoid") are managed in the ICE view, not here.
+      polarity: 'do',
       ...(kind && { kind }),
       ...(active !== undefined && { isActive: active }),
     },

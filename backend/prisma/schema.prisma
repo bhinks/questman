@@ -52,6 +52,10 @@ model User {
   purchases            Purchase[]
   achievements         UserAchievement[]
 
+  // World mechanics (phase 5)
+  bosses               Boss[]
+  questChains          QuestChain[]
+
   @@map("users")
 }
 
@@ -370,6 +374,11 @@ model Habit {
   module          Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   kind            String   @default("habit") // "habit" | "chore"
+  // Direction of the trackable: "do" = a positive habit/chore you complete;
+  // "avoid" = an anti-goal / ICE (you stay clean and log only SLIPS). Avoid
+  // habits don't generate "do this" quests; clean days auto-credit at the
+  // daily roll-over and currentStreak is the avoidance streak.
+  polarity        String   @default("do") // "do" | "avoid"
   title           String
   description     String?
   icon            String?
@@ -466,9 +475,17 @@ model WorkoutSession {
 
   xpAwarded   Int      @default(0)
 
+  // Idempotency key from the client (one per Log-Workout form). A double-
+  // submit/retry reuses it and collides on the unique index below, so the
+  // duplicate is a no-op instead of a second XP/eddie payout. NULL is allowed
+  // and (SQLite) distinct, so unkeyed logs and intentional separate sessions
+  // are never deduped.
+  clientRequestId String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([userId, clientRequestId])
   @@index([userId, performedAt])
   @@map("workout_sessions")
 }
@@ -508,6 +525,12 @@ model PlayerProfile {
   // active HUD palette (null = default neon).
   cosmetics     String?
   equippedTheme String?
+  // --- World mechanics (phase 5): energy / battery ---
+  // A daily capacity tier derived from sleep (vitals sleepHours) with a
+  // manual override. "low"|"med"|"high". energyOverrideOn pins the override
+  // to a local day; it's ignored once the day rolls over (back to derived).
+  energyOverride   String?
+  energyOverrideOn DateTime?
   longestStreak Int      @default(0)
   lastActiveOn  DateTime?
 
@@ -679,6 +702,7 @@ model Project {
 
   tasks       ProjectTask[]
   milestones  Milestone[]
+  bosses      Boss[]   // bosses whose HP is linked to this project's progress
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -885,4 +909,111 @@ model UserAchievement {
   @@unique([userId, key])
   @@index([userId])
   @@map("user_achievements")
+}
+
+// ============================================================
+// World mechanics (phase 5)
+// ============================================================
+
+// A big goal framed as a boss with HP you grind down (debt/project/
+// challenge) or charge up (savings). HP is a real number. Damage is dealt
+// MANUALLY (you log a hit — e.g. type a debt payment) or AUTOMATICALLY when
+// a linked project's milestone completes. No financial-account access: a
+// debt boss's balance is a number you type. Defeating one pays out XP +
+// eddies (a one-time kill-screen reward) and is idempotent (rewarded only on
+// the active->defeated transition).
+model Boss {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String
+  kind            String   @default("custom") // "debt"|"savings"|"project"|"challenge"|"custom"
+  // grind_down: currentValue starts at targetValue and damage reduces it;
+  //             defeated at <= 0 (debt, project, challenge).
+  // charge_up:  currentValue starts at 0 and contributions raise it;
+  //             defeated at >= targetValue (savings).
+  direction       String   @default("grind_down") // "grind_down" | "charge_up"
+  targetValue     Float                            // total HP / goal
+  currentValue    Float    @default(0)             // remaining HP / charged amount
+  unit            String?                          // display: "$", "days", "phases", ...
+  color           String?
+  status          String   @default("active")      // "active"|"defeated"|"abandoned"
+
+  // Optional auto-damage source: a project whose milestone completions chip
+  // the boss down. Null = purely manual.
+  linkedProjectId String?
+  linkedProject   Project? @relation(fields: [linkedProjectId], references: [id], onDelete: SetNull)
+
+  // Kill-screen payout (server-owned, granted once on defeat).
+  xpReward        Int      @default(200)
+  eddieReward     Int      @default(100)
+
+  logs            BossLog[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  defeatedAt      DateTime?
+
+  @@index([userId, status])
+  @@map("bosses")
+}
+
+// Append-only damage/contribution log for a boss (audit + history feed).
+model BossLog {
+  id        String   @id @default(cuid())
+  bossId    String
+  boss      Boss     @relation(fields: [bossId], references: [id], onDelete: Cascade)
+  userId    String   // scoping; cascades via boss
+
+  amount    Float                  // damage dealt (grind_down) / contribution (charge_up); > 0
+  note      String?
+  source    String   @default("manual") // "manual" | "project_milestone"
+
+  createdAt DateTime @default(now())
+
+  @@index([bossId, createdAt])
+  @@map("boss_logs")
+}
+
+// A linear questline: ordered steps where finishing one unlocks the next.
+// The current available step enters the daily candidate pool (source:"chain",
+// sourceId=stepId); completing that quest marks the step done and unlocks the
+// next. Projects can be mirrored as chains, but chains are user-authored here.
+model QuestChain {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      String   @default("active") // "active"|"done"|"abandoned"
+  color       String?
+
+  steps       ChainStep[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, status])
+  @@map("quest_chains")
+}
+
+model ChainStep {
+  id          String   @id @default(cuid())
+  chainId     String
+  chain       QuestChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+
+  order       Int                                  // 0-based position in the chain
+  title       String
+  description String?
+  difficulty  String   @default("medium") // "easy"|"medium"|"hard"
+  xpReward    Int      @default(30)
+  estMinutes  Int?
+  status      String   @default("locked") // "locked"|"available"|"done"
+  questId     String?  // the daily Quest generated for this step, when scheduled
+  completedAt DateTime?
+
+  @@index([chainId, order])
+  @@map("chain_steps")
 }

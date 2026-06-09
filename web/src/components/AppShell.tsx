@@ -29,6 +29,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'progress', label: 'Progress', icon: 'layers' },
   { id: 'shop', label: 'Shop', icon: 'bag' },
   { id: 'achievements', label: 'Street Cred', icon: 'trophy' },
+  { id: 'bosses', label: 'Bosses', icon: 'flame' },
+  { id: 'chains', label: 'Questlines', icon: 'repeat' },
+  { id: 'ice', label: 'ICE', icon: 'shield' },
   // Finance group (existing dashboard)
   { id: 'overview', label: 'Finance', icon: 'grid' },
   { id: 'categories', label: 'Categories', icon: 'layers' },

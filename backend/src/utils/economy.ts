@@ -51,6 +51,29 @@ export function xpStreakBonus(currentStreak: number): number {
   return Math.min(10, Math.floor(Math.max(0, currentStreak) / 3));
 }
 
+// --- Energy / battery: capacity, not just clock time (roadmap) -------
+
+export type EnergyTier = 'low' | 'med' | 'high';
+
+/** Map a logged sleep duration (hours) to a daily capacity tier.
+ *  Deliberately light: <6h drained, 6–7.5h steady, ≥7.5h charged. */
+export function energyTierFromSleep(sleepHours: number): EnergyTier {
+  if (sleepHours >= 7.5) return 'high';
+  if (sleepHours >= 6) return 'med';
+  return 'low';
+}
+
+/** A representative battery % for a tier (used when we only know the tier,
+ *  e.g. a manual override or the no-data default). */
+export function energyPctForTier(tier: EnergyTier): number {
+  return tier === 'high' ? 100 : tier === 'med' ? 65 : 30;
+}
+
+/** Granular battery % straight from sleep hours (0–100), for the HUD bar. */
+export function energyPctFromSleep(sleepHours: number): number {
+  return Math.max(5, Math.min(100, Math.round((sleepHours / 8) * 100)));
+}
+
 /** ISO-week key like "2026-W24" for the weekly token-allowance refill. */
 export function isoWeekKey(date: Date): string {
   // Copy to a UTC-ish date at local midnight, then find the Thursday of

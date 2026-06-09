@@ -89,6 +89,10 @@ export function TodayView() {
       api.post(`/api/quests/${id}/focus`, { actualMinutes: minutes }),
     onSuccess: invalidateAll,
   });
+  const setEnergy = useMutation({
+    mutationFn: (tier: 'low' | 'med' | 'high') => api.post('/api/player/energy', { tier }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['player'] }),
+  });
 
   const jackOut = () => {
     if (!focus) return;
@@ -117,7 +121,12 @@ export function TodayView() {
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {weatherQ.data?.weather && <WeatherCard weather={weatherQ.data.weather} />}
-      <PlayerHud player={player} todayXpAvailable={today.xpAvailable} todayXpEarned={today.xpEarned} />
+      <PlayerHud
+        player={player}
+        todayXpAvailable={today.xpAvailable}
+        todayXpEarned={today.xpEarned}
+        onSetEnergy={(tier) => setEnergy.mutate(tier)}
+      />
       <QuestPlanner
         today={today}
         plan={plan}
@@ -170,8 +179,13 @@ function WeatherCard({ weather }: { weather: NonNullable<WeatherToday['weather']
 }
 
 function PlayerHud({
-  player, todayXpAvailable, todayXpEarned,
-}: { player: PlayerSnapshot; todayXpAvailable: number; todayXpEarned: number }) {
+  player, todayXpAvailable, todayXpEarned, onSetEnergy,
+}: {
+  player: PlayerSnapshot;
+  todayXpAvailable: number;
+  todayXpEarned: number;
+  onSetEnergy: (tier: 'low' | 'med' | 'high') => void;
+}) {
   const pct = Math.round(player.progress * 100);
   return (
     <div className="panel hud" style={{ padding: 24 }}>
@@ -240,8 +254,39 @@ function PlayerHud({
 
         <OverclockTile streak={player.overclockStreak} mult={player.overclockMultiplier} />
         <ResourcesTile skip={player.skipTokens} reroll={player.rerollTokens} rr={player.rrCredits} />
+        {player.energy && <BatteryTile energy={player.energy} onSetEnergy={onSetEnergy} />}
       </div>
     </div>
+  );
+}
+
+/** Daily energy/battery. Tap to cycle a manual override (low→med→high). */
+function BatteryTile({
+  energy, onSetEnergy,
+}: { energy: NonNullable<PlayerSnapshot['energy']>; onSetEnergy: (t: 'low' | 'med' | 'high') => void }) {
+  const color = energy.tier === 'high' ? 'var(--lime)' : energy.tier === 'med' ? 'var(--amber)' : 'var(--red)';
+  const next = energy.tier === 'low' ? 'med' : energy.tier === 'med' ? 'high' : 'low';
+  const label = energy.source === 'sleep' && energy.sleepHours != null
+    ? `${energy.sleepHours}h SLEEP`
+    : energy.source === 'override' ? 'MANUAL' : 'NO DATA';
+  return (
+    <button
+      className="panel-inset"
+      title={`Energy: ${energy.tier.toUpperCase()} (${energy.source}). Click to override → ${next.toUpperCase()}.`}
+      onClick={() => onSetEnergy(next)}
+      style={{ padding: 12, minWidth: 116, textAlign: 'center', cursor: 'pointer', background: 'var(--bg-2)' }}
+    >
+      <div className="kicker" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+        <Icon name="bolt" size={12} style={{ color }} /> BATTERY
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 700, color, fontFamily: 'var(--font-display)' }}>
+        {energy.pct}%
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden', margin: '6px 0 4px' }}>
+        <div style={{ width: `${energy.pct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
+      </div>
+      <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>{label}</div>
+    </button>
   );
 }
 

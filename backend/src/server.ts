@@ -31,6 +31,9 @@ import metricRoutes from './routes/metrics';
 import npcRoutes from './routes/npcs';
 import shopRoutes from './routes/shop';
 import achievementRoutes from './routes/achievements';
+import bossRoutes from './routes/bosses';
+import chainRoutes from './routes/chains';
+import antigoalRoutes from './routes/antigoals';
 
 const app = express();
 const server = createServer(app);
@@ -85,6 +88,9 @@ app.use('/api/metrics', authMiddleware, metricRoutes);
 app.use('/api/npcs', authMiddleware, npcRoutes);
 app.use('/api/shop', authMiddleware, shopRoutes);
 app.use('/api/achievements', authMiddleware, achievementRoutes);
+app.use('/api/bosses', authMiddleware, bossRoutes);
+app.use('/api/chains', authMiddleware, chainRoutes);
+app.use('/api/antigoals', authMiddleware, antigoalRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

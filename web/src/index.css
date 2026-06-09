@@ -153,6 +153,10 @@
   --glow-cyan:   0 0 0.5px rgba(143,216,255,.85), 0 0 12px rgba(143,216,255,.40);
 }
 
+/* Low-battery day (World Mechanics): the HUD content visibly dims/desaturates
+   as a gentle "running on empty" cue. Set via <html data-energy="low">. */
+[data-energy="low"] .content { filter: saturate(0.72) brightness(0.93); transition: filter .4s ease; }
+
 * { box-sizing: border-box; }
 
 html, body {

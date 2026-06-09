@@ -35,6 +35,10 @@ export function WorkoutLogger() {
   const [notes, setNotes] = useState('');
   const [exercises, setExercises] = useState<ExerciseRow[]>([]);
   const [pendingDelete, setPendingDelete] = useState<Workout | null>(null);
+  // Idempotency key for THIS log attempt. A double-click fires two POSTs with
+  // the same key; the server dedupes the second (no double XP/eddie payout).
+  // Reset to a fresh key after a successful log so the next session is its own.
+  const [clientRequestId, setClientRequestId] = useState(() => crypto.randomUUID());
 
   const del = useMutation({
     mutationFn: (id: string) => api.del(`/api/workouts/${id}`),
@@ -56,9 +60,11 @@ export function WorkoutLogger() {
         exercise: e.exercise,
         sets: e.sets.filter(s => s.reps || s.weight),
       })).filter(e => e.exercise) : undefined,
+      clientRequestId,
     }),
     onSuccess: () => {
       setTitle(''); setNotes(''); setExercises([]);
+      setClientRequestId(crypto.randomUUID()); // fresh key for the next log
       qc.invalidateQueries({ queryKey: ['workouts', 'recent'] });
       qc.invalidateQueries({ queryKey: ['player'] });
       qc.invalidateQueries({ queryKey: ['quests', 'today'] });

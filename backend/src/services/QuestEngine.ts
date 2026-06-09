@@ -20,16 +20,18 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
-import { isoWeekKey } from '../utils/economy';
+import { startOfLocalDay, daysAgoLocal, isSameLocalDay } from '../utils/dates';
+import { isoWeekKey, eddiesForReward } from '../utils/economy';
 import { AppError } from '../middleware/errorHandler';
+import { GamificationService } from './GamificationService';
 import { generateThemedQuests, QuestCandidate, ThemedQuest } from './anthropic';
 import { WeatherService, WeatherSnapshot } from './WeatherService';
 import { isHabitDueToday } from '../routes/habits';
-// Pluggable per-pool candidate builders (phase 2). Each is owned by its
+// Pluggable per-pool candidate builders (phase 2+). Each is owned by its
 // domain route; the engine just concatenates their output.
 import { buildProjectCandidates } from '../routes/projects';
 import { buildMediaCandidates } from '../routes/media';
+import { buildChainCandidates } from '../routes/chains';
 import { buildVitalsCandidates } from '../routes/metrics';
 import { buildNpcCandidates } from '../routes/npcs';
 
@@ -62,6 +64,13 @@ export interface GenerateResult {
 
 export class QuestEngine {
   private weather = new WeatherService();
+  // Lazy GamificationService for the once-per-day economy roll-over awards
+  // (anti-goal clean-day credits). Lazy so we never instantiate it twice and
+  // avoid any field-init ordering concerns with the prisma parameter prop.
+  private _game: GamificationService | null = null;
+  private get game(): GamificationService {
+    return this._game ??= new GamificationService(this.prisma);
+  }
 
   constructor(private prisma: PrismaClient) {}
 
@@ -93,7 +102,19 @@ export class QuestEngine {
     // judges whether yesterday was a "full clear" from the quests' current
     // (pre-expiry) statuses.
     const yesterday = daysAgoLocal(1);
-    await this.updateEconomyForNewDay(userId, today, yesterday);
+    // Daily roll-over: overclock/tokens/R&R, then anti-goal clean-day credit.
+    // Both run here so they fire exactly once per local day (gated by the
+    // DailyQuestRun claim above). Defensive: that run row is ALREADY committed,
+    // so an unhandled throw here would strand the whole day (every later
+    // request hits the P2002 read branch and returns 0 quests). Isolate it —
+    // a roll-over hiccup must never block today's quest generation. Mirrors the
+    // per-pool-builder guard below.
+    try {
+      await this.updateEconomyForNewDay(userId, today, yesterday);
+      await this.processAntiGoalsForNewDay(userId, today, yesterday);
+    } catch (err: any) {
+      logger.warn(`[QuestEngine] daily roll-over failed for user ${userId}: ${err?.message ?? err}`);
+    }
 
     // Carry-over + expiry of yesterday's pending quests (roadmap §5).
     // Quests flagged carryOver (or mustDo, which always carries) roll
@@ -251,6 +272,75 @@ export class QuestEngine {
     });
   }
 
+  /**
+   * Anti-goals ("ICE") clean-day credit. For each active avoid-habit that
+   * was NOT breached yesterday, award its clean-day reward (XP + eddies via
+   * the single economy mutation point) and bump the avoidance streak; a
+   * breach yesterday leaves the streak broken. Runs once per local day (same
+   * gate as the economy roll-over), so credits are not duplicated.
+   *
+   * touchStreak:false — a clean day is passive (the user took no action), so
+   * it must not maintain the GLOBAL daily-activity streak; the per-habit
+   * avoidance streak is tracked separately on the habit.
+   */
+  private async processAntiGoalsForNewDay(userId: string, today: Date, yesterday: Date): Promise<void> {
+    const avoids = await this.prisma.habit.findMany({
+      where: { userId, isActive: true, polarity: 'avoid' },
+    });
+    if (avoids.length === 0) return;
+
+    const avoidIds = avoids.map(h => h.id);
+    const breached = new Set(
+      (await this.prisma.habitCompletion.findMany({
+        where: { userId, completedOn: yesterday, habitId: { in: avoidIds } },
+        select: { habitId: true },
+      })).map(c => c.habitId),
+    );
+
+    for (const h of avoids) {
+      // Only credit a day the anti-goal existed for in FULL — i.e. it was
+      // created on a strictly earlier calendar day than `yesterday`. (Comparing
+      // the raw createdAt timestamp to `today` would over-credit an anti-goal
+      // made partway through yesterday for that whole day.) And never double-
+      // credit the same day (defensive — the daily gate already ensures once).
+      if (startOfLocalDay(h.createdAt) >= yesterday) continue;
+      if (h.lastCompletedOn && isSameLocalDay(h.lastCompletedOn, yesterday)) continue;
+
+      if (breached.has(h.id)) {
+        // A slip yesterday — make sure the avoidance streak is broken.
+        if (h.currentStreak !== 0) {
+          await this.prisma.habit.update({ where: { id: h.id }, data: { currentStreak: 0 } });
+        }
+        continue;
+      }
+
+      // Clean day → reward + extend the avoidance streak, atomically.
+      const mod = await this.prisma.module.findUnique({
+        where: { id: h.moduleId }, select: { key: true },
+      });
+      const nextStreak = h.currentStreak + 1;
+      await this.prisma.$transaction(async (tx) => {
+        await this.game.awardXp(userId, {
+          amount: h.baseXp,
+          eddies: eddiesForReward(h.baseXp, h.difficulty),
+          reason: 'anti_goal_clean',
+          module: mod?.key,
+          refType: 'habit',
+          refId: h.id,
+          touchStreak: false,
+        }, tx);
+        await tx.habit.update({
+          where: { id: h.id },
+          data: {
+            currentStreak: nextStreak,
+            longestStreak: Math.max(h.longestStreak, nextStreak),
+            lastCompletedOn: yesterday,
+          },
+        });
+      });
+    }
+  }
+
   /** Force-regenerate today (dev only; the route guards this). */
   async regenerateToday(userId: string): Promise<GenerateResult> {
     const today = startOfLocalDay();
@@ -360,8 +450,10 @@ export class QuestEngine {
     const nextId = () => `cand_${date.getTime()}_${counter++}`;
 
     // --- Habits & chores due today, not yet completed ---
+    // Only positive ("do") trackables generate quests; anti-goals
+    // (polarity:"avoid") are tracked passively and credited at roll-over.
     const habits = await this.prisma.habit.findMany({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, polarity: 'do' },
     });
     const completedToday = new Set(
       (await this.prisma.habitCompletion.findMany({
@@ -425,6 +517,7 @@ export class QuestEngine {
       buildMediaCandidates,
       buildVitalsCandidates,
       buildNpcCandidates,
+      buildChainCandidates, // phase 5: linear questlines
     ];
     for (const build of poolBuilders) {
       try {

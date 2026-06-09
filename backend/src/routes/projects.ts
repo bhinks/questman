@@ -21,6 +21,7 @@ import { GamificationService } from '../services/GamificationService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
 import { QuestCandidate } from '../services/anthropic';
+import { dealBossDamageForLinkedProject } from '../routes/bosses';
 
 const router = express.Router();
 
@@ -370,6 +371,13 @@ router.put('/milestones/:mId', asyncHandler(async (req: AuthRequest, res) => {
         }, tx);
         xpAwarded = existing.bonusXp;
       }
+    }
+
+    // Auto-damage any boss linked to this project when a milestone is
+    // cleared (idempotent per milestone inside the hook). Runs on the
+    // false->true transition regardless of bonusXp.
+    if (flippingToDone) {
+      await dealBossDamageForLinkedProject(tx, userId, existing.projectId, existing.id);
     }
   });
 

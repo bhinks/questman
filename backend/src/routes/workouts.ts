@@ -53,6 +53,9 @@ const createSchema = z.object({
   notes:       z.string().max(2000).nullable().optional(),
   exercises:   z.array(exerciseSchema).optional(),
   metrics:     z.record(z.unknown()).optional(),
+  // Client-generated idempotency key (one per Log-Workout form). A double-
+  // submit/retry reuses it → deduped server-side (no second payout).
+  clientRequestId: z.string().min(1).max(100).optional(),
 });
 
 const updateSchema = createSchema.partial();
@@ -136,75 +139,92 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
   const performedAt = data.performedAt ? new Date(data.performedAt) : new Date();
   const xp = xpForWorkout(data.durationMin, data.intensity);
 
-  let workout;
+  let workout: any;
   let player: Awaited<ReturnType<GamificationService['awardXp']>> | null = null;
   let questAutoCompleted: { id: string; xpReward: number } | null = null;
+  let deduped = false;
 
-  await prisma.$transaction(async (tx) => {
-    workout = await tx.workoutSession.create({
-      data: {
-        userId,
-        moduleId,
-        title: data.title ?? null,
-        type: data.type,
-        performedAt,
-        durationMin: data.durationMin ?? null,
-        intensity: data.intensity ?? null,
-        caloriesEst: data.caloriesEst ?? null,
-        notes: data.notes ?? null,
-        exercises: data.exercises ? JSON.stringify(data.exercises) : null,
-        metrics: data.metrics ? JSON.stringify(data.metrics) : null,
-        xpAwarded: xp,
-      },
-    });
-
-    player = await game().awardXp(userId, {
-      amount: xp,
-      eddies: eddiesForReward(xp),
-      reason: 'workout_log',
-      module: 'fitness',
-      refType: 'workout',
-      refId: workout.id,
-    }, tx);
-
-    // Auto-complete a "log a workout today" quest if pending.
-    const today = startOfLocalDay(performedAt);
-    const pending = await tx.quest.findFirst({
-      where: {
-        userId, source: 'workout', questDate: today, status: 'pending',
-      },
-    });
-    if (pending) {
-      await tx.quest.update({
-        where: { id: pending.id },
-        data: { status: 'completed', progress: pending.target },
-      });
-      await tx.questCompletion.create({
+  try {
+    await prisma.$transaction(async (tx) => {
+      workout = await tx.workoutSession.create({
         data: {
-          userId, questId: pending.id, xpAwarded: 0,
-          meta: JSON.stringify({ trigger: 'workout-log', workoutId: workout.id }),
+          userId,
+          moduleId,
+          title: data.title ?? null,
+          type: data.type,
+          performedAt,
+          durationMin: data.durationMin ?? null,
+          intensity: data.intensity ?? null,
+          caloriesEst: data.caloriesEst ?? null,
+          notes: data.notes ?? null,
+          exercises: data.exercises ? JSON.stringify(data.exercises) : null,
+          metrics: data.metrics ? JSON.stringify(data.metrics) : null,
+          xpAwarded: xp,
+          clientRequestId: data.clientRequestId ?? null,
         },
       });
-      questAutoCompleted = { id: pending.id, xpReward: pending.xpReward };
+
+      player = await game().awardXp(userId, {
+        amount: xp,
+        eddies: eddiesForReward(xp),
+        reason: 'workout_log',
+        module: 'fitness',
+        refType: 'workout',
+        refId: workout.id,
+      }, tx);
+
+      // Auto-complete a "log a workout today" quest if pending.
+      const today = startOfLocalDay(performedAt);
+      const pending = await tx.quest.findFirst({
+        where: {
+          userId, source: 'workout', questDate: today, status: 'pending',
+        },
+      });
+      if (pending) {
+        await tx.quest.update({
+          where: { id: pending.id },
+          data: { status: 'completed', progress: pending.target },
+        });
+        await tx.questCompletion.create({
+          data: {
+            userId, questId: pending.id, xpAwarded: 0,
+            meta: JSON.stringify({ trigger: 'workout-log', workoutId: workout.id }),
+          },
+        });
+        questAutoCompleted = { id: pending.id, xpReward: pending.xpReward };
+      }
+    });
+  } catch (e: any) {
+    // Idempotency: a double-submit/retry reusing the same clientRequestId
+    // collides on the unique index. Treat it as a no-op — return the
+    // already-logged session WITHOUT a second XP/eddie payout.
+    if (data.clientRequestId && e?.code === 'P2002') {
+      workout = await prisma.workoutSession.findFirst({
+        where: { userId, clientRequestId: data.clientRequestId },
+      });
+      deduped = true;
+    } else {
+      throw e;
     }
-  });
+  }
 
   const ws = (global as any).wsService;
-  if (ws?.broadcastGameEvent && workout) {
+  if (ws?.broadcastGameEvent && workout && !deduped) {
     ws.broadcastGameEvent(userId, 'workout-logged', {
-      workoutId: (workout as any).id, xpAwarded: xp, questAutoCompleted,
+      workoutId: workout.id, xpAwarded: xp, questAutoCompleted,
     });
   }
 
-  res.status(201).json({
+  res.status(deduped ? 200 : 201).json({
     workout: workout && {
       ...workout,
-      exercises: parseJson((workout as any).exercises),
-      metrics: parseJson((workout as any).metrics),
+      exercises: parseJson(workout.exercises),
+      metrics: parseJson(workout.metrics),
     },
-    xpAwarded: xp,
+    xpAwarded: deduped ? (workout?.xpAwarded ?? 0) : xp,
     player,
     questAutoCompleted,
+    deduped,
   });
 }));
 

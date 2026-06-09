@@ -22,7 +22,10 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { levelFromXp, levelInfo } from '../utils/leveling';
 import { isSameLocalDay, isYesterdayLocal, startOfLocalDay } from '../utils/dates';
-import { overclockMultiplier, xpStreakBonus } from '../utils/economy';
+import {
+  overclockMultiplier, xpStreakBonus,
+  energyTierFromSleep, energyPctForTier, energyPctFromSleep, EnergyTier,
+} from '../utils/economy';
 
 /** Reasons that are NOT subject to the overclock multiplier: spends and
  *  corrections (must pass through raw), plus achievement payouts (one-time
@@ -83,6 +86,15 @@ export interface PlayerSnapshot {
   rrCredits: number;
   cosmetics: string[];
   equippedTheme: string | null;
+  /** Daily capacity/battery (World Mechanics). Optional: only the read path
+   *  (getSnapshot) computes it; awardXp leaves it undefined to avoid an extra
+   *  per-award query — the HUD reads it from GET /api/player. */
+  energy?: {
+    tier: EnergyTier;
+    pct: number;          // 0–100 for the battery bar
+    source: 'override' | 'sleep' | 'default';
+    sleepHours: number | null;
+  };
   leveledUp?: boolean;
   previousLevel?: number;
   /** Set on awardXp when the overclock multiplier boosted this eddie earn. */
@@ -151,13 +163,19 @@ export class GamificationService {
    */
   async getSnapshot(userId: string): Promise<PlayerSnapshot> {
     await this.ensurePlayer(userId);
-    const [p, totalXp, eddies, domainXp] = await Promise.all([
+    const today = startOfLocalDay();
+    const [p, totalXp, eddies, domainXp, sleepMetric] = await Promise.all([
       this.prisma.playerProfile.findUniqueOrThrow({ where: { userId } }),
       this.sumXp(userId, this.prisma),
       this.sumEddies(userId, this.prisma),
       this.domainXpFromLedger(userId, this.prisma),
+      this.prisma.dailyMetric.findFirst({
+        where: { userId, key: 'sleepHours', date: today },
+        select: { value: true },
+      }),
     ]);
     const info = levelInfo(totalXp);
+    const energy = this.computeEnergy(p, sleepMetric?.value ?? null, today);
     return {
       level: info.level,
       totalXp: info.totalXp,
@@ -177,7 +195,30 @@ export class GamificationService {
       rrCredits: p.rrCredits,
       cosmetics: parseCosmetics(p.cosmetics),
       equippedTheme: p.equippedTheme,
+      energy,
     };
+  }
+
+  /**
+   * Derive the daily energy/battery (World Mechanics). A manual override
+   * pinned to today wins; otherwise we map today's logged sleep to a tier;
+   * with no data we sit at a neutral "med". Light by design — informational
+   * + a soft planner nudge, never a hard gate.
+   */
+  private computeEnergy(
+    p: { energyOverride: string | null; energyOverrideOn: Date | null },
+    sleepHours: number | null,
+    today: Date,
+  ): PlayerSnapshot['energy'] {
+    const override = p.energyOverride as EnergyTier | null;
+    if (override && p.energyOverrideOn && isSameLocalDay(p.energyOverrideOn, today)) {
+      return { tier: override, pct: energyPctForTier(override), source: 'override', sleepHours };
+    }
+    if (sleepHours != null) {
+      const tier = energyTierFromSleep(sleepHours);
+      return { tier, pct: energyPctFromSleep(sleepHours), source: 'sleep', sleepHours };
+    }
+    return { tier: 'med', pct: energyPctForTier('med'), source: 'default', sleepHours: null };
   }
 
   /**

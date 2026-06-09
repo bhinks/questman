@@ -24,6 +24,9 @@ import { VitalsView } from './components/VitalsView';
 import { NpcsView } from './components/NpcsView';
 import { ShopView } from './components/ShopView';
 import { AchievementsView } from './components/AchievementsView';
+import { BossesView } from './components/BossesView';
+import { ChainsView } from './components/ChainsView';
+import { IceView } from './components/IceView';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -75,11 +78,15 @@ function HubApp() {
     queryFn: () => api.get<PlayerResponse>('/api/player').then(r => r.player),
   });
   const equippedTheme = playerQuery.data?.equippedTheme ?? null;
+  const energyTier = playerQuery.data?.energy?.tier ?? null;
   useEffect(() => {
     const el = document.documentElement;
     if (equippedTheme) el.dataset.theme = equippedTheme;
     else delete el.dataset.theme;
-  }, [equippedTheme]);
+    // World mechanics: a low battery visibly dims the UI (index.css).
+    if (energyTier) el.dataset.energy = energyTier;
+    else delete el.dataset.energy;
+  }, [equippedTheme, energyTier]);
 
   // Transactions now live in the DB. Pull the full set (single-user hub;
   // a high limit is fine) and map to the presentational shape the finance
@@ -280,6 +287,15 @@ function HubApp() {
 
       case 'achievements':
         return <AchievementsView />;
+
+      case 'bosses':
+        return <BossesView />;
+
+      case 'chains':
+        return <ChainsView />;
+
+      case 'ice':
+        return <IceView />;
 
       // --- Existing finance tabs (still local-CSV mode for now) ---
       case 'overview':
