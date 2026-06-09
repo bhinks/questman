@@ -27,6 +27,8 @@ import { AchievementsView } from './components/AchievementsView';
 import { BossesView } from './components/BossesView';
 import { ChainsView } from './components/ChainsView';
 import { IceView } from './components/IceView';
+import { NetView } from './components/NetView';
+import { DebriefView } from './components/DebriefView';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -296,6 +298,12 @@ function HubApp() {
 
       case 'ice':
         return <IceView />;
+
+      case 'intel':
+        return <NetView />;
+
+      case 'debrief':
+        return <DebriefView />;
 
       // --- Existing finance tabs (still local-CSV mode for now) ---
       case 'overview':

@@ -35,6 +35,9 @@ router.get('/today', asyncHandler(async (req: AuthRequest, res) => {
   const today = startOfLocalDay();
 
   const result = await engine().ensureToday(userId);
+  // Intelligence layer: lazily build last week's debrief on the first
+  // app-open of a new ISO week. Idempotent + best-effort (never throws).
+  await engine().ensureWeeklyReview(userId);
 
   const quests = await prisma.quest.findMany({
     where: { userId, questDate: today },

@@ -34,6 +34,9 @@ import achievementRoutes from './routes/achievements';
 import bossRoutes from './routes/bosses';
 import chainRoutes from './routes/chains';
 import antigoalRoutes from './routes/antigoals';
+import handlerRoutes from './routes/handler';
+import insightRoutes from './routes/insights';
+import debriefRoutes from './routes/debrief';
 
 const app = express();
 const server = createServer(app);
@@ -91,6 +94,9 @@ app.use('/api/achievements', authMiddleware, achievementRoutes);
 app.use('/api/bosses', authMiddleware, bossRoutes);
 app.use('/api/chains', authMiddleware, chainRoutes);
 app.use('/api/antigoals', authMiddleware, antigoalRoutes);
+app.use('/api/handler', authMiddleware, handlerRoutes);
+app.use('/api/insights', authMiddleware, insightRoutes);
+app.use('/api/debrief', authMiddleware, debriefRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

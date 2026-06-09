@@ -56,6 +56,11 @@ model User {
   bosses               Boss[]
   questChains          QuestChain[]
 
+  // Intelligence layer (phase 6): AI Handler + insights + weekly debrief
+  handlerMessages      HandlerMessage[]
+  insights             Insight[]
+  weeklyReviews        WeeklyReview[]
+
   @@map("users")
 }
 
@@ -81,6 +86,12 @@ model UserSettings {
   // WHAT to do, never WHEN (roadmap §5).
   weekdayBudgetMin   Int     @default(240)
   weekendBudgetMin   Int     @default(600)
+
+  // Intelligence layer (phase 6): the AI Handler persona. A configurable
+  // character that narrates the day (Brent picked "sardonic rogue AI").
+  // handlerEnabled gates the daily-rundown/debrief narration entirely.
+  handlerPersona     String  @default("rogue_ai") // "rogue_ai"|"fixer"|"ripperdoc"
+  handlerEnabled     Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1016,4 +1027,97 @@ model ChainStep {
 
   @@index([chainId, order])
   @@map("chain_steps")
+}
+
+// ============================================================
+// Intelligence layer (phase 6) — AI Handler, insights, weekly debrief.
+//
+// Design constraints (mirror the quest-theming rule): the Handler only
+// NARRATES. It never mints XP/eddies and never writes the economy. All of
+// these tables are derived from a SERVER-COMPUTED digest of facts the user
+// already earned; Claude phrases them. Everything degrades gracefully when
+// the API key / feature flag is absent (the rows simply aren't created).
+// ============================================================
+
+// One line of Handler banter — the sardonic rogue-AI voice of the app.
+// kind: "daily_rundown" (the day's gigs, generated once/day with the quest
+// set), "weekly_debrief" (delivered with the WeeklyReview), or "event"
+// (reserved for future reactive lines). Append-only; the ticker reads the
+// latest, the Net feed reads the log.
+model HandlerMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind      String   // "daily_rundown" | "weekly_debrief" | "event"
+  text      String
+  persona   String?  // which persona voiced it (for display continuity)
+  refType   String?  // "dailyQuestRun" | "weeklyReview" | ...
+  refId     String?
+  meta      String?  // JSON
+  seen      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("handler_messages")
+}
+
+// A cross-domain "possible pattern" surfaced from a SERVER-computed
+// correlation over the user's own data (sleep↔spend, sleep↔mood, gym↔mood,
+// budget drift, neglected contacts). Kept deliberately honest: a minimum
+// sample window gates creation, confidence is never stated as causation, and
+// the wording is "possible pattern". An insight may carry an allowlisted
+// suggested action the user can ACCEPT to spawn a small server-owned quest.
+model Insight {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  weekOf        DateTime?  // the review week it was computed for (null = ad hoc)
+  kind          String     // "sleep_spend"|"sleep_mood"|"gym_mood"|"budget"|"social"|"streak"
+  title         String
+  body          String     // the "possible pattern" narrative
+  evidence      String?    // short factual label, e.g. "avg spend 38% higher on <6h-sleep days"
+  confidence    String   @default("low")  // "low" | "medium" (small samples never exceed medium)
+  windowDays    Int?       // sample window backing it
+  suggestion    String?    // the actionable nudge
+  // Allowlisted action the user can accept → server spawns a constrained,
+  // low-XP quest. "none" = informational only. The XP is server-assigned;
+  // the AI never sets it (economy stays server-owned).
+  actionType    String   @default("none") // "none"|"reach_out"|"review_budget"|"log_sleep"|"review_spend"
+  status        String   @default("new")  // "new"|"accepted"|"dismissed"|"spawned"
+  spawnedQuestId String?
+
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@map("insights")
+}
+
+// The weekly after-action report (the "debrief terminal"). Generated once
+// per ISO week, lazily, for the PREVIOUS complete week — idempotent via the
+// unique (userId, weekOf). statsJson is the server-computed digest; the
+// Handler narrates handlerText; the user fills notes + focusForNext and
+// SUBMITS (a guarded draft→submitted transition that pays a small fixed
+// ritual reward, once).
+model WeeklyReview {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  weekOf       DateTime // local Monday midnight of the week being reviewed
+  statsJson    String   // server-computed digest snapshot (numbers only)
+  handlerText  String?  // the Handler's debrief narrative
+  status       String   @default("draft") // "draft" | "submitted"
+  notes        String?           // manual reflection
+  focusForNext String?           // "orders for next cycle"
+
+  generatedAt  DateTime @default(now())
+  submittedAt  DateTime?
+
+  @@unique([userId, weekOf])
+  @@index([userId, weekOf])
+  @@map("weekly_reviews")
 }

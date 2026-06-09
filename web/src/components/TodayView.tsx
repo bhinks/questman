@@ -15,6 +15,7 @@ import { api } from '../lib/api';
 import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
+import { HandlerTicker } from './HandlerTicker';
 
 export function TodayView() {
   const qc = useQueryClient();
@@ -120,6 +121,7 @@ export function TodayView() {
 
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <HandlerTicker />
       {weatherQ.data?.weather && <WeatherCard weather={weatherQ.data.weather} />}
       <PlayerHud
         player={player}

@@ -30,11 +30,19 @@ const configSchema = z.object({
 
   anthropic: z.object({
     apiKey: z.string().optional(),
-    model: z.string().default('claude-opus-4-8')
+    model: z.string().default('claude-opus-4-8'),
+    // Cheaper/faster model for the intelligence layer (AI Handler banter,
+    // daily rundown, weekly debrief, insight phrasing). Brent: "we can get
+    // away with using a cheaper/faster model." Defaults to Haiku.
+    handlerModel: z.string().default('claude-haiku-4-5')
   }),
 
   features: z.object({
-    aiQuests: z.boolean().default(true)
+    aiQuests: z.boolean().default(true),
+    // Intelligence layer toggles. Both degrade gracefully when off or when
+    // no API key is set — the app never blocks on Claude.
+    handler: z.boolean().default(true),
+    insights: z.boolean().default(true)
   }),
 
   // Hub location for weather-aware chores. Both must be set for the
@@ -83,11 +91,14 @@ const env = {
 
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY || undefined,
-    model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-8'
+    model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-8',
+    handlerModel: process.env.ANTHROPIC_HANDLER_MODEL || 'claude-haiku-4-5'
   },
 
   features: {
-    aiQuests: process.env.AI_QUESTS ? process.env.AI_QUESTS !== 'false' : true
+    aiQuests: process.env.AI_QUESTS ? process.env.AI_QUESTS !== 'false' : true,
+    handler: process.env.HANDLER ? process.env.HANDLER !== 'false' : true,
+    insights: process.env.INSIGHTS ? process.env.INSIGHTS !== 'false' : true
   },
 
   weather: {

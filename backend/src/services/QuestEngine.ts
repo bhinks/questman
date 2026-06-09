@@ -20,12 +20,17 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { startOfLocalDay, daysAgoLocal, isSameLocalDay } from '../utils/dates';
+import { startOfLocalDay, daysAgoLocal, isSameLocalDay, startOfIsoWeek } from '../utils/dates';
 import { isoWeekKey, eddiesForReward } from '../utils/economy';
 import { AppError } from '../middleware/errorHandler';
 import { GamificationService } from './GamificationService';
 import { generateThemedQuests, QuestCandidate, ThemedQuest } from './anthropic';
 import { WeatherService, WeatherSnapshot } from './WeatherService';
+// Intelligence layer (phase 6): the Handler narrates the day + the weekly
+// debrief; insights surface honest cross-domain patterns. All best-effort.
+import { buildDailyDigest, buildWeeklyDigest } from './digest';
+import { narrateDailyRundown, narrateWeeklyDebrief, asPersona } from './handler';
+import { generateInsightsForWeek } from './insights';
 import { isHabitDueToday } from '../routes/habits';
 // Pluggable per-pool candidate builders (phase 2+). Each is owned by its
 // domain route; the engine just concatenates their output.
@@ -214,7 +219,106 @@ export class QuestEngine {
       });
     });
 
+    // Intelligence layer: the Handler's daily rundown. Best-effort and AFTER
+    // the quest tx commits, so a narration hiccup can never block generation.
+    // Runs once per day (gated by the same DailyQuestRun claim above).
+    await this.generateDailyRundown(userId, today);
+
     return { generated: true, generator, questCount: chosen.length };
+  }
+
+  /**
+   * Persist the Handler's daily rundown (sardonic rogue-AI voice) for today.
+   * Best-effort: any failure (feature off, no key, narration error) is
+   * swallowed — the rundown is flavor, never load-bearing. The Handler only
+   * NARRATES a server-computed digest; it never touches the economy.
+   */
+  private async generateDailyRundown(userId: string, today: Date): Promise<void> {
+    if (!config.features.handler || !config.anthropic.apiKey) return;
+    try {
+      const settings = await this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: { handlerEnabled: true, handlerPersona: true },
+      });
+      if (settings && settings.handlerEnabled === false) return;
+      const persona = asPersona(settings?.handlerPersona);
+
+      const digest = await buildDailyDigest(this.prisma, userId, today);
+      const text = await narrateDailyRundown(digest, persona);
+      if (!text) return;
+
+      const msg = await this.prisma.handlerMessage.create({
+        data: { userId, kind: 'daily_rundown', text, persona, refType: 'dailyQuestRun' },
+      });
+      const ws = (globalThis as any).wsService;
+      ws?.broadcastGameEvent?.(userId, 'handler-message', { id: msg.id, kind: 'daily_rundown', text });
+    } catch (err: any) {
+      logger.warn(`[QuestEngine] daily rundown failed for user ${userId}: ${err?.message ?? err}`);
+    }
+  }
+
+  /**
+   * Generate the weekly debrief for the PREVIOUS complete ISO week, once.
+   * Idempotent via WeeklyReview @@unique([userId, weekOf]) — the create is the
+   * cross-process lock (mirrors DailyQuestRun). Called lazily from the today
+   * route, so the first app-open of a new week produces last week's review.
+   * Skips weeks with zero activity (no empty debriefs, no wasted Claude call).
+   * Best-effort: never throws into the caller.
+   */
+  async ensureWeeklyReview(userId: string): Promise<void> {
+    try {
+      const thisWeekMonday = startOfIsoWeek();
+      const weekStart = daysAgoLocal(7, thisWeekMonday); // previous Monday
+      const weekEnd = thisWeekMonday;                     // exclusive
+
+      // Already built? Cheap pre-check before the heavier digest work.
+      const existing = await this.prisma.weeklyReview.findUnique({
+        where: { userId_weekOf: { userId, weekOf: weekStart } },
+        select: { id: true },
+      });
+      if (existing) return;
+
+      // Activity gate: don't manufacture a debrief for a dead week.
+      const activity = await this.prisma.xpLedger.count({
+        where: { userId, createdAt: { gte: weekStart, lt: weekEnd } },
+      });
+      if (activity === 0) return;
+
+      const digest = await buildWeeklyDigest(this.prisma, userId, weekStart, weekEnd);
+
+      // The create is the idempotency guard. Loser of a race hits P2002.
+      let review;
+      try {
+        review = await this.prisma.weeklyReview.create({
+          data: { userId, weekOf: weekStart, statsJson: JSON.stringify(digest), status: 'draft' },
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2002') return; // another request already built it
+        throw err;
+      }
+
+      // Insights (honest, deterministic) + the Handler's debrief narration.
+      const findings = await generateInsightsForWeek(this.prisma, userId, weekStart);
+
+      const settings = await this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: { handlerEnabled: true, handlerPersona: true },
+      });
+      const handlerOn = config.features.handler && !!config.anthropic.apiKey && settings?.handlerEnabled !== false;
+      const persona = asPersona(settings?.handlerPersona);
+      const text = handlerOn ? await narrateWeeklyDebrief(digest, findings, persona) : null;
+
+      if (text) {
+        await this.prisma.weeklyReview.update({ where: { id: review.id }, data: { handlerText: text } });
+        await this.prisma.handlerMessage.create({
+          data: { userId, kind: 'weekly_debrief', text, persona, refType: 'weeklyReview', refId: review.id },
+        });
+        const ws = (globalThis as any).wsService;
+        ws?.broadcastGameEvent?.(userId, 'handler-message', { id: review.id, kind: 'weekly_debrief', text });
+      }
+    } catch (err: any) {
+      logger.warn(`[QuestEngine] weekly review failed for user ${userId}: ${err?.message ?? err}`);
+    }
   }
 
   /**

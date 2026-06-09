@@ -35,3 +35,15 @@ export function isYesterdayLocal(prior: Date, next: Date = new Date()): boolean 
   const expected = daysAgoLocal(1, next);
   return isSameLocalDay(prior, expected);
 }
+
+/**
+ * Local-midnight Monday of the ISO week containing `date` (default: now).
+ * The anchor for WeeklyReview.weekOf — pairs with isoWeekKey() in economy.ts
+ * (which keys the same week as a string). Monday-based to match ISO weeks.
+ */
+export function startOfIsoWeek(date: Date = new Date()): Date {
+  const d = startOfLocalDay(date);
+  const day = (d.getDay() + 6) % 7; // Mon=0 .. Sun=6
+  d.setDate(d.getDate() - day);
+  return d;
+}

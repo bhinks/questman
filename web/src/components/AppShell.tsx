@@ -32,6 +32,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'bosses', label: 'Bosses', icon: 'flame' },
   { id: 'chains', label: 'Questlines', icon: 'repeat' },
   { id: 'ice', label: 'ICE', icon: 'shield' },
+  { id: 'intel', label: 'Net', icon: 'eye' },
+  { id: 'debrief', label: 'Debrief', icon: 'file' },
   // Finance group (existing dashboard)
   { id: 'overview', label: 'Finance', icon: 'grid' },
   { id: 'categories', label: 'Categories', icon: 'layers' },

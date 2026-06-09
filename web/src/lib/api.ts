@@ -275,7 +275,7 @@ export interface Quest {
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
   xpReward: number;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'chain';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'chain' | 'insight';
   sourceId: string | null;
   status: 'pending' | 'completed' | 'skipped' | 'expired';
   target: number;
@@ -578,6 +578,91 @@ export interface QuestChain {
   steps: ChainStep[];
   createdAt: string;
 }
+
+// ---- intelligence layer (phase 6): Handler, insights, weekly debrief -----
+
+export type HandlerPersona = 'rogue_ai' | 'fixer' | 'ripperdoc';
+export type HandlerKind = 'daily_rundown' | 'weekly_debrief' | 'event';
+
+/** One line of Handler banter (the sardonic rogue-AI voice). */
+export interface HandlerMessage {
+  id: string;
+  kind: HandlerKind;
+  text: string;
+  persona: HandlerPersona | null;
+  refType: string | null;
+  refId: string | null;
+  meta: Record<string, unknown> | null;
+  seen: boolean;
+  createdAt: string;
+}
+export interface HandlerLatestResponse {
+  message: HandlerMessage | null;
+  enabled: boolean;     // feature on AND user hasn't toggled it off
+  persona: HandlerPersona;
+  available: boolean;   // an API key is configured (else no new lines generate)
+}
+export interface HandlerMessagesResponse { messages: HandlerMessage[]; }
+export interface PersonaOption { key: HandlerPersona; label: string; blurb: string; }
+export interface PersonaResponse { persona: HandlerPersona; enabled: boolean; options: PersonaOption[]; }
+
+export type InsightActionType = 'none' | 'reach_out' | 'review_budget' | 'log_sleep' | 'review_spend';
+export type InsightStatus = 'new' | 'accepted' | 'dismissed' | 'spawned';
+/** A cross-domain "possible pattern" surfaced from the user's own data. */
+export interface Insight {
+  id: string;
+  weekOf: string | null;
+  kind: string;          // "sleep_spend"|"sleep_mood"|"gym_mood"|"budget"|"social"
+  title: string;
+  body: string;
+  evidence: string | null;
+  confidence: 'low' | 'medium';
+  windowDays: number | null;
+  suggestion: string | null;
+  actionType: InsightActionType;
+  status: InsightStatus;
+  spawnedQuestId: string | null;
+  createdAt: string;
+}
+export interface InsightsResponse { insights: Insight[]; newCount: number; }
+
+/** The server-computed weekly digest snapshot (numbers only). */
+export interface WeeklyStats {
+  weekOf: string;
+  weekEnd: string;
+  xpEarned: number;
+  eddiesEarned: number;
+  eddiesSpent: number;
+  questsCompleted: number;
+  questsSkipped: number;
+  questsExpired: number;
+  completionRate: number;
+  currentStreak: number;
+  overclockStreak: number;
+  workouts: number;
+  bossDamageEvents: number;
+  bossesDefeated: number;
+  achievementsUnlocked: number;
+  spendTotal: number;
+  topCategories: { name: string; amount: number }[];
+  vitals: { sleepAvg: number | null; moodAvg: number | null; weightDelta: number | null };
+  activeDays: number;
+}
+export interface WeeklyReview {
+  id: string;
+  weekOf: string;
+  stats: WeeklyStats | null;
+  statsJson?: string;
+  handlerText: string | null;
+  status: 'draft' | 'submitted';
+  notes: string | null;
+  focusForNext: string | null;
+  generatedAt: string;
+  submittedAt: string | null;
+  insights?: Insight[];
+}
+export interface DebriefLatestResponse { review: WeeklyReview | null; }
+export interface DebriefListResponse { reviews: WeeklyReview[]; }
 
 /** An anti-goal ("ICE") — a Habit with polarity:"avoid". You log only slips. */
 export interface AntiGoal {
