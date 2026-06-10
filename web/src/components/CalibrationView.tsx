@@ -1,9 +1,10 @@
 /**
  * CalibrationView — SYS // CALIBRATION (Night City display tuning).
  *
- * The four per-user "CRT character" knobs from the design handoff: corner
- * cut (panel clip geometry), chroma split (display-type text-shadow), CRT
- * intensity (scanline + sweep alphas) and the topbar handler ticker.
+ * The three per-user "CRT character" knobs from the design handoff: corner
+ * cut (panel clip geometry), chroma split (display-type text-shadow) and CRT
+ * intensity (scanline + sweep alphas). (The old HANDLER FEED knob moved up
+ * a level — the AI Calibration panel's HANDLER UPLINK toggle owns it now.)
  *
  * Values LIVE-APPLY while dragging by writing the root CSS vars directly
  * (--cut / --cut-sm / --chroma / --scan-a / --sweep-a — same fan-out formula
@@ -16,6 +17,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { DisplaySettings, SettingsResponse } from '../lib/api';
+import { AiCalibrationPanel } from './AiCalibration';
 import { Icon } from './Icon';
 
 /** Documented baselines from the handoff ("ship as defaults"). */
@@ -23,7 +25,6 @@ const FACTORY: DisplaySettings = {
   displayCut: 24,
   displayChroma: 2,
   displayCrt: 75,
-  tickerEnabled: true,
 };
 
 /** Mirror of App.tsx's root-var fan-out so drags render instantly. */
@@ -94,15 +95,6 @@ export function CalibrationView() {
     save.mutate({ [field]: cur[field] });
   };
 
-  const setTicker = (on: boolean) => {
-    const cur = localRef.current;
-    if (!cur || cur.tickerEnabled === on) return;
-    setLocal({ ...cur, tickerEnabled: on });
-    committedRef.current = { ...(committedRef.current ?? cur), tickerEnabled: on };
-    qc.setQueryData<DisplaySettings>(['settings'], old => (old ? { ...old, tickerEnabled: on } : old));
-    save.mutate({ tickerEnabled: on });
-  };
-
   const resetFactory = () => {
     setLocal(FACTORY);
     committedRef.current = FACTORY;
@@ -130,13 +122,16 @@ export function CalibrationView() {
     );
   }
 
-  const { displayCut, displayChroma, displayCrt, tickerEnabled } = local;
+  const { displayCut, displayChroma, displayCrt } = local;
   const cutSm = Math.round(displayCut * 0.56);
   const scanA = ((displayCrt / 100) * 0.035).toFixed(4);
   const sweepA = ((displayCrt / 100) * 0.14).toFixed(3);
 
   return (
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* ---- AI Calibration (neural governor) — sits above display tuning ---- */}
+      <AiCalibrationPanel />
+
       {/* ---- Header ---- */}
       <div className="panel hud" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <div className="ncx-chip" style={{ width: 48, height: 48 }}>
@@ -166,7 +161,7 @@ export function CalibrationView() {
         <div className="ncx-panel">
           <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
             <span style={SECTION_HEADER}>TUNING PARAMETERS</span>
-            <span className="ncx-serial">4 CHANNELS</span>
+            <span className="ncx-serial">3 CHANNELS</span>
           </div>
 
           <KnobRow
@@ -202,41 +197,6 @@ export function CalibrationView() {
             onChange={v => tune({ displayCrt: v })}
             onCommit={() => commit('displayCrt')}
           />
-
-          {/* Ticker: chamfered ON/OFF pair. The className flips primary ↔ plain,
-              so each button is keyed by state — React remounts instead of
-              morphing (verified stuck-transition pitfall). */}
-          <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 64px', gap: 14, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid var(--line)' }}>
-            <div>
-              <div style={SECTION_HEADER}>HANDLER FEED</div>
-              <div className="ncx-serial" style={{ marginTop: 4 }}>TODAY-PAGE HANDLER CARD</div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                key={`ticker-on-${tickerEnabled ? 'p' : 'n'}`}
-                type="button"
-                className={tickerEnabled ? 'btn btn-primary' : 'btn'}
-                style={{ padding: '8px 16px', fontSize: 11 }}
-                aria-pressed={tickerEnabled}
-                onClick={() => setTicker(true)}
-              >
-                ON
-              </button>
-              <button
-                key={`ticker-off-${tickerEnabled ? 'n' : 'p'}`}
-                type="button"
-                className={tickerEnabled ? 'btn' : 'btn btn-primary'}
-                style={{ padding: '8px 16px', fontSize: 11 }}
-                aria-pressed={!tickerEnabled}
-                onClick={() => setTicker(false)}
-              >
-                OFF
-              </button>
-            </div>
-            <span className="ncx-val mono" style={{ fontSize: 13, textAlign: 'right', color: tickerEnabled ? 'var(--cyan)' : 'var(--text-faint)' }}>
-              {tickerEnabled ? 'LIVE' : 'MUTE'}
-            </span>
-          </div>
 
           <div style={{ padding: '14px 18px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span className="ncx-serial">

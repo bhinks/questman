@@ -102,13 +102,32 @@ model UserSettings {
   handlerPersona     String  @default("rogue_ai") // "rogue_ai"|"fixer"|"ripperdoc"
   handlerEnabled     Boolean @default(true)
 
-  // Night City display calibration (design handoff): the four user-tunable
+  // AI Calibration (SYS//CAL): the user owns every AI decision. AI is flavor,
+  // never load-bearing — everything below only narrows what the optional LLM
+  // layer may do and see. aiEnabled is the master breaker: off = zero LLM
+  // calls anywhere. The access grants control which data domains may be sent
+  // to the model (quest candidates, digest lines, insight re-voicing).
+  aiEnabled          Boolean @default(true)
+  aiQuestsEnabled    Boolean @default(true)  // AI-selected + themed daily quests
+  aiAccessFinance    Boolean @default(true)  // Vault: transactions, budgets, bills
+  aiAccessHealth     Boolean @default(true)  // Vitals + Workouts
+  aiAccessSocial     Boolean @default(true)  // Social: contacts/NPCs
+  aiProvider         String  @default("anthropic") // "anthropic" | "ollama"
+  aiModelQuests      String?                 // cloud model override (null = server default)
+  aiModelHandler     String?                 // cloud model override (null = server default)
+  ollamaUrl          String  @default("http://localhost:11434")
+  ollamaModel        String  @default("llama3.1")
+  aiDailyTokenCap    Int     @default(100000) // tokens/day, all calls; 0 = unlimited
+  aiTokensUsed       Int     @default(0)      // running total for aiTokensUsedOn's day
+  aiTokensUsedOn     DateTime?                // local-midnight day the counter covers
+
+  // Night City display calibration (design handoff): the three user-tunable
   // "CRT character" knobs, persisted per user and applied as CSS vars on the
-  // app root. Defaults are the design owner's reviewed baselines.
+  // app root. Defaults are the design owner's reviewed baselines. (The old
+  // tickerEnabled knob was retired — handlerEnabled owns handler visibility.)
   displayCut         Int     @default(24)   // panel corner clip, 0–28px
   displayChroma      Float   @default(2)    // chroma-split offset, 0–4px
   displayCrt         Int     @default(75)   // CRT intensity %, 0–100 → scan/sweep alphas
-  tickerEnabled      Boolean @default(true) // topbar handler ticker marquee on/off
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

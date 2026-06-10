@@ -12,6 +12,7 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { config } from '../config';
 import { ALL_PERSONA_KEYS, FREE_PERSONA_KEYS, Persona } from '../services/handler';
+import { getAiSettings, providerAvailable } from '../services/llm';
 import { SHOP_ITEMS } from '../services/shopCatalog';
 
 const router = express.Router();
@@ -75,15 +76,18 @@ router.get('/messages', asyncHandler(async (req: AuthRequest, res) => {
  */
 router.get('/latest', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
-  const [latest, settings] = await Promise.all([
+  const [latest, ai] = await Promise.all([
     prisma.handlerMessage.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-    prisma.userSettings.findUnique({ where: { userId }, select: { handlerEnabled: true, handlerPersona: true } }),
+    getAiSettings(prisma, userId),
   ]);
   res.json({
     message: latest ? { ...latest, meta: parseJson(latest.meta) } : null,
-    enabled: (settings?.handlerEnabled ?? true) && config.features.handler,
-    persona: settings?.handlerPersona ?? 'rogue_ai',
-    available: !!config.anthropic.apiKey,
+    // AI Calibration: the master breaker silences the Handler too.
+    enabled: ai.handlerEnabled && ai.aiEnabled && config.features.handler,
+    persona: ai.handlerPersona,
+    // "Can new lines generate?" — cloud needs a key; a local Ollama node
+    // is assumed reachable (calls degrade gracefully if it isn't).
+    available: providerAvailable(ai),
   });
 }));
 

@@ -30,7 +30,10 @@ import { WeatherService, WeatherSnapshot } from './WeatherService';
 // debrief; insights surface honest cross-domain patterns. All best-effort.
 import { buildDailyDigest, buildWeeklyDigest } from './digest';
 import { narrateDailyRundown, narrateWeeklyDebrief, asPersona } from './handler';
-import { generateInsightsForWeek } from './insights';
+import { generateInsightsForWeek, insightAllowedForAi } from './insights';
+// AI Calibration: per-user AI settings (master switch, feature toggles,
+// data-access grants, provider, token cap) — read once per generation pass.
+import { AiSettings, getAiSettings, aiAvailable, modelFor } from './llm';
 import { isHabitDueToday } from '../routes/habits';
 // Pluggable per-pool candidate builders (phase 2+). Each is owned by its
 // domain route; the engine just concatenates their output.
@@ -154,11 +157,20 @@ export class QuestEngine {
       select: { level: true, currentStreak: true },
     });
 
-    const themed = await generateThemedQuests(candidates, {
-      level: player?.level ?? 1,
-      currentStreak: player?.currentStreak ?? 0,
-      date: today,
-    });
+    // AI Calibration: only candidates from domains the user granted are ever
+    // sent to the model. Hidden-domain candidates stay fully eligible — they
+    // just take the deterministic path.
+    const ai = await getAiSettings(this.prisma, userId);
+    const aiVisible = candidates.filter(c => this.candidateAllowedForAi(c, ai));
+    const aiAttempted = ai.aiQuestsEnabled && aiAvailable(ai) && aiVisible.length > 0;
+
+    const themed = aiAttempted
+      ? await generateThemedQuests(this.prisma, userId, ai, aiVisible, {
+          level: player?.level ?? 1,
+          currentStreak: player?.currentStreak ?? 0,
+          date: today,
+        })
+      : null;
 
     let generator: GenerateResult['generator'];
     let chosen: { candidate: QuestCandidate; theme: ThemedQuest | null }[];
@@ -169,9 +181,15 @@ export class QuestEngine {
       chosen = themed.quests
         .map(q => ({ candidate: byId.get(q.candidateId)!, theme: q }))
         .filter(p => p.candidate);
+      // Domains hidden from the AI still deserve board slots: top up with a
+      // couple of deterministic (generic-titled) picks from the hidden pool.
+      const hidden = candidates.filter(c => !aiVisible.includes(c));
+      for (const c of this.pickFallback(hidden, 2)) {
+        chosen.push({ candidate: c, theme: null });
+      }
     } else {
       // Fallback: pick top N candidates by a fixed priority.
-      generator = config.anthropic.apiKey ? 'ai-fallback' : 'rule';
+      generator = aiAttempted ? 'ai-fallback' : 'rule';
       chosen = this.pickFallback(candidates).map(c => ({ candidate: c, theme: null }));
     }
 
@@ -217,7 +235,7 @@ export class QuestEngine {
         data: {
           generator,
           questCount: chosen.length,
-          meta: themed ? JSON.stringify({ flavor: themed.flavor, model: config.anthropic.model }) : null,
+          meta: themed ? JSON.stringify({ flavor: themed.flavor, model: `${ai.aiProvider}/${modelFor(ai, 'quests')}` }) : null,
         },
       });
     });
@@ -241,17 +259,14 @@ export class QuestEngine {
    * NARRATES a server-computed digest; it never touches the economy.
    */
   private async generateDailyRundown(userId: string, today: Date): Promise<void> {
-    if (!config.features.handler || !config.anthropic.apiKey) return;
+    if (!config.features.handler) return;
     try {
-      const settings = await this.prisma.userSettings.findUnique({
-        where: { userId },
-        select: { handlerEnabled: true, handlerPersona: true },
-      });
-      if (settings && settings.handlerEnabled === false) return;
-      const persona = asPersona(settings?.handlerPersona);
+      const ai = await getAiSettings(this.prisma, userId);
+      if (!aiAvailable(ai) || !ai.handlerEnabled) return;
+      const persona = asPersona(ai.handlerPersona);
 
       const digest = await buildDailyDigest(this.prisma, userId, today);
-      const text = await narrateDailyRundown(digest, persona);
+      const text = await narrateDailyRundown(this.prisma, userId, ai, digest, persona);
       if (!text) return;
 
       const msg = await this.prisma.handlerMessage.create({
@@ -307,13 +322,15 @@ export class QuestEngine {
       // Insights (honest, deterministic) + the Handler's debrief narration.
       const findings = await generateInsightsForWeek(this.prisma, userId, weekStart);
 
-      const settings = await this.prisma.userSettings.findUnique({
-        where: { userId },
-        select: { handlerEnabled: true, handlerPersona: true },
-      });
-      const handlerOn = config.features.handler && !!config.anthropic.apiKey && settings?.handlerEnabled !== false;
-      const persona = asPersona(settings?.handlerPersona);
-      const text = handlerOn ? await narrateWeeklyDebrief(digest, findings, persona) : null;
+      const ai = await getAiSettings(this.prisma, userId);
+      const handlerOn = config.features.handler && aiAvailable(ai) && ai.handlerEnabled;
+      const persona = asPersona(ai.handlerPersona);
+      // Insights still GENERATE for every domain (they're deterministic),
+      // but only grant-cleared ones may be re-voiced by the model.
+      const aiFindings = findings.filter(f => insightAllowedForAi(f.kind, {
+        finance: ai.aiAccessFinance, health: ai.aiAccessHealth, social: ai.aiAccessSocial,
+      }));
+      const text = handlerOn ? await narrateWeeklyDebrief(this.prisma, userId, ai, digest, aiFindings, persona) : null;
 
       if (text) {
         await this.prisma.weeklyReview.update({ where: { id: review.id }, data: { handlerText: text } });
@@ -716,6 +733,19 @@ export class QuestEngine {
   // -------------------------------------------------------------------
 
   /**
+   * AI Calibration data-access grants: may this candidate be SENT to the
+   * model? (Vault → finance/bills; Biometrics → vitals/workouts; Contacts
+   * → social/NPCs.) Denied candidates still become quests via the
+   * deterministic path — the model just never sees the underlying data.
+   */
+  private candidateAllowedForAi(c: QuestCandidate, ai: AiSettings): boolean {
+    if (!ai.aiAccessFinance && (c.moduleKey === 'finance' || c.source === 'finance' || c.source === 'bill')) return false;
+    if (!ai.aiAccessHealth && (c.moduleKey === 'vitals' || c.moduleKey === 'fitness' || c.source === 'vitals' || c.source === 'workout')) return false;
+    if (!ai.aiAccessSocial && (c.moduleKey === 'social' || c.source === 'npc')) return false;
+    return true;
+  }
+
+  /**
    * Fallback selection when the AI path is unavailable. Picks for
    * VARIETY: round-robin across modules so no single domain (projects,
    * media, vitals, social, …) gets starved by the cap — the bug the old
@@ -723,8 +753,8 @@ export class QuestEngine {
    * module, streak-at-risk and must-do candidates come first. Must-do
    * candidates are always included, even past the cap.
    */
-  private pickFallback(cands: QuestCandidate[]): QuestCandidate[] {
-    const CAP = 8;
+  private pickFallback(cands: QuestCandidate[], cap = 8): QuestCandidate[] {
+    const CAP = cap;
     const within = (c: QuestCandidate): number => {
       if (c.mustDo) return 0;
       if (c.source === 'habit' && c.context?.includes('streak at risk')) return 0;

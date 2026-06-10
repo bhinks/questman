@@ -104,16 +104,9 @@ function HandlerCard() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['handler', 'latest'] }),
   });
 
-  // The calibration "HANDLER FEED" toggle (formerly the topbar ticker knob)
-  // gates this card.
-  const settingsQ = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => api.get<{ settings: { tickerEnabled: boolean } }>('/api/settings').then(r => r.settings),
-    staleTime: 5 * 60_000,
-  });
-
+  // Visibility follows /api/handler/latest's `enabled` flag, which already
+  // folds in the AI Calibration gates (master breaker + HANDLER UPLINK).
   const data = handlerQ.data;
-  if (settingsQ.data?.tickerEnabled === false) return null;
   if (!data?.enabled) return null;
   const msg = data.message;
   if (!msg || msg.seen) return null;

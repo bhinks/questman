@@ -9,13 +9,22 @@
  * given a server-computed digest of facts the user already earned and phrases
  * them in character. It never mints XP/eddies, never invents numbers, and the
  * app never blocks on it — every call returns null on any failure and callers
- * carry on. Uses the cheaper/faster model (config.anthropic.handlerModel).
+ * carry on. Calls go through the LLM gateway (llm.ts), so the SYS//CAL master
+ * switch, provider choice, and daily token cap all apply; by default the
+ * cheaper/faster handler-tier model is used.
+ *
+ * AI Calibration redaction: digest lines that expose a data domain the user
+ * has NOT granted the AI (finance / health / social) are dropped from the
+ * brief here, right where the lines are built — the model never sees them.
  */
-import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import type { DailyDigest, WeeklyDigest } from './digest';
+import { AiSettings, completeJson } from './llm';
+
+type Db = PrismaClient | Prisma.TransactionClient;
 
 /** The free trio every player starts with. */
 export const FREE_PERSONA_KEYS = ['rogue_ai', 'fixer', 'ripperdoc'] as const;
@@ -67,24 +76,28 @@ const MESSAGE_JSON_SCHEMA = {
 
 /**
  * Low-level Handler call: feed a system prompt + a user brief, get back one
- * plain-text line. Returns null on any failure (no key, API error, bad JSON,
- * validation). Shared by the daily rundown, the weekly debrief, and insight
- * re-voicing (insights.ts).
+ * plain-text line. Returns null on any failure or gate (AI off, no key,
+ * token cap, API error, bad JSON, validation). Shared by the daily rundown
+ * and the weekly debrief.
  */
-export async function narrate(system: string, brief: string, maxTokens = 400): Promise<string | null> {
-  if (!config.anthropic.apiKey) return null;
+export async function narrate(
+  db: Db,
+  userId: string,
+  settings: AiSettings,
+  system: string,
+  brief: string,
+  maxTokens = 400,
+): Promise<string | null> {
   try {
-    const client = new Anthropic({ apiKey: config.anthropic.apiKey });
-    const response = await client.messages.create({
-      model: config.anthropic.handlerModel,
-      max_tokens: maxTokens,
+    const text = await completeJson({
+      db, userId, settings, tier: 'handler',
       system,
-      messages: [{ role: 'user', content: brief }],
-      output_config: { format: { type: 'json_schema', schema: MESSAGE_JSON_SCHEMA } } as any,
+      prompt: brief,
+      jsonSchema: MESSAGE_JSON_SCHEMA as unknown as Record<string, unknown>,
+      maxTokens,
     });
-    const textBlock = response.content.find((b: any) => b.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') return null;
-    const parsed = messageSchema.safeParse(JSON.parse(textBlock.text));
+    if (!text) return null;
+    const parsed = messageSchema.safeParse(JSON.parse(text));
     if (!parsed.success) return null;
     const msg = parsed.data.message.trim();
     // Soft cap so a runaway response can't blow up the ticker.
@@ -96,8 +109,15 @@ export async function narrate(system: string, brief: string, maxTokens = 400): P
 }
 
 /** The Handler's daily rundown — "here's what's on your plate, choom." */
-export async function narrateDailyRundown(d: DailyDigest, persona: Persona): Promise<string | null> {
+export async function narrateDailyRundown(
+  db: Db,
+  userId: string,
+  settings: AiSettings,
+  d: DailyDigest,
+  persona: Persona,
+): Promise<string | null> {
   if (!config.features.handler) return null;
+  if (!settings.aiEnabled || !settings.handlerEnabled) return null;
 
   const lines: string[] = [
     // The exact local day — the model must use THIS, never infer a weekday.
@@ -107,10 +127,11 @@ export async function narrateDailyRundown(d: DailyDigest, persona: Persona): Pro
   if (d.questTitles.length) lines.push(`The lineup: ${d.questTitles.join('; ')}.`);
   if (d.carriedOverCount) lines.push(`${d.carriedOverCount} carried over from yesterday — still hanging.`);
   lines.push(`Daily streak: ${d.streak} day(s). Overclock: ${d.overclockStreak}-day chain (×${d.overclockMultiplier}).`);
-  lines.push(`Energy reads ${d.energyTier}.`);
+  // Energy tier derives from logged sleep — health data. Grant-gated.
+  if (settings.aiAccessHealth) lines.push(`Energy reads ${d.energyTier}.`);
   if (d.rrCredits) lines.push(`${d.rrCredits} R&R credit(s) banked for downtime.`);
   if (d.topBoss) lines.push(`Boss in play: ${d.topBoss.name}, ${d.topBoss.pct}% down.`);
-  if (d.neglectedContact) lines.push(`${d.neglectedContact.name} has gone ${d.neglectedContact.days} days without a ping.`);
+  if (d.neglectedContact && settings.aiAccessSocial) lines.push(`${d.neglectedContact.name} has gone ${d.neglectedContact.days} days without a ping.`);
   if (d.breachedYesterday.length) lines.push(`ICE breached yesterday: ${d.breachedYesterday.join(', ')}.`);
 
   const brief = [
@@ -121,26 +142,34 @@ export async function narrateDailyRundown(d: DailyDigest, persona: Persona): Pro
     ...lines.map(l => `- ${l}`),
   ].join('\n');
 
-  return narrate(personaSystem(persona), brief, 350);
+  return narrate(db, userId, settings, personaSystem(persona), brief, 350);
 }
 
-/** The Handler's weekly debrief narrative, delivered with the WeeklyReview. */
+/**
+ * The Handler's weekly debrief narrative, delivered with the WeeklyReview.
+ * `insights` must already be filtered to the user's data-access grants
+ * (QuestEngine does this by insight kind).
+ */
 export async function narrateWeeklyDebrief(
+  db: Db,
+  userId: string,
+  settings: AiSettings,
   w: WeeklyDigest,
   insights: { title: string; evidence: string }[],
   persona: Persona,
 ): Promise<string | null> {
   if (!config.features.handler) return null;
+  if (!settings.aiEnabled || !settings.handlerEnabled) return null;
 
   const lines: string[] = [
     `Week of ${w.weekOf} to ${w.weekEnd}.`,
     `Active on ${w.activeDays} day(s). Quests: ${w.questsCompleted} cleared, ${w.questsSkipped} skipped, ${w.questsExpired} missed (${w.completionRate}% clear rate).`,
     `Earned ${w.xpEarned} cred and ${w.eddiesEarned} eddies; spent ${w.eddiesSpent} eddies.`,
     `Current streak ${w.currentStreak}, overclock chain ${w.overclockStreak}.`,
-    `Workouts logged: ${w.workouts}. Boss hits: ${w.bossDamageEvents}, kills: ${w.bossesDefeated}. New cred badges: ${w.achievementsUnlocked}.`,
+    `${settings.aiAccessHealth ? `Workouts logged: ${w.workouts}. ` : ''}Boss hits: ${w.bossDamageEvents}, kills: ${w.bossesDefeated}. New cred badges: ${w.achievementsUnlocked}.`,
   ];
-  if (w.spendTotal) lines.push(`Spend this week: $${w.spendTotal}${w.topCategories.length ? ` (top: ${w.topCategories.map(c => `${c.name} $${c.amount}`).join(', ')})` : ''}.`);
-  if (w.vitals.sleepAvg != null) lines.push(`Avg sleep ${w.vitals.sleepAvg}h${w.vitals.moodAvg != null ? `, avg mood ${w.vitals.moodAvg}` : ''}${w.vitals.weightDelta != null ? `, weight ${w.vitals.weightDelta >= 0 ? '+' : ''}${w.vitals.weightDelta}` : ''}.`);
+  if (w.spendTotal && settings.aiAccessFinance) lines.push(`Spend this week: $${w.spendTotal}${w.topCategories.length ? ` (top: ${w.topCategories.map(c => `${c.name} $${c.amount}`).join(', ')})` : ''}.`);
+  if (w.vitals.sleepAvg != null && settings.aiAccessHealth) lines.push(`Avg sleep ${w.vitals.sleepAvg}h${w.vitals.moodAvg != null ? `, avg mood ${w.vitals.moodAvg}` : ''}${w.vitals.weightDelta != null ? `, weight ${w.vitals.weightDelta >= 0 ? '+' : ''}${w.vitals.weightDelta}` : ''}.`);
   for (const i of insights) lines.push(`Pattern flagged: ${i.title} — ${i.evidence}.`);
 
   const brief = [
@@ -151,5 +180,5 @@ export async function narrateWeeklyDebrief(
     ...lines.map(l => `- ${l}`),
   ].join('\n');
 
-  return narrate(personaSystem(persona), brief, 500);
+  return narrate(db, userId, settings, personaSystem(persona), brief, 500);
 }

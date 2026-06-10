@@ -23,6 +23,27 @@ type Tx = Prisma.TransactionClient;
 type Db = PrismaClient | Tx;
 
 /**
+ * Which data domains each insight kind is built from. Used to keep findings
+ * out of the AI's weekly-debrief brief when the user hasn't granted that
+ * domain (AI Calibration). Insight GENERATION is deterministic server math
+ * and is not gated — only what gets sent to the model is.
+ */
+export const INSIGHT_KIND_DOMAINS: Record<string, Array<'finance' | 'health' | 'social'>> = {
+  sleep_spend: ['health', 'finance'],
+  sleep_mood: ['health'],
+  gym_mood: ['health'],
+  budget: ['finance'],
+  social: ['social'],
+};
+
+export function insightAllowedForAi(
+  kind: string,
+  access: { finance: boolean; health: boolean; social: boolean },
+): boolean {
+  return (INSIGHT_KIND_DOMAINS[kind] ?? []).every(d => access[d]);
+}
+
+/**
  * Compute + persist this week's insights. Returns the created rows (lightly
  * typed). Skips silently on any failure — insights are never load-bearing.
  */
@@ -30,7 +51,7 @@ export async function generateInsightsForWeek(
   db: Db,
   userId: string,
   weekOf: Date,
-): Promise<Array<{ title: string; evidence: string }>> {
+): Promise<Array<{ kind: string; title: string; evidence: string }>> {
   if (!config.features.insights) return [];
   let findings: CorrelationFinding[] = [];
   try {
@@ -64,7 +85,7 @@ export async function generateInsightsForWeek(
       logger.warn(`[insights] persist failed: ${err?.message ?? err}`);
     }
   }
-  return chosen.map(f => ({ title: f.title, evidence: f.evidence }));
+  return chosen.map(f => ({ kind: f.kind, title: f.title, evidence: f.evidence }));
 }
 
 // Allowlist: action type → the quest template the server spawns. moduleKey

@@ -44,6 +44,11 @@ briefing, weather-aware scheduling for outdoor chores, and the live session log.
 - Claude-powered quest theming and narrative
 - Cross-domain insights and pattern analysis
 - Weekly retrospective debriefs
+- **Fully optional and user-governed**: the AI Calibration panel (SYS // CALIBRATION)
+  has a master kill-switch, per-feature toggles, and per-domain data-access grants
+  (finance / health / contacts) — sealed domains are never sent to any model
+- Bring your own brain: Anthropic cloud (per-tier model selection) or a local
+  LLM via [Ollama](https://ollama.com), plus a configurable daily token cap
 
 ## Screenshots
 

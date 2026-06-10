@@ -1,25 +1,28 @@
 /**
- * Thin wrapper around @anthropic-ai/sdk for daily quest theming.
+ * Daily quest theming through the LLM gateway (services/llm.ts).
  *
  * Design constraints (see plan.md):
- *   - The SERVER owns the XP economy. Claude only SELECTS from
+ *   - The SERVER owns the XP economy. The model only SELECTS from
  *     provided candidates and THEMES them (cyberpunk title +
  *     description + emoji). It never invents XP values.
  *   - Every AI-referenced sourceId is validated against the candidate
  *     set before persisting; unknown refs are dropped.
- *   - If the API key is absent, the API errors, or the response fails
- *     Zod validation, callers must fall back to a deterministic
- *     rule-based path. We never block the user on Claude.
+ *   - On ANY gateway failure/gate (AI disabled, no key, token cap, API
+ *     error, Zod validation), callers must fall back to a deterministic
+ *     rule-based path. We never block the user on the model.
+ *   - AI Calibration: callers pass only the candidates the user's
+ *     data-access grants allow (QuestEngine partitions them); the
+ *     master switch / quest toggle / provider / cap live in llm.ts.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 // Note: we don't use `zodOutputFormat` from @anthropic-ai/sdk/helpers/zod
 // because that helper requires Zod v4 (it reads `schema.def`), and this
 // backend is on Zod v3 (used by every existing route's request schema).
 // We pass a hand-rolled JSON schema to the API for response shaping and
 // still validate the response ourselves with Zod v3.
-import { config } from '../config';
 import { logger } from '../utils/logger';
+import { AiSettings, completeJson, modelFor } from './llm';
 
 /** Candidate quest as passed TO the model. */
 export interface QuestCandidate {
@@ -89,20 +92,19 @@ Hard rules:
   5. The whole batch should feel like a coherent terminal of "today's ops".`;
 
 /**
- * Generate themed quests via Claude. Returns null on any failure
- * (missing key, API error, validation error). Caller must fall back.
+ * Generate themed quests via the user's configured model. Returns null on
+ * any failure or gate (AI off, missing key, cap, API error, validation).
+ * Caller must fall back.
  */
 export async function generateThemedQuests(
+  db: PrismaClient | Prisma.TransactionClient,
+  userId: string,
+  settings: AiSettings,
   candidates: QuestCandidate[],
   ctx: { level: number; currentStreak: number; date: Date },
 ): Promise<ThemedBatch | null> {
-  if (!config.anthropic.apiKey) {
-    logger.info('[anthropic] no API key — skipping AI theming');
-    return null;
-  }
+  if (!settings.aiEnabled || !settings.aiQuestsEnabled) return null;
   if (candidates.length === 0) return null;
-
-  const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
   const prompt = [
     `Date: ${ctx.date.toISOString().slice(0, 10)}`,
@@ -151,23 +153,18 @@ export async function generateThemedQuests(
   } as const;
 
   try {
-    const response = await client.messages.create({
-      model: config.anthropic.model,
-      max_tokens: 1500,
+    const text = await completeJson({
+      db, userId, settings, tier: 'quests',
       system: SYSTEM,
-      messages: [{ role: 'user', content: prompt }],
-      output_config: { format: { type: 'json_schema', schema: jsonSchema } } as any,
+      prompt,
+      jsonSchema: jsonSchema as unknown as Record<string, unknown>,
+      maxTokens: 1500,
     });
+    if (!text) return null;
 
-    // First text block is guaranteed to be valid JSON by output_config.
-    const textBlock = response.content.find((b: any) => b.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      logger.warn('[anthropic] response had no text block');
-      return null;
-    }
     let candidate: unknown;
     try {
-      candidate = JSON.parse(textBlock.text);
+      candidate = JSON.parse(text);
     } catch (e) {
       logger.warn('[anthropic] response was not valid JSON');
       return null;
@@ -202,7 +199,7 @@ export async function generateThemedQuests(
       return null;
     }
 
-    logger.info(`[anthropic] themed ${cleaned.quests.length} quests via ${config.anthropic.model}`);
+    logger.info(`[anthropic] themed ${cleaned.quests.length} quests via ${settings.aiProvider}/${modelFor(settings, 'quests')}`);
     return cleaned;
   } catch (err: any) {
     logger.warn(`[anthropic] generation failed, will fall back: ${err?.message ?? err}`);

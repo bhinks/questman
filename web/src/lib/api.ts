@@ -662,9 +662,32 @@ export interface DisplaySettings {
   displayCut: number;     // panel corner clip 0–28px
   displayChroma: number;  // chroma-split offset 0–4px
   displayCrt: number;     // CRT intensity % 0–100 (→ scanline/sweep alphas)
-  tickerEnabled: boolean; // topbar handler ticker marquee
 }
-export interface SettingsResponse { settings: DisplaySettings; }
+
+// ---- AI Calibration (SYS//CAL): the user owns every AI decision ----------
+
+export type AiProviderKind = 'anthropic' | 'ollama';
+export interface AiSettings {
+  aiEnabled: boolean;        // master breaker — off = zero LLM calls anywhere
+  aiQuestsEnabled: boolean;  // AI-selected + themed daily quests
+  handlerEnabled: boolean;   // Handler daily rundown + weekly debrief
+  aiAccessFinance: boolean;  // grant: Vault (finance) data
+  aiAccessHealth: boolean;   // grant: Vitals + Workouts data
+  aiAccessSocial: boolean;   // grant: Social (contacts) data
+  aiProvider: AiProviderKind;
+  aiModelQuests: string | null;  // cloud model override; null = server default
+  aiModelHandler: string | null; // cloud model override; null = server default
+  ollamaUrl: string;
+  ollamaModel: string;
+  aiDailyTokenCap: number;   // tokens/day across all calls; 0 = unlimited
+  // Read-only status, server-computed (ignored on PUT):
+  aiCloudKey: boolean;       // ANTHROPIC_API_KEY configured on the server
+  aiTokensUsedToday: number; // burned against the cap so far today
+}
+
+/** The full /api/settings payload: display + AI calibration blocks. */
+export interface AppSettings extends DisplaySettings, AiSettings {}
+export interface SettingsResponse { settings: AppSettings; }
 
 // ---- intelligence layer (phase 6): Handler, insights, weekly debrief -----
 

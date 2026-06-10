@@ -5,10 +5,10 @@
  *   - Deck: brand lockup, 5 nav groups (OPS / LIFE / PROGRESSION / VAULT /
  *     SYSTEM), arrow-wedge items, and the runner ID card pinned bottom
  *     (hex level badge, handle, slim segmented XP bar, LVL/streak/eddies).
- *   - Topbar: 3 hairline-divided cells — screen title + DAY serial, the
- *     handler TICKER (marquee, duplicated track for a seamless loop; gated
- *     by reduced-motion and the user's tickerEnabled setting), and the live
- *     clock + bell + import button (import survives the redesign here).
+ *   - Topbar: 3 hairline-divided cells — screen title + DAY serial, compact
+ *     live stats (the old handler ticker marquee is retired; the Handler line
+ *     lives on the Today page, gated by the AI Calibration toggles), and the
+ *     live clock + bell + import button (import survives the redesign here).
  *   - Status rail: uplink (live socket state), vault/ICE status, cleared
  *     count + token counts + serial.
  *
