@@ -350,6 +350,8 @@ export interface PlanQuest {
   module: { key: string; name: string; color: string | null; icon: string | null };
   meta: { emoji?: string; flavor?: string; bestWindow?: string } | null;
   inPlan: boolean;
+  /** Outdoor quest that passes its weather rule today but not tomorrow. */
+  lastClearDay?: boolean;
 }
 export interface DayPlan {
   budgetMin: number;
@@ -550,6 +552,19 @@ export interface WeatherToday {
     tempMinF: number;
     rainTodayIn: number;
     windMaxMph: number;
+    /** Today's hourly forecast, local hours 0–23. */
+    hours: Array<{ hour: number; tempF: number; precipIn: number; precipProbPct: number }>;
+    /** First upcoming likely-wet hour ("rain at 2pm"), null if dry ahead. */
+    nextRain: { hour: number; label: string; probPct: number } | null;
+    /** Tomorrow's daily rollup, for "tomorrow will be rainy/hot" cues. */
+    tomorrow: {
+      label: string;
+      emoji: string;
+      tempMaxF: number;
+      tempMinF: number;
+      rainSumIn: number;
+      windMaxMph: number;
+    } | null;
   } | null;
 }
 

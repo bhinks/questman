@@ -45,7 +45,15 @@ const REASON_LABELS: Record<string, string> = {
   level_up: 'level up',
   shop_purchase: 'shop purchase',
 };
-const humanizeReason = (r: string): string => REASON_LABELS[r] ?? r.replace(/_/g, ' ');
+/** Habits and chores share the 'habit_log' reason — the ledger's module
+ *  column ('chores' vs 'habits') tells them apart. */
+const humanizeReason = (e: Pick<LedgerEntry, 'reason' | 'module'>): string => {
+  if (e.module === 'chores') {
+    if (e.reason === 'habit_log') return 'chore logged';
+    if (e.reason === 'habit_log_undo') return 'chore undone';
+  }
+  return REASON_LABELS[e.reason] ?? e.reason.replace(/_/g, ' ');
+};
 
 function isToday(iso: string): boolean {
   const d = new Date(iso);
@@ -311,6 +319,8 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
   const ledgerRows = [...inPlanPending.filter(q => q.id !== priority?.id), ...doneRows];
   const sideJobs: PlanQuest[] = (plan?.quests ?? []).filter(q => !q.inPlan);
   const bestWindowQuest = pending.find(q => q.meta?.bestWindow) ?? null;
+  // Outdoor quests on their LAST CLEAR DAY (blocked by tomorrow's forecast).
+  const lastClearIds = new Set((plan?.quests ?? []).filter(q => q.lastClearDay).map(q => q.id));
 
   // SESSION LOG: today's XP grants + focus runs, oldest → newest
   // (terminal order), interleaved by timestamp.
@@ -393,6 +403,11 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                     <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--cyan)' }}>▸▸ PRIORITY CONTRACT</span>
                     <span className="ncx-serial">CTR-{priority.id.slice(0, 6).toUpperCase()}</span>
                     <span style={{ flex: 1 }} />
+                    {lastClearIds.has(priority.id) && (
+                      <span className="ncx-stamp flat" style={{ color: 'var(--amber)' }} title="Tomorrow's forecast blocks this — today's the day">
+                        LAST CLEAR DAY
+                      </span>
+                    )}
                     {priority.mustDo && <span className="ncx-stamp flat" style={{ color: 'var(--red)' }}>MUST-DO</span>}
                     <span className={`ncx-stamp ${priority.difficulty}`}>{priority.difficulty}</span>
                   </div>
@@ -518,9 +533,29 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                     </div>
                   ))}
                 </div>
+                {/* Rain tip: the first likely-wet hour ahead — get outdoor
+                    things done before this. */}
+                {weather.nextRain && (
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--amber)', letterSpacing: '0.08em', marginTop: 10, lineHeight: 1.6 }}>
+                    ▴ RAIN AT {weather.nextRain.label.toUpperCase()} · {weather.nextRain.probPct}%
+                  </div>
+                )}
                 {bestWindowQuest && (
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', marginTop: 10, lineHeight: 1.6 }}>
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', marginTop: weather.nextRain ? 4 : 10, lineHeight: 1.6 }}>
                     ▴ BEST WINDOW · {bestWindowQuest.title.toUpperCase()} {bestWindowQuest.meta!.bestWindow}
+                  </div>
+                )}
+                {/* Tomorrow's outlook — informs which outdoor work can wait. */}
+                {weather.tomorrow && (
+                  <div className="mono" style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 10, letterSpacing: '0.08em', marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)', lineHeight: 1.6 }}>
+                    <span style={{ color: 'var(--text-ghost)', letterSpacing: '0.2em' }}>TOMORROW</span>
+                    <span style={{ color: weather.tomorrow.rainSumIn > 0.04 ? 'var(--amber)' : weather.tomorrow.tempMaxF >= 90 ? 'var(--red)' : 'var(--text-dim)' }}>
+                      {weather.tomorrow.label.toUpperCase()}
+                    </span>
+                    <span style={{ color: 'var(--text-dim)' }}>{weather.tomorrow.tempMaxF}/{weather.tomorrow.tempMinF}°F</span>
+                    {weather.tomorrow.rainSumIn > 0 && (
+                      <span style={{ color: 'var(--text-faint)' }}>{weather.tomorrow.rainSumIn.toFixed(2)}"</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -565,8 +600,8 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                   <div key={r.key}>
                     <span className="cy">{hhmm(r.entry.createdAt)}</span>{' '}
                     {r.entry.amount > 0
-                      ? <span className="ok">✓ {humanizeReason(r.entry.reason)}</span>
-                      : humanizeReason(r.entry.reason)}
+                      ? <span className="ok">✓ {humanizeReason(r.entry)}</span>
+                      : humanizeReason(r.entry)}
                     {r.entry.amount > 0 && <span> +{r.entry.amount}xp</span>}
                   </div>
                 ) : (

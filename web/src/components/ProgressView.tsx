@@ -248,6 +248,16 @@ const REASON_LABELS: Record<string, string> = {
   shop_purchase: 'Shop purchase',
 };
 
+/** Habits and chores share the 'habit_log' reason — the ledger's module
+ *  column ('chores' vs 'habits') tells them apart. */
+function reasonLabel(entry: LedgerEntry): string {
+  if (entry.module === 'chores') {
+    if (entry.reason === 'habit_log') return 'Chore logged';
+    if (entry.reason === 'habit_log_undo') return 'Chore undone';
+  }
+  return REASON_LABELS[entry.reason] ?? entry.reason;
+}
+
 function TermRow({ entry }: { entry: LedgerEntry }) {
   const positive = entry.amount >= 0;
   const isEddies = entry.currency === 'eddies';
@@ -260,7 +270,7 @@ function TermRow({ entry }: { entry: LedgerEntry }) {
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap' }}>
       <span style={{ color: 'var(--text-ghost)' }}>&gt; {stamp}</span>
       <span style={{ color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {(REASON_LABELS[entry.reason] ?? entry.reason).toUpperCase()}
+        {reasonLabel(entry).toUpperCase()}
         {entry.module && <span style={{ color: 'var(--text-ghost)' }}>{' // ' + entry.module.toUpperCase()}</span>}
       </span>
       <span style={{ marginLeft: 'auto', color: amtColor }}>

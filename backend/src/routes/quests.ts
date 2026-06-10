@@ -5,6 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { QuestEngine } from '../services/QuestEngine';
 import { GamificationService } from '../services/GamificationService';
+import { WeatherService } from '../services/WeatherService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
@@ -16,6 +17,7 @@ let _engine: QuestEngine | null = null;
 let _game: GamificationService | null = null;
 const engine = () => (_engine ??= new QuestEngine(prisma));
 const game = () => (_game ??= new GamificationService(prisma));
+const weather = new WeatherService();
 
 function parseJson<T>(raw: string | null): T | null {
   if (!raw) return null;
@@ -450,8 +452,10 @@ router.post('/:id/focus', asyncHandler(async (req: AuthRequest, res) => {
  * fits a subset inside the time budget (default: 4h weekdays / 10h
  * weekends, from UserSettings). Returns a RANKED LIST with each quest
  * flagged inPlan/overflow — the app suggests WHAT to do, never WHEN.
- * Ranking: must-do first, then quests whose best weather window is open
- * now, then higher reward, then shorter (so more fit).
+ * Ranking: must-do first, then outdoor quests on their LAST CLEAR DAY
+ * (doable today, blocked by tomorrow's forecast), then quests whose best
+ * weather window is open now, then higher reward, then shorter (so more
+ * fit).
  */
 router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
@@ -476,8 +480,26 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
 
   const quests = await prisma.quest.findMany({
     where: { userId, questDate: today, status: 'pending' },
-    include: { module: { select: { key: true, name: true, color: true, icon: true } } },
+    include: {
+      module: { select: { key: true, name: true, color: true, icon: true } },
+      habit: { select: { weatherRule: true } },
+    },
   });
+
+  // LAST CLEAR DAY: an outdoor quest that passes its weather rule today
+  // (it generated, so it did) but would FAIL tomorrow gets boosted —
+  // "tomorrow will be rainy/hot, do it while you can". One cached
+  // snapshot covers every check; no snapshot → no boosts.
+  const lastClearIds = new Set<string>();
+  const outdoorRules = quests
+    .map(q => ({ id: q.id, rule: WeatherService.parseRule(q.habit?.weatherRule ?? null) }))
+    .filter((x): x is { id: string; rule: NonNullable<ReturnType<typeof WeatherService.parseRule>> } => x.rule !== null);
+  if (outdoorRules.length > 0) {
+    const snap = await weather.getSnapshot();
+    for (const { id, rule } of outdoorRules) {
+      if (!weather.passesTomorrow(rule, snap)) lastClearIds.add(id);
+    }
+  }
 
   const nowHour = new Date().getHours();
   const windowOpenNow = (meta: any): boolean => {
@@ -504,6 +526,8 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
     }
     // Hard deadlines rank above nice-to-haves: bill reminders are due-dated.
     if (q.source === 'bill') s += 800;
+    // Tomorrow's forecast blocks this outdoor quest → today's the day.
+    if (lastClearIds.has(q.id)) s += 1_200;
     if (windowOpenNow(meta)) s += 1_000;
     s += q.xpReward; // higher reward ranks higher
     // The GENERIC "log a workout" filler (source workout, no sourceId) is a
@@ -544,6 +568,7 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
       module: q.module,
       meta: parseJson(q.meta),
       inPlan: fits,
+      lastClearDay: lastClearIds.has(q.id),
     };
   });
 
