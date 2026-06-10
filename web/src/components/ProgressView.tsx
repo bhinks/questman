@@ -1,19 +1,18 @@
 /**
  * ProgressView — "Street Cred" (NIGHT CITY direction).
  *
- * Focal cred strip (level hex + XP bar + badge count), XP velocity (12 ISO
- * weeks bucketed client-side from the XP ledger), XP by module (domainXp),
- * the badge wall (GET /api/achievements), a 7×17 activity grid (completed
+ * The ANALYTICS view: XP velocity (12 ISO weeks bucketed client-side from
+ * the XP ledger), XP by module (domainXp), a 7×17 activity grid (completed
  * quests per local day, last 119 days), and the original "data-shard log" —
- * the combined XP/eddie ledger feed (roadmap §8), now styled as a terminal.
+ * the combined XP/eddie ledger feed (roadmap §8), styled as a terminal.
+ * (The cred strip + badge wall live on the Street Cred page, per Brent.)
  * Level and balances are pure functions of these ledgers server-side, so a
  * grant survives the deletion of whatever produced it.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { Achievement, AchievementsResponse, LedgerEntry, PlayerStats } from '../lib/api';
-import { Icon } from './Icon';
+import type { LedgerEntry, PlayerStats } from '../lib/api';
 
 type CurrencyFilter = 'all' | 'xp' | 'eddies';
 
@@ -54,7 +53,6 @@ interface HistoryQuest { id: string; questDate: string; status: string; }
 
 export function ProgressView() {
   const [currency, setCurrency] = useState<CurrencyFilter>('all');
-  const qc = useQueryClient();
 
   const statsQ = useQuery({
     queryKey: ['player', 'stats'],
@@ -74,11 +72,6 @@ export function ProgressView() {
       .then(r => r.entries),
   });
 
-  const achQ = useQuery({
-    queryKey: ['achievements'],
-    queryFn: () => api.get<AchievementsResponse>('/api/achievements'),
-  });
-
   // Completed quests per local day for the activity grid.
   const histQ = useQuery({
     queryKey: ['quests', 'history', 'grid'],
@@ -90,12 +83,6 @@ export function ProgressView() {
       ).then(r => r.quests);
     },
   });
-
-  // The achievements GET evaluates lazily and may have just unlocked + paid
-  // out — refresh the player HUD so balances stay honest.
-  useEffect(() => {
-    if (achQ.data) qc.invalidateQueries({ queryKey: ['player'] });
-  }, [achQ.data, qc]);
 
   // ---- derived: weekly XP velocity (sum of positive grants per ISO week) ----
   const weekly = useMemo(() => {
@@ -135,11 +122,6 @@ export function ProgressView() {
 
   const { player } = statsQ.data;
   const entries = ledgerQ.data ?? [];
-  const ach = achQ.data;
-
-  const levelPct = Math.min(100, player.xpForNextLevel > 0
-    ? (player.xpIntoLevel / player.xpForNextLevel) * 100
-    : 100);
 
   const maxWeek = Math.max(...weekly, 1);
   const domain = Object.entries(player.domainXp).sort((a, b) => b[1] - a[1]);
@@ -148,39 +130,8 @@ export function ProgressView() {
   return (
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ---- focal cred strip ---- */}
-      <div className="ncx-ticks">
-        <span className="tick" style={{ top: -4, left: -4, color: 'var(--cyan)' }} />
-        <span className="tick" style={{ bottom: -4, right: -4, color: 'var(--cyan)' }} />
-        <div className="ncx-panel focal" style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '18px 24px' }}>
-          <div className="ncx-hex" style={{ width: 56, height: 56, fontSize: 22, boxShadow: '0 0 24px -4px rgba(var(--accent-rgb),0.6)' }}>
-            {player.level}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span className="kicker" style={{ fontSize: 10 }}>STREET CRED {player.level} → {player.level + 1}</span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                {player.totalXp.toLocaleString()} LIFETIME XP
-              </span>
-            </div>
-            <div className="ncx-bar">
-              <i style={{
-                width: `${levelPct}%`,
-                background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))',
-                boxShadow: '0 0 14px rgba(var(--accent-rgb),0.5)',
-              }} />
-              <span className="seg-mask" />
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', paddingLeft: 22, borderLeft: '1px solid var(--line)' }}>
-            <div className="kicker" style={{ fontSize: 9 }}>BADGES</div>
-            <div className="ncx-val" style={{ fontSize: 24 }}>
-              {ach ? ach.unlockedCount : '–'}
-              <span style={{ color: 'var(--text-faint)', fontSize: 15 }}>/{ach ? ach.totalCount : '–'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* (The cred strip + badge wall live on the Street Cred page — this
+          screen is the analytics view: velocity, modules, activity, ledger.) */}
 
       {/* ---- two-up: XP velocity / XP by module ---- */}
       <div className="split-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -235,18 +186,6 @@ export function ProgressView() {
         </div>
       </div>
 
-      {/* ---- badge wall ---- */}
-      <div className="mono" style={SECTION}>STREET CRED — BADGE WALL</div>
-      {achQ.isLoading ? (
-        <Empty>READING STREET CRED…</Empty>
-      ) : achQ.isError ? (
-        <Empty color="var(--red)">FAILED TO LOAD STREET CRED</Empty>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-          {(ach?.achievements ?? []).map(a => <BadgeCard key={a.key} a={a} />)}
-        </div>
-      )}
-
       {/* ---- activity grid ---- */}
       <div className="ncx-panel" style={{ padding: 20 }}>
         <div style={{ display: 'flex', marginBottom: 14 }}>
@@ -293,42 +232,6 @@ export function ProgressView() {
             <span className="cursor-blink cy">▌</span>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-/** Hex achievement chip + name/desc + unlock date or progress meter. */
-function BadgeCard({ a }: { a: Achievement }) {
-  const unlocked = a.unlocked;
-  const progress = Math.max(0, Math.min(1, a.progress ?? 0));
-  return (
-    <div className="ncx-panel" style={{ padding: 14, display: 'flex', gap: 12, opacity: unlocked ? 1 : 0.5 }}>
-      <div style={{
-        width: 40, height: 40, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
-        background: unlocked
-          ? 'linear-gradient(150deg, rgba(var(--accent-rgb),0.3), color-mix(in srgb, var(--magenta) 25%, transparent))'
-          : '#10121f',
-        color: unlocked ? '#dffaff' : 'var(--text-ghost)',
-      }}>
-        <Icon name={unlocked ? a.icon : 'lock'} size={16} />
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{a.name}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 3, lineHeight: 1.45 }}>{a.description}</div>
-        {unlocked ? (
-          <div className="mono" style={{ fontSize: 9, color: 'var(--lime)', letterSpacing: '0.14em', marginTop: 5 }}>
-            ✓ {a.unlockedAt
-              ? new Date(a.unlockedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase()
-              : 'UNLOCKED'}
-          </div>
-        ) : a.progress != null ? (
-          <div className="ncx-bar slim" style={{ marginTop: 7 }}>
-            <i style={{ width: `${progress * 100}%`, background: 'var(--cyan)', opacity: 0.55 }} />
-            <span className="seg-mask" />
-          </div>
-        ) : null}
       </div>
     </div>
   );

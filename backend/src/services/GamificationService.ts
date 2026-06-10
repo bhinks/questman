@@ -90,6 +90,8 @@ export interface PlayerSnapshot {
   budgetBoostOn: Date | null;   // Time Dilation day (+2h planner budget)
   cosmetics: string[];
   equippedTheme: string | null;
+  equippedFont: string | null;  // display-font pack (Night Market)
+  equippedFx: string | null;    // ambient FX pack (Night Market)
   /** Daily capacity/battery (World Mechanics). Optional: only the read path
    *  (getSnapshot) computes it; awardXp leaves it undefined to avoid an extra
    *  per-award query — the HUD reads it from GET /api/player. */
@@ -202,6 +204,8 @@ export class GamificationService {
       budgetBoostOn: p.budgetBoostOn,
       cosmetics: parseCosmetics(p.cosmetics),
       equippedTheme: p.equippedTheme,
+      equippedFont: p.equippedFont,
+      equippedFx: p.equippedFx,
       energy,
     };
   }
@@ -385,6 +389,8 @@ export class GamificationService {
         budgetBoostOn: before.budgetBoostOn,
         cosmetics: parseCosmetics(before.cosmetics),
         equippedTheme: before.equippedTheme,
+        equippedFont: before.equippedFont,
+        equippedFx: before.equippedFx,
         leveledUp: nextLevel > previousLevel,
         previousLevel,
         eddieMultiplierApplied: earn && mult > 1 ? mult : undefined,

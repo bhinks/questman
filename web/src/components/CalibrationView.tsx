@@ -208,8 +208,8 @@ export function CalibrationView() {
               morphing (verified stuck-transition pitfall). */}
           <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 64px', gap: 14, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid var(--line)' }}>
             <div>
-              <div style={SECTION_HEADER}>TICKER</div>
-              <div className="ncx-serial" style={{ marginTop: 4 }}>HANDLER MARQUEE</div>
+              <div style={SECTION_HEADER}>HANDLER FEED</div>
+              <div className="ncx-serial" style={{ marginTop: 4 }}>TODAY-PAGE HANDLER CARD</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button

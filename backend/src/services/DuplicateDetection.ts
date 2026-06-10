@@ -9,6 +9,8 @@ export interface TransactionInput {
   originalDescription?: string;
   sourceFile?: string;
   sourceRow?: number;
+  // Optional source-account label carried through from the import mapping.
+  account?: string | null;
 }
 
 export interface DuplicateCheckResult {
@@ -216,7 +218,8 @@ export class DuplicateDetection {
             // The source filename lives on the linked Import record; the
             // Transaction model has no `sourceFile` column.
             importId: importId || null,
-            notes: transaction.sourceRow ? `Imported from row ${transaction.sourceRow}` : null
+            notes: transaction.sourceRow ? `Imported from row ${transaction.sourceRow}` : null,
+            account: transaction.account ?? null
           }
         });
 

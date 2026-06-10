@@ -6,15 +6,21 @@
  * backend stores `exercises` as JSON so the UI can evolve without a
  * migration. XP is awarded automatically on POST.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { Workout } from '../lib/api';
+import type { Workout, WorkoutPlan, WorkoutPlanResponse } from '../lib/api';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type WorkoutType = 'strength' | 'cardio' | 'mobility' | 'sport' | 'other';
 type Intensity = 'low' | 'moderate' | 'high';
+
+const SESSION_TYPES: WorkoutType[] = ['strength', 'cardio', 'mobility', 'sport', 'other'];
+
+function coerceType(t: string | undefined | null): WorkoutType {
+  return (SESSION_TYPES as string[]).includes(t ?? '') ? (t as WorkoutType) : 'strength';
+}
 
 interface ExerciseRow {
   exercise: string;
@@ -39,6 +45,19 @@ export function WorkoutLogger() {
   // the same key; the server dedupes the second (no double XP/eddie payout).
   // Reset to a fresh key after a successful log so the next session is its own.
   const [clientRequestId, setClientRequestId] = useState(() => crypto.randomUUID());
+
+  // "LOG" on a weekly-protocol slot pre-fills the form below and jumps to it.
+  const formRef = useRef<HTMLFormElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const prefillFromPlan = (plan: WorkoutPlan) => {
+    setTitle(plan.title);
+    setType(coerceType(plan.type));
+    if (plan.targetMin != null) setDurationMin(plan.targetMin);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      titleInputRef.current?.focus({ preventScroll: true });
+    });
+  };
 
   const del = useMutation({
     mutationFn: (id: string) => api.del(`/api/workouts/${id}`),
@@ -75,7 +94,10 @@ export function WorkoutLogger() {
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <Header />
 
+      <WeeklyProtocol onLogSlot={prefillFromPlan} />
+
       <form
+        ref={formRef}
         className="panel"
         style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}
         onSubmit={e => { e.preventDefault(); log.mutate(); }}
@@ -107,6 +129,7 @@ export function WorkoutLogger() {
 
         <Field label="TITLE (optional)">
           <input
+            ref={titleInputRef}
             placeholder='e.g. "Push day", "5k run"'
             value={title}
             onChange={e => setTitle(e.target.value)}
@@ -166,6 +189,241 @@ function Header() {
       <div>
         <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>WORKOUTS</h2>
         <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3 }}>TRAINING SESSIONS · XP BANKED ON LOG</div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------- weekly protocol -- */
+
+// Display Monday-first; values stay JS getDay numbers (0=Sun..6=Sat).
+const WEEK: { dow: number; label: string }[] = [
+  { dow: 1, label: 'MON' }, { dow: 2, label: 'TUE' }, { dow: 3, label: 'WED' },
+  { dow: 4, label: 'THU' }, { dow: 5, label: 'FRI' }, { dow: 6, label: 'SAT' },
+  { dow: 0, label: 'SUN' },
+];
+
+const TYPE_COLOR: Record<string, string> = {
+  strength: 'var(--magenta)',
+  cardio:   'var(--cyan)',
+  mobility: 'var(--teal)',
+  sport:    'var(--amber)',
+  other:    'var(--text-dim)',
+};
+
+interface PlanBody {
+  title: string;
+  type: string;
+  targetMin: number | null;
+  notes: string | null;
+}
+
+/**
+ * WEEKLY PROTOCOL — the planned training week as a 7-column strip.
+ * Each slot can be logged (pre-fills the form below), edited inline,
+ * or deleted; each day has an "+ ADD" affordance. Plan changes feed
+ * tomorrow's quest candidates, so create/delete also refresh quests.
+ */
+function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void }) {
+  const qc = useQueryClient();
+  const plansQ = useQuery({
+    queryKey: ['workouts', 'plan'],
+    queryFn: () => api.get<WorkoutPlanResponse>('/api/workouts/plan').then(r => r.plans),
+  });
+
+  const [addingDay, setAddingDay] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const invalidatePlan = () => qc.invalidateQueries({ queryKey: ['workouts', 'plan'] });
+  const invalidateQuests = () => qc.invalidateQueries({ queryKey: ['quests', 'today'] });
+
+  const create = useMutation({
+    mutationFn: (body: PlanBody & { dayOfWeek: number }) => api.post('/api/workouts/plan', body),
+    onSuccess: () => { setAddingDay(null); invalidatePlan(); invalidateQuests(); },
+  });
+  const update = useMutation({
+    mutationFn: ({ id, ...body }: PlanBody & { id: string }) => api.put(`/api/workouts/plan/${id}`, body),
+    onSuccess: () => { setEditingId(null); invalidatePlan(); },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.del(`/api/workouts/plan/${id}`),
+    onSuccess: () => { invalidatePlan(); invalidateQuests(); },
+  });
+
+  const plans = plansQ.data ?? [];
+  const todayDow = new Date().getDay();
+
+  return (
+    <section className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>WEEKLY PROTOCOL</span>
+        <span style={{ flex: 1 }} />
+        <span className="ncx-serial">{plans.length} SLOT{plans.length === 1 ? '' : 'S'}</span>
+      </div>
+
+      {plansQ.isLoading ? (
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SYNCING PROTOCOL…</div>
+      ) : plans.length === 0 && (
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
+          NO PROTOCOL ON FILE — lay out your training week
+        </div>
+      )}
+
+      <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6, minWidth: 660 }}>
+          {WEEK.map(({ dow, label }) => {
+            const isToday = dow === todayDow;
+            const daySlots = plans.filter(p => p.dayOfWeek === dow);
+            return (
+              <div
+                key={dow}
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 6, padding: 6,
+                  border: isToday ? '1px solid rgba(var(--accent-rgb), 0.45)' : '1px solid var(--line)',
+                  background: isToday ? 'rgba(var(--accent-rgb), 0.05)' : 'transparent',
+                }}
+              >
+                <div className="mono" style={{
+                  fontSize: 9, letterSpacing: '0.22em', fontWeight: 700, textAlign: 'center',
+                  color: isToday ? 'rgba(var(--accent-rgb), 0.95)' : 'var(--text-faint)',
+                }}>
+                  {label}
+                </div>
+
+                {daySlots.map(plan => editingId === plan.id ? (
+                  <PlanForm
+                    key={plan.id}
+                    initial={plan}
+                    busy={update.isPending}
+                    onSave={body => update.mutate({ id: plan.id, ...body })}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ) : (
+                  <PlanSlot
+                    key={plan.id}
+                    plan={plan}
+                    busy={remove.isPending}
+                    onLog={() => onLogSlot(plan)}
+                    onEdit={() => { setEditingId(plan.id); setAddingDay(null); }}
+                    onDelete={() => remove.mutate(plan.id)}
+                  />
+                ))}
+
+                {addingDay === dow ? (
+                  <PlanForm
+                    busy={create.isPending}
+                    onSave={body => create.mutate({ dayOfWeek: dow, ...body })}
+                    onCancel={() => setAddingDay(null)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ padding: '3px 6px', fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-faint)', justifyContent: 'center' }}
+                    onClick={() => { setAddingDay(dow); setEditingId(null); }}
+                  >
+                    <Icon name="plus" size={9} /> ADD
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** One planned slot card in a day column. */
+function PlanSlot({
+  plan, busy, onLog, onEdit, onDelete,
+}: { plan: WorkoutPlan; busy: boolean; onLog: () => void; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <div className="panel-inset" style={{ padding: 7, display: 'flex', flexDirection: 'column', gap: 5, opacity: plan.isActive ? 1 : 0.45 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'break-word' }}>{plan.title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+        <span className="ncx-stamp flat" style={{ fontSize: 8, padding: '1px 5px', letterSpacing: '0.12em', color: TYPE_COLOR[plan.type] ?? 'var(--text-dim)' }}>
+          {plan.type}
+        </span>
+        {plan.targetMin != null && (
+          <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <Icon name="clock" size={9} /> {plan.targetMin}m
+          </span>
+        )}
+      </div>
+      {plan.notes && (
+        <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', lineHeight: 1.4, overflowWrap: 'break-word' }}>{plan.notes}</div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+        <button type="button" className="btn btn-ghost" style={{ padding: '2px 7px', fontSize: 9, letterSpacing: '0.14em' }} onClick={onLog}>
+          LOG
+        </button>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="btn btn-ghost" style={{ padding: '2px 5px' }} onClick={onEdit} aria-label="Edit slot">
+          <Icon name="edit" size={10} />
+        </button>
+        <button type="button" className="btn btn-ghost" style={{ padding: '2px 5px', color: 'var(--red)' }} onClick={onDelete} disabled={busy} aria-label="Delete slot">
+          <Icon name="close" size={10} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Inline add/edit form for a plan slot (fits inside a day column). */
+function PlanForm({
+  initial, busy, onSave, onCancel,
+}: { initial?: WorkoutPlan; busy: boolean; onSave: (body: PlanBody) => void; onCancel: () => void }) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [type, setType] = useState<WorkoutType>(coerceType(initial?.type));
+  const [targetMin, setTargetMin] = useState<string>(initial?.targetMin != null ? String(initial.targetMin) : '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+
+  const slotInput: React.CSSProperties = { ...inputStyle, padding: '5px 8px', fontSize: 11, width: '100%', boxSizing: 'border-box' };
+
+  const submit = () => {
+    if (!title.trim()) return;
+    const mins = Number(targetMin);
+    onSave({
+      title: title.trim(),
+      type,
+      targetMin: targetMin !== '' && Number.isFinite(mins) && mins > 0 ? Math.round(mins) : null,
+      notes: notes.trim() || null,
+    });
+  };
+
+  return (
+    <div className="panel-inset" style={{ padding: 7, display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <input
+        placeholder="Title" autoFocus
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+        style={slotInput}
+      />
+      <select value={type} onChange={e => setType(coerceType(e.target.value))} style={slotInput}>
+        {SESSION_TYPES.map(t => <option key={t} value={t}>{t[0].toUpperCase()}{t.slice(1)}</option>)}
+      </select>
+      <input
+        type="number" min={0} max={720} placeholder="Min"
+        value={targetMin}
+        onChange={e => setTargetMin(e.target.value)}
+        style={slotInput}
+      />
+      <input
+        placeholder="Notes"
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+        style={slotInput}
+      />
+      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+        <button type="button" className="btn btn-ghost" style={{ padding: '2px 6px' }} onClick={onCancel} aria-label="Cancel">
+          <Icon name="close" size={10} />
+        </button>
+        <button type="button" className="btn btn-primary" style={{ padding: '2px 6px' }} onClick={submit} disabled={busy || !title.trim()} aria-label="Save slot">
+          <Icon name="check" size={10} />
+        </button>
       </div>
     </div>
   );

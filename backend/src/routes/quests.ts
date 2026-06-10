@@ -496,8 +496,20 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
     const meta = parseJson<any>(q.meta);
     let s = 0;
     if (q.mustDo) s += 10_000;
+    // Neglect: carried-over quests climb the board ~one tier per day stuck
+    // ("something that has been neglected for several days").
+    if (q.originDate) {
+      const carriedDays = Math.max(0, Math.round((today.getTime() - startOfLocalDay(q.originDate).getTime()) / 86_400_000));
+      s += Math.min(4, carriedDays) * 600;
+    }
+    // Hard deadlines rank above nice-to-haves: bill reminders are due-dated.
+    if (q.source === 'bill') s += 800;
     if (windowOpenNow(meta)) s += 1_000;
     s += q.xpReward; // higher reward ranks higher
+    // The GENERIC "log a workout" filler (source workout, no sourceId) is a
+    // fallback, not a commitment — it shouldn't permanently squat the top
+    // slot. Scheduled/specific workouts (with a sourceId) are unaffected.
+    if (q.source === 'workout' && !q.sourceId) s -= 200;
     return s;
   };
 

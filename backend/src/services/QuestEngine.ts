@@ -41,6 +41,7 @@ import { buildVitalsCandidates } from '../routes/metrics';
 import { buildNpcCandidates } from '../routes/npcs';
 import { buildBudgetCandidates } from '../routes/budgets';
 import { buildBillCandidates } from '../routes/recurring';
+import { buildWorkoutCandidates } from '../routes/workouts';
 
 type Tx = Prisma.TransactionClient;
 
@@ -654,21 +655,13 @@ export class QuestEngine {
       }
     }
 
-    // --- Fitness: "log a workout today" if none yet ---
-    const workoutToday = await this.prisma.workoutSession.findFirst({
-      where: { userId, performedAt: { gte: date } },
-      select: { id: true },
-    });
-    if (!workoutToday) {
-      out.push({
-        candidateId: nextId(),
-        source: 'workout',
-        sourceId: null,
-        moduleKey: 'fitness',
-        baseTitle: 'Log a workout',
-        difficulty: 'medium',
-        xpReward: XP_BY_DIFFICULTY.medium,
-      });
+    // --- Fitness: today's scheduled plan slots, or the generic "log a
+    // workout" fallback. Owned by routes/workouts.ts; guarded like the
+    // pool builders above — a failure must never block generation.
+    try {
+      out.push(...await buildWorkoutCandidates(this.prisma, userId, date, nextId));
+    } catch (err: any) {
+      logger.warn(`[QuestEngine] workout candidate builder failed: ${err?.message ?? err}`);
     }
 
     // --- Finance: top 1-2 active WastefulPattern rows, if any. ---

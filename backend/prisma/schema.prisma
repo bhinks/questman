@@ -64,6 +64,9 @@ model User {
   // Finance depth (phase 7): recurring bills / subscription audit
   recurringExpenses    RecurringExpense[]
 
+  // Weekly workout plan (phase 8)
+  workoutPlans         WorkoutPlan[]
+
   @@map("users")
 }
 
@@ -153,6 +156,11 @@ model Transaction {
   importId    String?
   import      Import?   @relation(fields: [importId], references: [id])
   
+  // Source account ("checking", "amex", …) — captured from the optional
+  // Account column on import. A filter dimension only; NO account
+  // integration, balances, or sync (per Brent).
+  account     String?
+
   // Notes and tags
   notes       String?
   tags        String?   // JSON array of tags
@@ -493,6 +501,30 @@ model HabitCompletion {
   @@map("habit_completions")
 }
 
+// A weekly workout TEMPLATE entry ("push day every Monday"). Brent lays the
+// plan out once; each week the planned slot for today feeds a specific quest
+// candidate and pre-fills the logger. Actuals are still WorkoutSessions —
+// the plan is the intention, the session is the receipt.
+model WorkoutPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dayOfWeek   Int      // 0=Sunday .. 6=Saturday (JS Date.getDay convention)
+  title       String   // "Push day", "Long run"
+  type        String   @default("strength") // mirrors WorkoutSession.type
+  targetMin   Int?     // intended duration
+  notes       String?  // "bench/OHP/dips"
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, dayOfWeek])
+  @@map("workout_plans")
+}
+
 model WorkoutSession {
   id          String   @id @default(cuid())
   userId      String
@@ -572,10 +604,13 @@ model PlayerProfile {
   // ISO-week key (e.g. "2026-W24") of the last weekly token grant, so the
   // allowance refills once per week, lazily, on the first run of the week.
   lastTokenGrantWeek String?
-  // Cosmetics: JSON array of unlocked cosmetic keys; equippedTheme is the
-  // active HUD palette (null = default neon).
+  // Cosmetics: JSON array of unlocked cosmetic keys (themes, fonts, FX,
+  // personas); equippedTheme is the active HUD palette (null = default neon).
   cosmetics     String?
   equippedTheme String?
+  // Night Market expansion: independently-equippable cosmetic slots.
+  equippedFont  String?  // display-font pack key (null = stock Chakra Petch)
+  equippedFx    String?  // ambient FX pack key (null = none)
   // --- World mechanics (phase 5): energy / battery ---
   // A daily capacity tier derived from sleep (vitals sleepHours) with a
   // manual override. "low"|"med"|"high". energyOverrideOn pins the override

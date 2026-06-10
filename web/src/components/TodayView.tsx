@@ -18,7 +18,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry } from '../lib/api';
+import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry, HandlerLatestResponse, HandlerPersona } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
 
@@ -62,6 +62,81 @@ function fmtHm(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m ? `${h}H${String(m).padStart(2, '0')}` : `${h}H`;
+}
+
+/** Persona key → display label + accent. */
+const PERSONA_META: Record<HandlerPersona, { label: string; accent: string }> = {
+  rogue_ai:  { label: 'ROGUE AI',  accent: 'var(--violet)' },
+  fixer:     { label: 'FIXER',     accent: 'var(--cyan)' },
+  ripperdoc: { label: 'RIPPERDOC', accent: 'var(--magenta)' },
+};
+
+/**
+ * HandlerCard — the Handler's latest line, full-width under the HUD strip
+ * (moved here from the topbar ticker, which truncated on narrow screens).
+ * Dismiss marks it seen; a fresh line (socket push) brings the card back.
+ */
+function HandlerCard() {
+  const qc = useQueryClient();
+  const handlerQ = useQuery({
+    queryKey: ['handler', 'latest'],
+    queryFn: () => api.get<HandlerLatestResponse>('/api/handler/latest'),
+  });
+
+  useEffect(() => {
+    const s = getSocket();
+    if (!s) return;
+    const refresh = () => qc.invalidateQueries({ queryKey: ['handler', 'latest'] });
+    s.on('handler-message', refresh);
+    return () => { s.off('handler-message', refresh); };
+  }, [qc]);
+
+  const dismiss = useMutation({
+    mutationFn: (id: string) => api.post('/api/handler/seen', { ids: [id] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['handler', 'latest'] }),
+  });
+
+  // The calibration "HANDLER FEED" toggle (formerly the topbar ticker knob)
+  // gates this card.
+  const settingsQ = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<{ settings: { tickerEnabled: boolean } }>('/api/settings').then(r => r.settings),
+    staleTime: 5 * 60_000,
+  });
+
+  const data = handlerQ.data;
+  if (settingsQ.data?.tickerEnabled === false) return null;
+  if (!data?.enabled) return null;
+  const msg = data.message;
+  if (!msg || msg.seen) return null;
+
+  const meta = PERSONA_META[(msg.persona ?? data.persona) as HandlerPersona] ?? PERSONA_META.rogue_ai;
+  return (
+    <div
+      className="panel"
+      style={{
+        padding: '13px 18px', display: 'flex', alignItems: 'flex-start', gap: 12,
+        borderLeft: `3px solid ${meta.accent}`,
+        background: `linear-gradient(90deg, color-mix(in srgb, ${meta.accent} 7%, transparent), transparent 55%), #0b0c16`,
+      }}
+    >
+      <span className="kicker" style={{ color: meta.accent, flexShrink: 0, marginTop: 2 }}>
+        HANDLER · {meta.label}
+      </span>
+      <span style={{ flex: 1, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text)' }}>
+        {msg.text}
+      </span>
+      <button
+        className="btn btn-ghost"
+        title="Dismiss"
+        disabled={dismiss.isPending}
+        onClick={() => dismiss.mutate(msg.id)}
+        style={{ padding: '4px 7px', flexShrink: 0, color: 'var(--text-faint)' }}
+      >
+        <Icon name="close" size={12} />
+      </button>
+    </div>
+  );
 }
 
 /** ISO week number (Mon-based — matches the server's isoWeekKey / debrief cadence). */
@@ -308,6 +383,9 @@ export function TodayView() {
         </div>
       </Ticks>
 
+      {/* Handler line — full width, full text (moved here from the topbar). */}
+      <HandlerCard />
+
       {today.totalCount === 0 ? (
         <div className="panel hud" style={{ padding: '34px 24px', textAlign: 'center' }}>
           <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700 }}>NO CONTRACTS ON FILE</div>
@@ -439,8 +517,22 @@ export function TodayView() {
                   <span style={{ flex: 1 }} />
                   <span className="ncx-serial">ENV.SCAN</span>
                 </div>
+                {/* Full conditions readout — high/low, precipitation, wind. */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                  {[
+                    ['HIGH', `${weather.tempMaxF}°F`],
+                    ['LOW', `${weather.tempMinF}°F`],
+                    ['RAIN', `${weather.rainTodayIn.toFixed(2)}"`],
+                    ['WIND', `${weather.windMaxMph} MPH`],
+                  ].map(([k, v]) => (
+                    <div key={k} className="panel-inset" style={{ flex: 1, padding: '7px 4px', textAlign: 'center' }}>
+                      <div className="mono" style={{ fontSize: 8, letterSpacing: '0.2em', color: 'var(--text-ghost)' }}>{k}</div>
+                      <div className="ncx-val" style={{ fontSize: 12.5, marginTop: 3 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
                 {bestWindowQuest && (
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', marginTop: 8, lineHeight: 1.6 }}>
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', marginTop: 10, lineHeight: 1.6 }}>
                     ▴ BEST WINDOW · {bestWindowQuest.title.toUpperCase()} {bestWindowQuest.meta!.bestWindow}
                   </div>
                 )}
@@ -535,15 +627,22 @@ function LedgerRow({
   const skipped = quest.status === 'skipped';
   const isCounter = quest.targetCount > 1;
 
+  // Days this quest has been carried forward (0 = generated today).
+  const carriedDays = quest.originDate
+    ? Math.max(0, Math.round((new Date().setHours(0, 0, 0, 0) - new Date(quest.originDate).setHours(0, 0, 0, 0)) / 86_400_000))
+    : 0;
+
   const meta = skipped
     ? 'SKIPPED — STREAK SAFE'
     : done
       ? 'CLEARED'
       : [
           quest.module.name.toUpperCase(),
-          quest.estMinutes != null ? `${quest.estMinutes}M` : null,
-          quest.carryOver ? 'CARRY-OVER' : null,
+          quest.difficulty.toUpperCase(),
+          quest.estMinutes != null ? `EST ${quest.estMinutes}M` : null,
+          quest.source === 'bill' ? 'DUE' : null,
           quest.meta?.bestWindow ? `BEST WINDOW ${quest.meta.bestWindow}` : null,
+          isCounter ? `${quest.currentCount}/${quest.targetCount} CHECKED` : null,
         ].filter(Boolean).join(' · ');
 
   return (
@@ -553,7 +652,22 @@ function LedgerRow({
         <Icon name={done ? 'check' : moduleIcon(quest.module.key)} size={18} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="ncx-row-title-text" style={{ fontSize: 14, fontWeight: 500 }}>{quest.title}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+          <span className="ncx-row-title-text" style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {quest.title}
+          </span>
+          {!done && !skipped && carriedDays > 0 && (
+            <span className="mono" style={{ flex: 'none', fontSize: 8.5, letterSpacing: '0.14em', color: 'var(--amber)' }}>
+              CARRIED ×{carriedDays}D
+            </span>
+          )}
+        </div>
+        {/* The underlying activity — the themed title alone can be cryptic. */}
+        {!done && !skipped && quest.description && quest.description !== quest.title && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {quest.description}
+          </div>
+        )}
         <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 3 }}>
           {meta}
         </div>

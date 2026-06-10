@@ -9,14 +9,44 @@ import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { config } from '../config';
+import { ALL_PERSONA_KEYS, FREE_PERSONA_KEYS, Persona } from '../services/handler';
+import { SHOP_ITEMS } from '../services/shopCatalog';
 
 const router = express.Router();
 
 function parseJson(raw: string | null): unknown {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
+}
+
+/** Parse PlayerProfile.cosmetics (JSON-string array) defensively. */
+function parseCosmetics(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Persona display copy. Free trio first; paid voices are Night Market goods
+ *  (price comes from the shop catalog so it lives in exactly one place). */
+const PERSONA_OPTIONS: { key: Persona; label: string; blurb: string; free: boolean }[] = [
+  { key: 'rogue_ai', label: 'Rogue AI', blurb: 'Sardonic, dry, quietly amused. The default.', free: true },
+  { key: 'fixer', label: 'Fixer', blurb: 'Gruff, all-business, hands you the gig.', free: true },
+  { key: 'ripperdoc', label: 'Ripperdoc', blurb: 'Upbeat, clinical, optimizes your day.', free: true },
+  { key: 'drill', label: 'Drill Sergeant', blurb: 'Barked orders, zero sympathy, secretly proud.', free: false },
+  { key: 'zen', label: 'Zen Monk', blurb: 'Koans and stillness. The work is the way.', free: false },
+  { key: 'noir', label: 'Noir Detective', blurb: 'Hardboiled voice-over, rain-slicked metaphors.', free: false },
+  { key: 'showman', label: 'The Showman', blurb: 'Prime-time hype-man. You are the headline act.', free: false },
+];
+
+/** Catalog price for a paid persona ('persona_<key>'), if listed. */
+function personaPrice(key: Persona): number | undefined {
+  return SHOP_ITEMS.find(i => i.category === 'persona' && i.key === `persona_${key}`)?.priceEddies;
 }
 
 /**
@@ -72,35 +102,52 @@ router.post('/seen', asyncHandler(async (req: AuthRequest, res) => {
 }));
 
 /**
- * GET /api/handler/persona — current persona + the catalog of choices.
+ * GET /api/handler/persona — current persona + ALL personas (free + paid)
+ * with { key, label, blurb, free, owned, priceEddies? } so the UI can
+ * render locked chips for unbought voices.
  */
 router.get('/persona', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
-  const settings = await prisma.userSettings.findUnique({
-    where: { userId }, select: { handlerPersona: true, handlerEnabled: true },
-  });
+  const [settings, profile] = await Promise.all([
+    prisma.userSettings.findUnique({
+      where: { userId }, select: { handlerPersona: true, handlerEnabled: true },
+    }),
+    prisma.playerProfile.findUnique({ where: { userId }, select: { cosmetics: true } }),
+  ]);
+  const ownedKeys = parseCosmetics(profile?.cosmetics);
   res.json({
     persona: settings?.handlerPersona ?? 'rogue_ai',
     enabled: settings?.handlerEnabled ?? true,
-    options: [
-      { key: 'rogue_ai', label: 'Rogue AI', blurb: 'Sardonic, dry, quietly amused. The default.' },
-      { key: 'fixer', label: 'Fixer', blurb: 'Gruff, all-business, hands you the gig.' },
-      { key: 'ripperdoc', label: 'Ripperdoc', blurb: 'Upbeat, clinical, optimizes your day.' },
-    ],
+    options: PERSONA_OPTIONS.map(o => ({
+      ...o,
+      owned: o.free || ownedKeys.includes(`persona_${o.key}`),
+      ...(o.free ? {} : { priceEddies: personaPrice(o.key) }),
+    })),
   });
 }));
 
 /**
  * PUT /api/handler/persona  { persona?, enabled? }
  * Update the Handler's voice / toggle it off. Upserts UserSettings so a user
- * with no settings row yet can still configure it.
+ * with no settings row yet can still configure it. Paid personas require
+ * 'persona_<key>' in PlayerProfile.cosmetics — 400 'Not owned' otherwise;
+ * the free trio is always allowed.
  */
 router.put('/persona', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
   const body = z.object({
-    persona: z.enum(['rogue_ai', 'fixer', 'ripperdoc']).optional(),
+    persona: z.enum(ALL_PERSONA_KEYS).optional(),
     enabled: z.boolean().optional(),
   }).parse(req.body ?? {});
+
+  if (body.persona && !(FREE_PERSONA_KEYS as readonly string[]).includes(body.persona)) {
+    const profile = await prisma.playerProfile.findUnique({
+      where: { userId }, select: { cosmetics: true },
+    });
+    if (!parseCosmetics(profile?.cosmetics).includes(`persona_${body.persona}`)) {
+      throw new AppError('Not owned', 400);
+    }
+  }
 
   const data = {
     ...(body.persona !== undefined ? { handlerPersona: body.persona } : {}),

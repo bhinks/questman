@@ -43,10 +43,17 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
     queryKey: ['habits', 'chore'],
     queryFn: () => api.get<{ habits: Habit[] }>('/api/habits?kind=chore').then(r => r.habits),
   });
+  // Known account labels — datalist suggestions for the free-text field.
+  const acctQ = useQuery({
+    queryKey: ['transactions', 'accounts'],
+    queryFn: () => api.get<{ accounts: string[] }>('/api/transactions/accounts').then(r => r.accounts),
+    staleTime: 5 * 60_000,
+  });
 
   const cats: FinanceCategory[] = catQ.data ?? [];
   const projects: Project[] = projQ.data ?? [];
   const chores: Habit[] = choreQ.data ?? [];
+  const accounts: string[] = acctQ.data ?? [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,10 +143,23 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
             </div>
           </div>
 
-          <div>
-            <label style={labelStyle}>VENDOR</label>
-            <input type="text" value={t.vendor || ''}
-              onChange={(e) => setT(p => ({ ...p, vendor: e.target.value || undefined }))} style={fieldStyle} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>VENDOR</label>
+              <input type="text" value={t.vendor || ''}
+                onChange={(e) => setT(p => ({ ...p, vendor: e.target.value || undefined }))} style={fieldStyle} />
+            </div>
+            <div>
+              {/* Source-account label (free text; cleared field unsets it). */}
+              <label style={labelStyle}>ACCOUNT</label>
+              <input type="text" value={t.account || ''} list="txn-account-options"
+                placeholder="— none —"
+                onChange={(e) => setT(p => ({ ...p, account: e.target.value || undefined }))}
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} />
+              <datalist id="txn-account-options">
+                {accounts.map(a => <option key={a} value={a} />)}
+              </datalist>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

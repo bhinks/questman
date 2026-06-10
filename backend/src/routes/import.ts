@@ -33,7 +33,8 @@ const columnMappingSchema = z.object({
   amount: z.string().min(1, 'Amount column is required'),
   category: z.string().optional(),
   vendor: z.string().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  account: z.string().optional()
 });
 
 const importOptionsSchema = z.object({

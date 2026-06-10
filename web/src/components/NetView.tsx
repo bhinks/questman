@@ -302,6 +302,14 @@ function InsightCard({ insight }: { insight: Insight }) {
 
 // ---- Handler: persona + log ---------------------------------------------
 
+/** The persona endpoint now flags Night-Market voices with free/owned (+price).
+ *  Local extension until lib/api's PersonaOption catches up. */
+type PersonaOptionEx = PersonaResponse['options'][number] & {
+  free?: boolean;
+  owned?: boolean;
+  priceEddies?: number;
+};
+
 function PersonaControl({
   data, loading, error,
 }: { data: PersonaResponse | undefined; loading: boolean; error: boolean }) {
@@ -344,8 +352,44 @@ function PersonaControl({
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {data.options.map(opt => {
+        {(data.options as PersonaOptionEx[]).map(opt => {
           const selected = opt.key === data.persona;
+          // owned === false marks a Night-Market voice not yet bought; free /
+          // legacy responses (no flag) stay selectable.
+          const locked = opt.owned === false;
+
+          if (locked) {
+            return (
+              <div
+                key={opt.key}
+                className="panel-inset"
+                title="Unlock in the Night Market"
+                style={{
+                  flex: '1 1 180px', minWidth: 160, textAlign: 'left',
+                  padding: '10px 12px', cursor: 'not-allowed',
+                  opacity: 0.55,
+                  border: '1px dashed var(--line-2)',
+                  background: 'var(--panel-2)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <Icon name="lock" size={12} style={{ color: 'var(--text-faint)' }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)' }}>
+                    {opt.label}
+                  </span>
+                  {opt.priceEddies != null && (
+                    <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--amber)' }}>
+                      €${opt.priceEddies.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', lineHeight: 1.4 }}>
+                  {opt.blurb}
+                </div>
+              </div>
+            );
+          }
+
           return (
             <button
               key={opt.key}

@@ -22,7 +22,9 @@ const createTransactionSchema = z.object({
   isWasteful: z.boolean().optional(),
   excluded: z.boolean().optional(),
   projectId: z.string().nullable().optional(),
-  choreId: z.string().nullable().optional()
+  choreId: z.string().nullable().optional(),
+  // Source-account label (plain string dimension; null clears it).
+  account: z.string().nullable().optional()
 });
 
 const updateTransactionSchema = createTransactionSchema.partial();
@@ -44,7 +46,9 @@ const querySchema = z.object({
   // excluded rows in-place).
   excluded: z.enum(['true', 'false']).transform(v => v === 'true').optional(),
   projectId: z.string().optional(),
-  choreId: z.string().optional()
+  choreId: z.string().optional(),
+  // Exact-match filter on the source-account label.
+  account: z.string().optional()
 });
 
 const bulkOperationSchema = z.object({
@@ -75,7 +79,8 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     isWasteful,
     excluded,
     projectId,
-    choreId
+    choreId,
+    account
   } = querySchema.parse(req.query);
 
   const offset = (page - 1) * limit;
@@ -98,6 +103,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   if (excluded !== undefined) where.excluded = excluded;
   if (projectId) where.projectId = projectId;
   if (choreId) where.choreId = choreId;
+  if (account) where.account = account;
 
   if (search) {
     // SQLite has no `mode: 'insensitive'` (Postgres-only); `contains`
@@ -140,6 +146,19 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
       hasPrev: page > 1
     }
   });
+}));
+
+// Get distinct source-account labels for filter dropdowns.
+// NOTE: must be registered before GET /:id or "accounts" matches as an id.
+router.get('/accounts', asyncHandler(async (req: AuthRequest, res) => {
+  const rows = await prisma.transaction.findMany({
+    where: { userId: req.user!.id, account: { not: null } },
+    distinct: ['account'],
+    select: { account: true },
+    orderBy: { account: 'asc' }
+  });
+
+  res.json({ accounts: rows.map(r => r.account as string) });
 }));
 
 // Get transaction by ID

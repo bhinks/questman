@@ -72,6 +72,7 @@ function mapApiTransaction(t: ApiTransaction): Transaction {
     choreId: t.choreId ?? undefined,
     projectName: t.project?.name ?? undefined,
     choreName: t.chore?.title ?? undefined,
+    account: t.account ?? undefined,
   };
 }
 
@@ -113,6 +114,18 @@ function HubApp() {
     if (energyTier) el.dataset.energy = energyTier;
     else delete el.dataset.energy;
   }, [energyTier]);
+
+  // Night Market cosmetic slots: display-font + ambient FX packs apply as
+  // data attributes (index.css ships a [data-font]/[data-fx] block per pack).
+  const equippedFont = playerQuery.data?.equippedFont ?? null;
+  const equippedFx = playerQuery.data?.equippedFx ?? null;
+  useEffect(() => {
+    const el = document.documentElement;
+    if (equippedFont) el.dataset.font = equippedFont;
+    else delete el.dataset.font;
+    if (equippedFx) el.dataset.fx = equippedFx;
+    else delete el.dataset.fx;
+  }, [equippedFont, equippedFx]);
 
   // Night City display calibration: apply the per-user CRT knobs as CSS vars
   // on the root. CRT % fans out to the scanline/sweep alphas (handoff formula).
@@ -187,6 +200,7 @@ function HubApp() {
         excluded: t.excluded ?? false,
         projectId: t.projectId ?? null,
         choreId: t.choreId ?? null,
+        account: t.account?.trim() || null,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['transactions'] });

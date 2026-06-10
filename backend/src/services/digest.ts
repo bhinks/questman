@@ -39,6 +39,9 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export interface DailyDigest {
   date: string;
+  /** Explicit local weekday + date label ("Wednesday, June 10") so the
+   *  Handler NEVER has to guess the day — it was confabulating weekdays. */
+  dayLabel: string;
   isWeekend: boolean;
   streak: number;
   overclockStreak: number;
@@ -107,6 +110,7 @@ export async function buildDailyDigest(db: Db, userId: string, day: Date): Promi
 
   return {
     date: dayKey(day),
+    dayLabel: day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     isWeekend: [0, 6].includes(day.getDay()),
     streak: profile?.currentStreak ?? 0,
     overclockStreak: profile?.overclockStreak ?? 0,

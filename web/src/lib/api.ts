@@ -159,8 +159,10 @@ export interface PlayerSnapshot {
   streakShields: number;         // banked shields (each absorbs one missed day)
   boosterUntil: string | null;   // Overdrive expiry — 2× eddies while in the future
   budgetBoostOn: string | null;  // Time Dilation day (+2h planner budget)
-  cosmetics: string[];           // owned cosmetic theme keys
+  cosmetics: string[];           // owned cosmetic keys (themes, fonts, FX, personas)
   equippedTheme: string | null;  // active cosmetic theme key
+  equippedFont: string | null;   // active display-font pack key
+  equippedFx: string | null;     // active ambient FX pack key
   // World mechanics: daily energy/battery (only present on GET /api/player).
   energy?: {
     tier: 'low' | 'med' | 'high';
@@ -177,7 +179,8 @@ export interface PlayerSnapshot {
 // ---- economy & rewards: shop + achievements ------------------------
 
 export type ShopCategory =
-  | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable';
+  | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable'
+  | 'font' | 'fx' | 'persona';
 
 export interface ShopItem {
   key: string;
@@ -472,8 +475,9 @@ export interface ApiTransaction {
   categoryId: string | null;
   category: { id: string; name: string; color: string | null; icon: string | null } | null;
   vendor: { id: string; name: string } | null;
-  // Finance depth: exclusion + chore/project links.
+  // Finance depth: exclusion + chore/project links + source account.
   excluded: boolean;
+  account: string | null;
   projectId: string | null;
   choreId: string | null;
   project: { id: string; name: string } | null;
@@ -515,6 +519,19 @@ export interface WeatherToday {
     windMaxMph: number;
   } | null;
 }
+
+/** One weekly workout-plan slot ("push day every Monday"). */
+export interface WorkoutPlan {
+  id: string;
+  dayOfWeek: number;            // 0=Sunday .. 6=Saturday
+  title: string;
+  type: string;
+  targetMin: number | null;
+  notes: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+export interface WorkoutPlanResponse { plans: WorkoutPlan[]; }
 
 export interface Workout {
   id: string;

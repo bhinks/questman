@@ -7,7 +7,8 @@
  * and loot crates are a gamble for the eddie-rich.
  *
  * Categories:
- *   token_skip | token_reroll | rr_credit | cosmetic | loot_crate
+ *   token_skip | token_reroll | rr_credit | cosmetic | loot_crate | consumable
+ *   | font | fx | persona
  *
  * Purchases record to the Purchase table + a WalletLedger spend entry; the
  * grant (tokens/credits/cosmetic/loot roll) is applied to PlayerProfile,
@@ -16,16 +17,24 @@
  *
  * Cosmetic themeKeys are FIXED to the set index.css already supports:
  *   synthwave | matrix | vaporwave | gold | bloodmoon | arctic
+ *   | toxic | sakura | ronin | ultraviolet
+ *   | edgerunner | arasaka | militech | netrunner | ghost
+ *
+ * Ownership keys in PlayerProfile.cosmetics: themes are BARE keys
+ * ('synthwave'); the newer lines are PREFIXED ('font_orbitron', 'fx_rain',
+ * 'persona_drill') — conveniently identical to their catalog item keys.
  */
 
 export interface ShopItem {
   key: string;
   name: string;
   description: string;
-  category: 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable';
+  category: 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable'
+    | 'font' | 'fx' | 'persona';
   priceEddies: number;
   /** Category-specific payload, e.g. { tokens: 1 }, { themeKey: 'synthwave' },
-   *  or { kind: 'shield' | 'booster' | 'budget' } for consumables. */
+   *  { kind: 'shield' | 'booster' | 'budget' } for consumables, or
+   *  { fontKey } / { fxKey } / { personaKey } for the display/persona lines. */
   payload?: Record<string, unknown>;
 }
 
@@ -46,10 +55,18 @@ export interface LootDrop {
   themePool?: string[];
 }
 
-/** The six fixed cosmetic theme keys index.css ships a [data-theme] for. */
+/** The fixed cosmetic theme keys index.css ships a [data-theme] for. */
 export const COSMETIC_THEME_KEYS = [
   'synthwave', 'matrix', 'vaporwave', 'gold', 'bloodmoon', 'arctic',
+  'toxic', 'sakura', 'ronin', 'ultraviolet',
+  'edgerunner', 'arasaka', 'militech', 'netrunner', 'ghost',
 ] as const;
+
+/** Display-font pack keys index.css ships a html[data-font] block for. */
+export const FONT_KEYS = ['orbitron', 'vt323', 'spacemono', 'sharetech'] as const;
+
+/** Ambient FX pack keys index.css ships a html[data-fx] block for. */
+export const FX_KEYS = ['rain', 'aurora', 'vhs', 'datastream', 'radar', 'crt'] as const;
 
 export const SHOP_ITEMS: ShopItem[] = [
   // ---- Skip tokens (drop a quest, no penalty) ------------------------
@@ -154,6 +171,200 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'cosmetic',
     priceEddies: 600,
     payload: { themeKey: 'bloodmoon' },
+  },
+
+  // ---- Cosmetic themes, second wave (slightly premium) ----------------
+  {
+    key: 'theme_toxic',
+    name: 'Theme: Toxic',
+    description: 'Acid green-yellow biohazard glow. Looks like it voids warranties.',
+    category: 'cosmetic',
+    priceEddies: 450,
+    payload: { themeKey: 'toxic' },
+  },
+  {
+    key: 'theme_sakura',
+    name: 'Theme: Sakura',
+    description: 'Soft blossom pink over chrome. Neon petals on black rain.',
+    category: 'cosmetic',
+    priceEddies: 500,
+    payload: { themeKey: 'sakura' },
+  },
+  {
+    key: 'theme_ronin',
+    name: 'Theme: Ronin',
+    description: 'Burnt ember orange. A masterless blade running on spite and caffeine.',
+    category: 'cosmetic',
+    priceEddies: 550,
+    payload: { themeKey: 'ronin' },
+  },
+  {
+    key: 'theme_ultraviolet',
+    name: 'Theme: Ultraviolet',
+    description: 'Electric purple past the visible spectrum. Blacklight for the HUD.',
+    category: 'cosmetic',
+    priceEddies: 650,
+    payload: { themeKey: 'ultraviolet' },
+  },
+
+  // ---- Cosmetic themes, third wave (corpo/runner editions) ------------
+  {
+    key: 'theme_edgerunner',
+    name: 'Theme: Edgerunner',
+    description: 'Construct-yellow with a cyan pop. The street-samurai HUD, straight off the box art.',
+    category: 'cosmetic',
+    priceEddies: 600,
+    payload: { themeKey: 'edgerunner' },
+  },
+  {
+    key: 'theme_arasaka',
+    name: 'Theme: Arasaka',
+    description: 'Cold corporate crimson. Compliance red on tower black — security is always watching.',
+    category: 'cosmetic',
+    priceEddies: 650,
+    payload: { themeKey: 'arasaka' },
+  },
+  {
+    key: 'theme_militech',
+    name: 'Theme: Militech',
+    description: 'Mil-spec tactical green. Muted, disciplined HUD tones for runners who plan the op.',
+    category: 'cosmetic',
+    priceEddies: 500,
+    payload: { themeKey: 'militech' },
+  },
+  {
+    key: 'theme_netrunner',
+    name: 'Theme: Netrunner',
+    description: 'Deep-dive electric blue. ICE-cold interface tones from the far side of the blackwall.',
+    category: 'cosmetic',
+    priceEddies: 500,
+    payload: { themeKey: 'netrunner' },
+  },
+  {
+    key: 'theme_ghost',
+    name: 'Theme: Ghost',
+    description: 'Monochrome white phosphor. A war-room mainframe HUD — shall we play a game?',
+    category: 'cosmetic',
+    priceEddies: 700,
+    payload: { themeKey: 'ghost' },
+  },
+
+  // ---- Handler personas (new AI voice styles; auto-equip on buy) ------
+  {
+    key: 'persona_drill',
+    name: 'Drill Sergeant',
+    description: 'A relentless PT instructor in your ear. Barked orders, zero sympathy, secretly proud.',
+    category: 'persona',
+    priceEddies: 350,
+    payload: { personaKey: 'drill' },
+  },
+  {
+    key: 'persona_zen',
+    name: 'Zen Monk',
+    description: 'A serene minimalist. Koans, stillness, and the quiet insistence that the work is the way.',
+    category: 'persona',
+    priceEddies: 350,
+    payload: { personaKey: 'zen' },
+  },
+  {
+    key: 'persona_noir',
+    name: 'Noir Detective',
+    description: 'Hardboiled first-person narration. Your to-do list, retold in rain-slicked metaphors.',
+    category: 'persona',
+    priceEddies: 400,
+    payload: { personaKey: 'noir' },
+  },
+  {
+    key: 'persona_showman',
+    name: 'The Showman',
+    description: 'A glam media-star hype-man. Every quest is a broadcast and you are the headline act.',
+    category: 'persona',
+    priceEddies: 400,
+    payload: { personaKey: 'showman' },
+  },
+
+  // ---- Display fonts (auto-equip on buy; toggle via /equip) -----------
+  {
+    key: 'font_orbitron',
+    name: 'Orbitron Display',
+    description: 'Geometric sci-fi display face for headers and HUD titles. Clean orbital chrome.',
+    category: 'font',
+    priceEddies: 250,
+    payload: { fontKey: 'orbitron' },
+  },
+  {
+    key: 'font_vt323',
+    name: 'VT323 Terminal',
+    description: 'Pixel terminal face straight off a CRT. Headers go full retro-green-screen.',
+    category: 'font',
+    priceEddies: 250,
+    payload: { fontKey: 'vt323' },
+  },
+  {
+    key: 'font_spacemono',
+    name: 'Space Mono Hardline',
+    description: 'The hardline hacker duospace. Headers read like a terminal session that means business.',
+    category: 'font',
+    priceEddies: 250,
+    payload: { fontKey: 'spacemono' },
+  },
+  {
+    key: 'font_sharetech',
+    name: 'Share Tech Mono',
+    description: 'Condensed engineering mono. Tight, technical, straight off a corpo schematic.',
+    category: 'font',
+    priceEddies: 250,
+    payload: { fontKey: 'sharetech' },
+  },
+
+  // ---- Ambient FX (auto-equip on buy; toggle via /equip) --------------
+  {
+    key: 'fx_rain',
+    name: 'Neon Drizzle',
+    description: 'Subtle animated rain streaks over the whole HUD. Night City weather, indoors.',
+    category: 'fx',
+    priceEddies: 300,
+    payload: { fxKey: 'rain' },
+  },
+  {
+    key: 'fx_aurora',
+    name: 'Aurora Shift',
+    description: 'Slow drifting accent-tinted light fields. Re-tints itself to match your skin.',
+    category: 'fx',
+    priceEddies: 300,
+    payload: { fxKey: 'aurora' },
+  },
+  {
+    key: 'fx_vhs',
+    name: 'VHS Tracking',
+    description: 'Drifting interference bands with a tape-deck wobble. Your life, recorded over a rental.',
+    category: 'fx',
+    priceEddies: 300,
+    payload: { fxKey: 'vhs' },
+  },
+  {
+    key: 'fx_datastream',
+    name: 'Data Stream',
+    description: 'Thin code columns sliding across the HUD. Corpo net traffic, always passing through.',
+    category: 'fx',
+    priceEddies: 300,
+    payload: { fxKey: 'datastream' },
+  },
+  {
+    key: 'fx_radar',
+    name: 'Tac-Sweep',
+    description: 'A slow tactical radar wedge sweeping the whole display. Contacts unconfirmed.',
+    category: 'fx',
+    priceEddies: 350,
+    payload: { fxKey: 'radar' },
+  },
+  {
+    key: 'fx_crt',
+    name: 'CRT Retrace',
+    description: 'A phosphor refresh line crawling down the tube over a faint scanline wash.',
+    category: 'fx',
+    priceEddies: 350,
+    payload: { fxKey: 'crt' },
   },
 
   // ---- Power consumables (real mechanics, server-enforced) -----------

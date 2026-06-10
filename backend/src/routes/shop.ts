@@ -20,7 +20,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
-import { SHOP_ITEMS, ShopItem, LootDrop, COSMETIC_THEME_KEYS } from '../services/shopCatalog';
+import { SHOP_ITEMS, ShopItem, LootDrop, COSMETIC_THEME_KEYS, FONT_KEYS, FX_KEYS } from '../services/shopCatalog';
 import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
@@ -77,6 +77,11 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     if (item.category === 'cosmetic') {
       const themeKey = item.payload?.themeKey as string | undefined;
       return { ...item, owned: themeKey ? owned.has(themeKey) : false };
+    }
+    // font/fx/persona ownership keys are prefixed and equal the item key
+    // ('font_orbitron', 'fx_rain', 'persona_drill').
+    if (item.category === 'font' || item.category === 'fx' || item.category === 'persona') {
+      return { ...item, owned: owned.has(item.key) };
     }
     return { ...item };
   });
@@ -220,6 +225,45 @@ async function applyGrant(
       await tx.playerProfile.update({ where: { userId }, data: { cosmetics: JSON.stringify(next) } });
       return { grant: { themeKey }, message: `Unlocked theme: ${themeKey}` };
     }
+    case 'persona': {
+      // Owned key is 'persona_<key>' (== the catalog item key). Auto-equips.
+      const personaKey = item.payload?.personaKey as string;
+      const ownKey = `persona_${personaKey}`;
+      if (owned.includes(ownKey)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, ownKey]) },
+      });
+      // Auto-equip: point the Handler's voice at the new persona.
+      await tx.userSettings.upsert({
+        where: { userId },
+        update: { handlerPersona: personaKey },
+        create: { userId, handlerPersona: personaKey },
+      });
+      return { grant: { personaKey }, message: `Handler persona unlocked + equipped: ${item.name}` };
+    }
+    case 'font': {
+      // Owned key is 'font_<key>' (== the catalog item key). Auto-equips.
+      const fontKey = item.payload?.fontKey as string;
+      const ownKey = `font_${fontKey}`;
+      if (owned.includes(ownKey)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, ownKey]), equippedFont: fontKey },
+      });
+      return { grant: { fontKey }, message: `Display font unlocked + equipped: ${item.name}` };
+    }
+    case 'fx': {
+      // Owned key is 'fx_<key>' (== the catalog item key). Auto-equips.
+      const fxKey = item.payload?.fxKey as string;
+      const ownKey = `fx_${fxKey}`;
+      if (owned.includes(ownKey)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, ownKey]), equippedFx: fxKey },
+      });
+      return { grant: { fxKey }, message: `Ambient FX unlocked + equipped: ${item.name}` };
+    }
     case 'loot_crate': {
       const table = (item.payload?.table as LootDrop[] | undefined) ?? [];
       const drop = rollLoot(table, owned);
@@ -272,36 +316,67 @@ async function applyGrant(
 
 // --- equip --------------------------------------------------------------
 
-const equipSchema = z.object({ themeKey: z.string().max(100).nullable() });
+const equipSchema = z.object({
+  themeKey: z.string().max(100).nullable().optional(),
+  fontKey: z.string().max(100).nullable().optional(),
+  fxKey: z.string().max(100).nullable().optional(),
+});
 
 /**
- * POST /equip { themeKey }
+ * POST /equip { themeKey? | fontKey? | fxKey? }
  *
- * Set the active cosmetic theme. `null` or 'default' unequips (back to the
- * stock neon palette). A non-default theme must be owned, else 400.
+ * Set/clear an equipped cosmetic slot. Omitted keys are left untouched;
+ * an explicit `null` clears the slot. For the theme slot, 'default' also
+ * clears (back to the stock neon palette). Any non-null key must be a real,
+ * owned cosmetic, else 400 'Not owned'.
  */
 router.post('/equip', asyncHandler(async (req: AuthRequest, res) => {
-  const { themeKey } = equipSchema.parse(req.body);
+  const { themeKey, fontKey, fxKey } = equipSchema.parse(req.body);
   const userId = req.user!.id;
 
   await game().ensurePlayer(userId);
-  const isClear = themeKey == null || themeKey === 'default';
 
-  if (!isClear) {
-    // Validate it's a real, owned theme.
-    if (!(COSMETIC_THEME_KEYS as readonly string[]).includes(themeKey)) {
-      throw new AppError('Not owned', 400);
-    }
+  // One profile read covers every ownership check this request needs.
+  const wantsTheme = themeKey != null && themeKey !== 'default';
+  let ownedKeys: string[] = [];
+  if (wantsTheme || fontKey != null || fxKey != null) {
     const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
-    if (!parseCosmetics(profile.cosmetics).includes(themeKey)) {
-      throw new AppError('Not owned', 400);
-    }
+    ownedKeys = parseCosmetics(profile.cosmetics);
   }
 
-  await prisma.playerProfile.update({
-    where: { userId },
-    data: { equippedTheme: isClear ? null : themeKey },
-  });
+  const data: { equippedTheme?: string | null; equippedFont?: string | null; equippedFx?: string | null } = {};
+
+  if (themeKey !== undefined) {
+    const isClear = themeKey == null || themeKey === 'default';
+    if (!isClear) {
+      // Validate it's a real, owned theme (themes use BARE ownership keys).
+      if (!(COSMETIC_THEME_KEYS as readonly string[]).includes(themeKey)) {
+        throw new AppError('Not owned', 400);
+      }
+      if (!ownedKeys.includes(themeKey)) throw new AppError('Not owned', 400);
+    }
+    data.equippedTheme = isClear ? null : themeKey;
+  }
+
+  if (fontKey !== undefined) {
+    if (fontKey != null) {
+      if (!(FONT_KEYS as readonly string[]).includes(fontKey)) throw new AppError('Not owned', 400);
+      if (!ownedKeys.includes(`font_${fontKey}`)) throw new AppError('Not owned', 400);
+    }
+    data.equippedFont = fontKey ?? null;
+  }
+
+  if (fxKey !== undefined) {
+    if (fxKey != null) {
+      if (!(FX_KEYS as readonly string[]).includes(fxKey)) throw new AppError('Not owned', 400);
+      if (!ownedKeys.includes(`fx_${fxKey}`)) throw new AppError('Not owned', 400);
+    }
+    data.equippedFx = fxKey ?? null;
+  }
+
+  if (Object.keys(data).length === 0) throw new AppError('Nothing to equip', 400);
+
+  await prisma.playerProfile.update({ where: { userId }, data });
 
   const player = await game().getSnapshot(userId);
   res.json({ player });

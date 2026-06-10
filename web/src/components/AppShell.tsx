@@ -20,8 +20,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from './Icon';
 import { api } from '../lib/api';
 import type {
-  PlayerResponse, PlayerSnapshot, TodayResponse, HandlerLatestResponse,
-  AntiGoal, Boss, SettingsResponse,
+  PlayerResponse, PlayerSnapshot, TodayResponse,
+  AntiGoal, Boss,
 } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
@@ -44,14 +44,14 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     ['workouts', 'Workouts', 'spark'], ['projects', 'Projects', 'grid'],
     ['media', 'Media', 'play'], ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
   ]},
-  { group: 'PROGRESSION', items: [
-    ['progress', 'Progress', 'layers'], ['achievements', 'Street Cred', 'trophy'],
-    ['shop', 'Shop', 'bag'], ['intel', 'Net', 'eye'], ['debrief', 'Debrief', 'file'],
-  ]},
   { group: 'VAULT', items: [
     ['overview', 'Finance', 'wallet'], ['categories', 'Categories', 'layers'],
     ['budgets', 'Budgets', 'target'], ['bills', 'Bills', 'clock'],
     ['savings', 'Savings', 'trend'], ['transactions', 'Transactions', 'list'],
+  ]},
+  { group: 'PROGRESSION', items: [
+    ['progress', 'Progress', 'layers'], ['achievements', 'Street Cred', 'trophy'],
+    ['shop', 'Shop', 'bag'], ['intel', 'Net', 'eye'], ['debrief', 'Debrief', 'file'],
   ]},
   { group: 'SYSTEM', items: [
     ['calibration', 'Calibration', 'bolt'],
@@ -97,11 +97,6 @@ export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShel
     queryKey: ['quests', 'today'],
     queryFn: () => api.get<TodayResponse>('/api/quests/today'),
   });
-  const handlerQ = useQuery({
-    queryKey: ['handler', 'latest'],
-    queryFn: () => api.get<HandlerLatestResponse>('/api/handler/latest'),
-    staleTime: 60_000,
-  });
   const iceQ = useQuery({
     queryKey: ['antigoals'],
     queryFn: () => api.get<{ antigoals: AntiGoal[] }>('/api/antigoals').then(r => r.antigoals),
@@ -112,25 +107,18 @@ export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShel
     queryFn: () => api.get<{ bosses: Boss[] }>('/api/bosses').then(r => r.bosses),
     staleTime: 5 * 60_000,
   });
-  const settingsQ = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => api.get<SettingsResponse>('/api/settings').then(r => r.settings),
-    staleTime: 5 * 60_000,
-  });
 
-  // Live shell: socket state drives the UPLINK light; handler pushes refresh
-  // the ticker. Other events already invalidate via the views.
+  // Live shell: socket state drives the UPLINK light. (The handler feed
+  // lives on the Today page now — no ticker here.)
   useEffect(() => {
     const s = getSocket();
     if (!s) { setUplink(false); return; }
     setUplink(s.connected);
     const on = () => setUplink(true);
     const off = () => setUplink(false);
-    const handlerRefresh = () => qc.invalidateQueries({ queryKey: ['handler', 'latest'] });
     s.on('connect', on);
     s.on('disconnect', off);
-    s.on('handler-message', handlerRefresh);
-    return () => { s.off('connect', on); s.off('disconnect', off); s.off('handler-message', handlerRefresh); };
+    return () => { s.off('connect', on); s.off('disconnect', off); };
   }, [qc]);
 
   const p: PlayerSnapshot | undefined = playerQ.data;
@@ -141,38 +129,8 @@ export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShel
   const activeIce = (iceQ.data ?? []).filter(a => a.isActive).length;
   const topBoss = (bossQ.data ?? []).find(b => b.status === 'active');
 
-  // Ticker items — real data, no invented numbers. Handler line first.
-  const handlerMsg = handlerQ.data?.message;
-  const tickerEnabled = settingsQ.data?.tickerEnabled ?? true;
-  const tickerItems: React.ReactNode[] = [];
-  if (handlerMsg) {
-    tickerItems.push(
-      <span key="h"><span style={{ color: 'var(--cyan)' }}>HANDLER&gt;</span> {handlerMsg.text}</span>,
-    );
-  }
-  tickerItems.push(<span key="s">STREAK <span style={{ color: 'var(--lime)' }}>{streak}D</span></span>);
-  if (today) {
-    tickerItems.push(
-      <span key="x">XP TODAY <span style={{ color: 'var(--lime)' }}>+{today.xpEarned}</span> · {today.xpAvailable} ON THE TABLE</span>,
-    );
-  }
-  if (p) tickerItems.push(<span key="e">EDDIES <span style={{ color: 'var(--amber)' }}>€${p.eddies.toLocaleString()}</span></span>);
-  if (topBoss) {
-    tickerItems.push(
-      <span key="b">TARGET <span style={{ color: 'var(--magenta)' }}>{topBoss.name.toUpperCase()} · {topBoss.pct}%</span></span>,
-    );
-  }
-
-  const markHandlerSeen = () => {
-    if (handlerMsg && !handlerMsg.seen) {
-      api.post('/api/handler/seen', { ids: [handlerMsg.id] })
-        .then(() => qc.invalidateQueries({ queryKey: ['handler', 'latest'] }))
-        .catch(() => {});
-    }
-  };
-
   return (
-    <div className={'app-shell' + (tickerEnabled ? '' : ' no-ticker')}>
+    <div className="app-shell">
       <div className="ncx-shell">
         {/* ---- DECK ---- */}
         <aside className="ncx-deck">
@@ -247,20 +205,25 @@ export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShel
               </span>
               <span className="ncx-serial">DAY {streak}</span>
             </div>
-            <div
-              className="ncx-ticker-wrap ncx-topcell"
-              style={{ padding: '0 18px', cursor: handlerMsg && !handlerMsg.seen ? 'pointer' : 'default' }}
-              onClick={markHandlerSeen}
-              title={handlerMsg && !handlerMsg.seen ? 'Mark handler line read' : undefined}
-            >
-              {tickerEnabled && (
-                <div className="ncx-ticker-track">
-                  {[0, 1].map(rep => (
-                    <span key={rep} aria-hidden={rep === 1} style={{ display: 'flex', gap: 56 }}>
-                      {tickerItems.map((it, i) => <span key={`${rep}-${i}`}>{it}</span>)}
-                    </span>
-                  ))}
-                </div>
+            {/* Live HUD stats (the handler feed lives on the Today page now). */}
+            <div className="ncx-topcell" style={{ flex: 1, minWidth: 0, gap: 22, overflow: 'hidden' }}>
+              <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                STREAK <span style={{ color: 'var(--lime)' }}>{streak}D</span>
+              </span>
+              {today && (
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                  XP <span style={{ color: 'var(--lime)' }}>+{today.xpEarned}</span> · {today.xpAvailable} OPEN
+                </span>
+              )}
+              {p && (
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                  €$<span style={{ color: 'var(--amber)' }}>{p.eddies.toLocaleString()}</span>
+                </span>
+              )}
+              {topBoss && (
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  TGT <span style={{ color: 'var(--magenta)' }}>{topBoss.name.toUpperCase()} {topBoss.pct}%</span>
+                </span>
               )}
             </div>
             <div className="ncx-topcell" style={{ borderRight: 'none', gap: 14 }}>

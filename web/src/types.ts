@@ -9,8 +9,9 @@ export interface Transaction {
   vendor?: string;
   isWasteful?: boolean;
   notes?: string;
-  // Finance depth: exclusion (transfers) + chore/project links.
+  // Finance depth: exclusion (transfers) + chore/project links + account.
   excluded?: boolean;
+  account?: string;
   projectId?: string;
   choreId?: string;
   projectName?: string;

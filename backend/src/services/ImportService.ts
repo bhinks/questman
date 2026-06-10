@@ -22,6 +22,9 @@ export interface ColumnMapping {
   category?: string;
   vendor?: string;
   notes?: string;
+  // Optional source-account label column (e.g. "Checking", "Visa"). Just a
+  // string dimension — no balances or sync.
+  account?: string;
 }
 
 export interface ImportResult extends ImportSummary {
@@ -404,6 +407,10 @@ export class ImportService {
       throw new Error('Empty description');
     }
 
+    // Optional account label — trimmed string, empty cell → null.
+    const accountStr = mapping.account ? this.getFieldValue(row, mapping.account) : '';
+    const account = accountStr.length > 0 ? accountStr : null;
+
     return {
       date,
       description: cleanDescription,
@@ -411,7 +418,8 @@ export class ImportService {
       userId,
       originalDescription: description,
       sourceFile,
-      sourceRow: rowNumber
+      sourceRow: rowNumber,
+      account
     };
   }
 
@@ -534,6 +542,13 @@ export class ImportService {
     // Amount column
     const amountKeywords = ['amount', 'value', 'debit', 'credit', 'total', 'sum'];
     mapping.amount = this.findBestMatch(columnLower, amountKeywords, columns);
+
+    // Account column (optional) — only set when a header actually matches;
+    // there is no sensible fallback for an optional dimension.
+    const accountIndex = columnLower.findIndex(col => /account|acct|source|bank|card/i.test(col));
+    if (accountIndex !== -1) {
+      mapping.account = columns[accountIndex];
+    }
 
     return mapping;
   }

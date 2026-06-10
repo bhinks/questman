@@ -18,7 +18,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
-import type { ShopItem, ShopResponse, ShopCategory, BuyResponse, PlayerSnapshot } from '../lib/api';
+import type { ShopItem, ShopResponse, ShopCategory, BuyResponse, PlayerSnapshot, PersonaResponse } from '../lib/api';
 import { Icon } from './Icon';
 
 /**
@@ -28,13 +28,43 @@ import { Icon } from './Icon';
  * themeKeys / index.css [data-theme] blocks.
  */
 const SKIN_PALETTES: Record<string, [string, string, string]> = {
-  default:   ['#1ce2ff', '#9d6bff', '#ff2e9a'],
-  synthwave: ['#ff3d8b', '#b06bff', '#ff9de0'],
-  matrix:    ['#43ff8e', '#8bff43', '#2ff5a6'],
-  vaporwave: ['#67e8ff', '#c9a6ff', '#ff9ed6'],
-  gold:      ['#ffc24b', '#ffe08a', '#ffb347'],
-  bloodmoon: ['#ff4d6d', '#ff6b6b', '#ff7a99'],
-  arctic:    ['#8fd8ff', '#a6c8ff', '#c9e6ff'],
+  default:     ['#1ce2ff', '#9d6bff', '#ff2e9a'],
+  synthwave:   ['#ff3d8b', '#b06bff', '#ff9de0'],
+  matrix:      ['#43ff8e', '#8bff43', '#2ff5a6'],
+  vaporwave:   ['#67e8ff', '#c9a6ff', '#ff9ed6'],
+  gold:        ['#ffc24b', '#ffe08a', '#ffb347'],
+  bloodmoon:   ['#ff4d6d', '#ff6b6b', '#ff7a99'],
+  arctic:      ['#8fd8ff', '#a6c8ff', '#c9e6ff'],
+  toxic:       ['#b4ff39', '#d8ff4d', '#6dff6d'],
+  sakura:      ['#ff9ecf', '#d8a6ff', '#ffd1e8'],
+  ronin:       ['#ff6a3d', '#ff4d6d', '#ffb03d'],
+  ultraviolet: ['#b14dff', '#7a4dff', '#ff4dd8'],
+  edgerunner:  ['#fcf300', '#ffdd00', '#00f0ff'],
+  arasaka:     ['#ff0040', '#ff4d8b', '#ff6d00'],
+  militech:    ['#52b788', '#74c69d', '#95d5b2'],
+  netrunner:   ['#3d7bff', '#7a5cff', '#00d4ff'],
+  ghost:       ['#f2f5ff', '#aab4d0', '#c9d1e8'],
+};
+
+/** Literal font stacks for the Display Mods previews. Literal families are
+ *  CORRECT here (same exception as SKIN_PALETTES): each card previews its
+ *  own face regardless of the currently equipped --font-display. */
+const FONT_FAMILIES: Record<string, string> = {
+  orbitron:  "'Orbitron', 'Chakra Petch', sans-serif",
+  vt323:     "'VT323', 'Chakra Petch', monospace",
+  spacemono: "'Space Mono', 'Chakra Petch', monospace",
+  sharetech: "'Share Tech Mono', 'Chakra Petch', monospace",
+};
+
+/** FX preview backgrounds keyed by fxKey — punchier alphas than the live
+ *  index.css overlays so each effect reads at thumbnail size. */
+const FX_PREVIEWS: Record<string, string> = {
+  rain:       'repeating-linear-gradient(100deg, transparent 0px, transparent 7px, rgba(var(--accent-rgb),0.35) 7px, rgba(var(--accent-rgb),0.35) 8px)',
+  aurora:     'radial-gradient(80px 40px at 25% 30%, rgba(var(--accent-rgb),0.45), transparent 70%), radial-gradient(90px 50px at 75% 70%, rgba(157,107,255,0.4), transparent 70%)',
+  vhs:        'repeating-linear-gradient(0deg, transparent 0px, transparent 12px, rgba(var(--accent-rgb),0.30) 12px, rgba(var(--accent-rgb),0.30) 15px, rgba(255,255,255,0.14) 15px, rgba(255,255,255,0.14) 16px)',
+  datastream: 'repeating-linear-gradient(90deg, transparent 0px, transparent 12px, rgba(var(--accent-rgb),0.35) 12px, rgba(var(--accent-rgb),0.35) 13px)',
+  radar:      'conic-gradient(from 300deg at 50% 60%, rgba(var(--accent-rgb),0.5) 0deg, rgba(var(--accent-rgb),0.12) 45deg, transparent 90deg)',
+  crt:        'linear-gradient(180deg, transparent 30%, rgba(var(--accent-rgb),0.45) 50%, transparent 70%), repeating-linear-gradient(0deg, rgba(255,255,255,0.07) 0 1px, transparent 1px 3px)',
 };
 
 const CONSUMABLE_ORDER: ShopCategory[] = ['token_skip', 'token_reroll', 'rr_credit', 'consumable', 'loot_crate'];
@@ -105,16 +135,38 @@ export function ShopView() {
     queryKey: ['shop'],
     queryFn: () => api.get<ShopResponse>('/api/shop'),
   });
+  // Current Handler persona — the EQUIPPED stamp for the persona cards.
+  const personaQ = useQuery({
+    queryKey: ['handler', 'persona'],
+    queryFn: () => api.get<PersonaResponse>('/api/handler/persona'),
+  });
 
   const refreshPlayer = () => {
     qc.invalidateQueries({ queryKey: ['shop'] });
     qc.invalidateQueries({ queryKey: ['player'] });
     qc.invalidateQueries({ queryKey: ['player', 'stats'] });
   };
+  const refreshPersona = () => {
+    qc.invalidateQueries({ queryKey: ['handler', 'persona'] });
+    qc.invalidateQueries({ queryKey: ['handler', 'latest'] });
+  };
 
   const equip = useMutation({
     mutationFn: (themeKey: string | null) => api.post<{ player: PlayerSnapshot }>('/api/shop/equip', { themeKey }),
     onSuccess: refreshPlayer,
+  });
+
+  // Display-mod slots: { fontKey } / { fxKey }; explicit null clears a slot.
+  const equipMod = useMutation({
+    mutationFn: (body: { fontKey?: string | null; fxKey?: string | null }) =>
+      api.post<{ player: PlayerSnapshot }>('/api/shop/equip', body),
+    onSuccess: refreshPlayer,
+  });
+
+  // Owned Handler voices equip through the Handler config endpoint.
+  const equipPersona = useMutation({
+    mutationFn: (personaKey: string) => api.put('/api/handler/persona', { persona: personaKey }),
+    onSuccess: refreshPersona,
   });
 
   const buy = useMutation({
@@ -133,6 +185,9 @@ export function ShopView() {
         const themeKey = bought?.payload?.themeKey;
         if (typeof themeKey === 'string') equip.mutate(themeKey);
       }
+      // Personas auto-equip SERVER-SIDE on buy — refresh the Handler config.
+      if (res.purchase.category === 'persona') refreshPersona();
+      // Fonts/FX also auto-equip server-side; refreshPlayer above covers them.
     },
     onError: (err: unknown, itemKey) => {
       const msg = err instanceof ApiError ? err.message : 'Purchase failed';
@@ -163,6 +218,9 @@ export function ShopView() {
   ];
 
   const consumables = CONSUMABLE_ORDER.flatMap(cat => items.filter(i => i.category === cat));
+  const personas = items.filter(i => i.category === 'persona');
+  const mods = [...items.filter(i => i.category === 'font'), ...items.filter(i => i.category === 'fx')];
+  const currentPersona = personaQ.data?.persona ?? null;
 
   return (
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -204,6 +262,59 @@ export function ShopView() {
             onEquip={() => equip.mutate(skin.themeKey)}
           />
         ))}
+      </div>
+
+      {/* ---- handler personas ---- */}
+      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
+        HANDLER PERSONAS — NEW VOICES FOR THE EAR-PIECE · AUTO-EQUIP ON BUY
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        {personas.map(item => {
+          const personaKey = typeof item.payload?.personaKey === 'string' ? (item.payload.personaKey as string) : item.key;
+          return (
+            <PersonaCard
+              key={item.key}
+              item={item}
+              equipped={currentPersona === personaKey}
+              owned={item.owned === true}
+              affordable={player.eddies >= item.priceEddies}
+              busy={pendingKey === item.key || equipPersona.isPending}
+              feedback={feedback?.key === item.key ? feedback : null}
+              onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
+              onEquip={() => equipPersona.mutate(personaKey)}
+            />
+          );
+        })}
+      </div>
+
+      {/* ---- display mods: fonts + ambient fx ---- */}
+      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
+        DISPLAY MODS — HEADER FONTS &amp; AMBIENT FX · AUTO-EQUIP ON BUY
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        {mods.map(item => {
+          const isFont = item.category === 'font';
+          const modKey = typeof item.payload?.[isFont ? 'fontKey' : 'fxKey'] === 'string'
+            ? (item.payload[isFont ? 'fontKey' : 'fxKey'] as string)
+            : item.key;
+          const equippedNow = isFont ? player.equippedFont === modKey : player.equippedFx === modKey;
+          return (
+            <ModCard
+              key={item.key}
+              item={item}
+              isFont={isFont}
+              modKey={modKey}
+              equipped={equippedNow}
+              owned={item.owned === true}
+              affordable={player.eddies >= item.priceEddies}
+              busy={pendingKey === item.key || equipMod.isPending}
+              feedback={feedback?.key === item.key ? feedback : null}
+              onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
+              onEquip={() => equipMod.mutate(isFont ? { fontKey: modKey } : { fxKey: modKey })}
+              onUnequip={() => equipMod.mutate(isFont ? { fontKey: null } : { fxKey: null })}
+            />
+          );
+        })}
       </div>
 
       {/* ---- consumables ---- */}
@@ -291,6 +402,121 @@ function SkinCard({ skin, equipped, affordable, busy, feedback, onBuy, onEquip }
           title={affordable ? undefined : 'Not enough eddies'}
         >
           <span style={{ color: 'var(--amber)' }}>€${(skin.price ?? 0).toLocaleString()}</span>· UNLOCK
+        </button>
+      )}
+
+      {feedback && <FeedbackLine feedback={feedback} />}
+    </div>
+  );
+}
+
+/* ---------- handler persona card ---------- */
+
+function PersonaCard({ item, equipped, owned, affordable, busy, feedback, onBuy, onEquip }: {
+  item: ShopItem;
+  equipped: boolean;
+  owned: boolean;
+  affordable: boolean;
+  busy: boolean;
+  feedback: { message: string; ok: boolean } | null;
+  onBuy: () => void;
+  onEquip: () => void;
+}) {
+  return (
+    <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="ncx-chip" style={{ width: 34, height: 34, color: equipped ? 'var(--cyan)' : 'var(--violet)' }}>
+          <Icon name="bell" size={15} />
+        </div>
+        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
+        <span style={{ flex: 1 }} />
+        {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>EQUIPPED</span>}
+        {!equipped && owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{item.description}</div>
+
+      {/* keyed by state — see file header */}
+      {equipped ? (
+        <button key={item.key + '-eq'} className="btn btn-primary" style={{ fontSize: 11, padding: 8 }} disabled>
+          EQUIPPED
+        </button>
+      ) : owned ? (
+        <button key={item.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
+          EQUIP
+        </button>
+      ) : (
+        <button
+          key={item.key + '-buy'}
+          className="btn"
+          style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
+          disabled={!affordable || busy}
+          onClick={onBuy}
+          title={affordable ? undefined : 'Not enough eddies'}
+        >
+          <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· UNLOCK
+        </button>
+      )}
+
+      {feedback && <FeedbackLine feedback={feedback} />}
+    </div>
+  );
+}
+
+/* ---------- display mod card (font / ambient fx) ---------- */
+
+function ModCard({ item, isFont, modKey, equipped, owned, affordable, busy, feedback, onBuy, onEquip, onUnequip }: {
+  item: ShopItem;
+  isFont: boolean;
+  modKey: string;
+  equipped: boolean;
+  owned: boolean;
+  affordable: boolean;
+  busy: boolean;
+  feedback: { message: string; ok: boolean } | null;
+  onBuy: () => void;
+  onEquip: () => void;
+  onUnequip: () => void;
+}) {
+  return (
+    <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* preview: font cards render their own name IN the face; fx cards a swatch */}
+      <div className="panel-inset" style={{ height: 54, padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+        {isFont ? (
+          <span style={{ fontFamily: FONT_FAMILIES[modKey] ?? 'var(--font-display)', fontSize: modKey === 'vt323' ? 22 : 16, letterSpacing: '0.06em', color: 'var(--cyan)' }}>
+            {item.name.toUpperCase()}
+          </span>
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, background: FX_PREVIEWS[modKey] ?? FX_PREVIEWS.aurora }} />
+        )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
+        <span style={{ flex: 1 }} />
+        {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>EQUIPPED</span>}
+        {!equipped && owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{item.description}</div>
+
+      {/* keyed by state — see file header */}
+      {equipped ? (
+        <button key={item.key + '-uneq'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onUnequip}>
+          UNEQUIP
+        </button>
+      ) : owned ? (
+        <button key={item.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
+          EQUIP
+        </button>
+      ) : (
+        <button
+          key={item.key + '-buy'}
+          className="btn"
+          style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
+          disabled={!affordable || busy}
+          onClick={onBuy}
+          title={affordable ? undefined : 'Not enough eddies'}
+        >
+          <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· UNLOCK
         </button>
       )}
 

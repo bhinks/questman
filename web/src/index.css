@@ -649,3 +649,354 @@ html.theming, html.theming * { transition: background .35s, box-shadow .35s, col
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+   Cosmetic themes — SECOND WAVE (Shop "Neon Skins"). Same contract
+   as the blocks above: accent remap only, surfaces/text constant,
+   --lime/--amber/--red stay semantic, accent alphas ALWAYS built
+   via rgba(var(--accent-rgb), α).
+   ============================================================ */
+
+/* Toxic — acid green-yellow biohazard */
+[data-theme="toxic"] {
+  --cyan:        #b4ff39;
+  --cyan-deep:   #7fc41c;
+  --magenta:     #6dff6d;
+  --violet:      #d8ff4d;
+  --teal:        #8aff5e;
+  --brand:       var(--cyan);
+  --accent-rgb:  180, 255, 57;
+  --line-bright: rgba(180, 255, 57, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(180,255,57,.85), 0 0 12px rgba(180,255,57,.40);
+}
+
+/* Sakura — soft blossom pink */
+[data-theme="sakura"] {
+  --cyan:        #ff9ecf;
+  --cyan-deep:   #cf639d;
+  --magenta:     #ffd1e8;
+  --violet:      #d8a6ff;
+  --teal:        #ffc1de;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 158, 207;
+  --line-bright: rgba(255, 158, 207, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,158,207,.8), 0 0 12px rgba(255,158,207,.38);
+}
+
+/* Ronin — burnt ember orange */
+[data-theme="ronin"] {
+  --cyan:        #ff6a3d;
+  --cyan-deep:   #c2421c;
+  --magenta:     #ffb03d;
+  --violet:      #ff4d6d;
+  --teal:        #ff9d6b;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 106, 61;
+  --line-bright: rgba(255, 106, 61, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,106,61,.85), 0 0 12px rgba(255,106,61,.40);
+}
+
+/* Ultraviolet — electric purple, past the visible spectrum */
+[data-theme="ultraviolet"] {
+  --cyan:        #b14dff;
+  --cyan-deep:   #7e22cc;
+  --magenta:     #ff4dd8;
+  --violet:      #7a4dff;
+  --teal:        #c98aff;
+  --brand:       var(--cyan);
+  --accent-rgb:  177, 77, 255;
+  --line-bright: rgba(177, 77, 255, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(177,77,255,.85), 0 0 12px rgba(177,77,255,.40);
+}
+
+/* ============================================================
+   Cosmetic themes — THIRD WAVE (corpo/runner editions). Same
+   contract: accent remap only, surfaces/text constant, accent
+   alphas ALWAYS built via rgba(var(--accent-rgb), α).
+   ============================================================ */
+
+/* Edgerunner — construct yellow with a cyan pop (the 2077 duo) */
+[data-theme="edgerunner"] {
+  --cyan:        #fcf300;
+  --cyan-deep:   #c2bb00;
+  --magenta:     #00f0ff;
+  --violet:      #ffdd00;
+  --teal:        #f5ff66;
+  --brand:       var(--cyan);
+  --accent-rgb:  252, 243, 0;
+  --line-bright: rgba(252, 243, 0, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(252,243,0,.85), 0 0 12px rgba(252,243,0,.38);
+}
+
+/* Arasaka — cold corporate crimson (colder + harder than bloodmoon) */
+[data-theme="arasaka"] {
+  --cyan:        #ff0040;
+  --cyan-deep:   #b8002e;
+  --magenta:     #ff6d00;
+  --violet:      #ff4d8b;
+  --teal:        #ff8c7a;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 0, 64;
+  --line-bright: rgba(255, 0, 64, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,0,64,.85), 0 0 12px rgba(255,0,64,.40);
+}
+
+/* Militech — muted mil-spec tactical green (matrix's disciplined cousin) */
+[data-theme="militech"] {
+  --cyan:        #52b788;
+  --cyan-deep:   #2d6a4f;
+  --magenta:     #95d5b2;
+  --violet:      #74c69d;
+  --teal:        #95d5b2;
+  --brand:       var(--cyan);
+  --accent-rgb:  82, 183, 136;
+  --line-bright: rgba(82, 183, 136, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(82,183,136,.85), 0 0 12px rgba(82,183,136,.40);
+}
+
+/* Netrunner — deep-dive electric blue */
+[data-theme="netrunner"] {
+  --cyan:        #3d7bff;
+  --cyan-deep:   #2451c4;
+  --magenta:     #00d4ff;
+  --violet:      #7a5cff;
+  --teal:        #5cb8ff;
+  --brand:       var(--cyan);
+  --accent-rgb:  61, 123, 255;
+  --line-bright: rgba(61, 123, 255, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(61,123,255,.85), 0 0 12px rgba(61,123,255,.42);
+}
+
+/* Ghost — monochrome white phosphor (war-room mainframe) */
+[data-theme="ghost"] {
+  --cyan:        #f2f5ff;
+  --cyan-deep:   #aab3cc;
+  --magenta:     #c9d1e8;
+  --violet:      #aab4d0;
+  --teal:        #dde3f5;
+  --brand:       var(--cyan);
+  --accent-rgb:  242, 245, 255;
+  --line-bright: rgba(242, 245, 255, 0.28);
+  --glow-cyan:   0 0 0.5px rgba(242,245,255,.8), 0 0 12px rgba(242,245,255,.30);
+}
+
+/* ============================================================
+   Display font packs (Shop "Display Mods"). Applied via
+   <html data-font="KEY"> from PlayerSnapshot.equippedFont — only
+   --font-display swaps; UI/mono faces stay constant.
+   ============================================================ */
+
+html[data-font="orbitron"] {
+  --font-display: 'Orbitron', 'Chakra Petch', sans-serif;
+}
+
+html[data-font="vt323"] {
+  --font-display: 'VT323', 'Chakra Petch', monospace;
+}
+/* VT323 renders small at a given px size — open the tracking a touch. */
+html[data-font="vt323"] .ncx-chroma { letter-spacing: 0.04em; }
+
+html[data-font="spacemono"] {
+  --font-display: 'Space Mono', 'Chakra Petch', monospace;
+}
+
+html[data-font="sharetech"] {
+  --font-display: 'Share Tech Mono', 'Chakra Petch', monospace;
+}
+/* Share Tech Mono runs narrow — open display tracking like VT323. */
+html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
+
+/* ============================================================
+   Ambient FX packs (Shop "Display Mods"). Applied via
+   <html data-fx="KEY"> from PlayerSnapshot.equippedFx. A single
+   fixed pseudo-element overlay: pointer-events none, z-index 2
+   (above the body frame layers, far below modals), texture alphas
+   kept ≤ 0.06 so content always reads through. Motion is gated
+   behind prefers-reduced-motion: no-preference.
+   ============================================================ */
+
+/* Neon Drizzle — thin near-vertical streaks drifting down */
+html[data-fx="rain"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(
+      100deg,
+      transparent 0px,
+      transparent 22px,
+      rgba(var(--accent-rgb), 0.05) 22px,
+      rgba(var(--accent-rgb), 0.05) 23px
+    ),
+    repeating-linear-gradient(
+      100deg,
+      transparent 0px,
+      transparent 30px,
+      rgba(190, 210, 255, 0.04) 30px,
+      rgba(190, 210, 255, 0.04) 31px
+    );
+}
+
+/* Aurora Shift — slow drifting accent-tinted light fields (re-tints
+   with the equipped theme via --accent-rgb) */
+html[data-fx="aurora"]::after {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    radial-gradient(620px 420px at 18% 22%, rgba(var(--accent-rgb), 0.05), transparent 70%),
+    radial-gradient(720px 480px at 78% 28%, rgba(157, 107, 255, 0.04), transparent 70%),
+    radial-gradient(660px 520px at 55% 82%, rgba(var(--accent-rgb), 0.04), transparent 70%);
+}
+
+/* VHS Tracking — wide interference bands drifting down with a tape wobble.
+   Band period 160px; the X nudge at the animation midpoint is the wobble. */
+html[data-fx="vhs"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 89px,
+      rgba(var(--accent-rgb), 0.05) 89px,
+      rgba(var(--accent-rgb), 0.05) 92px,
+      rgba(255, 255, 255, 0.03) 92px,
+      rgba(255, 255, 255, 0.03) 94px,
+      transparent 94px,
+      transparent 160px
+    ),
+    repeating-linear-gradient(90deg, rgba(190, 210, 255, 0.02) 0 1px, transparent 1px 6px);
+}
+
+/* Data Stream — thin vertical code columns sliding sideways (corpo net
+   traffic). Column period 74px. */
+html[data-fx="datastream"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 58px,
+      rgba(var(--accent-rgb), 0.05) 58px,
+      rgba(var(--accent-rgb), 0.05) 59px,
+      transparent 59px,
+      transparent 73px,
+      rgba(190, 210, 255, 0.03) 73px,
+      rgba(190, 210, 255, 0.03) 74px
+    );
+}
+
+/* Tac-Sweep — a rotating radar wedge centered on the viewport. The element
+   is an oversized square so the rotation never exposes a corner; without
+   motion it degrades to a faint static wedge. */
+html[data-fx="radar"]::after {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 160vmax;
+  height: 160vmax;
+  margin: -80vmax 0 0 -80vmax;
+  pointer-events: none;
+  z-index: 2;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(var(--accent-rgb), 0.055) 0deg,
+    rgba(var(--accent-rgb), 0.018) 26deg,
+    transparent 60deg,
+    transparent 360deg
+  );
+}
+
+/* CRT Retrace — a phosphor refresh line crawling down the tube over a faint
+   scanline wash. The line lives in a 300%-tall gradient; animating its
+   background-position 100%→0% sends it top-to-bottom. */
+html[data-fx="crt"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 47%,
+      rgba(var(--accent-rgb), 0.06) 50%,
+      transparent 53%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px);
+  background-size: 100% 300%, 100% 100%;
+  background-position: 0 100%, 0 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-fx="rain"]::after {
+    animation: qm-fx-rain 9s linear infinite;
+  }
+  /* Layer periods 23px/31px at 100deg → vertical tiling ≈ 89px/120px;
+     8 and 6 loops land both layers back on phase together. */
+  @keyframes qm-fx-rain {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 0 712px, 0 720px; }
+  }
+
+  html[data-fx="aurora"]::after {
+    animation: qm-fx-aurora 26s ease-in-out infinite alternate;
+  }
+  @keyframes qm-fx-aurora {
+    from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
+    to   { transform: translate3d(1.5%, 1%, 0) scale(1.05); }
+  }
+
+  html[data-fx="vhs"]::after {
+    animation: qm-fx-vhs 11s linear infinite;
+  }
+  /* One 160px band period per loop; the 2px X excursion at 50% is the
+     tape-tracking wobble (returns to 0 so the loop is seamless). */
+  @keyframes qm-fx-vhs {
+    0%   { background-position: 0 0, 0 0; }
+    50%  { background-position: 2px 80px, 0 0; }
+    100% { background-position: 0 160px, 0 0; }
+  }
+
+  html[data-fx="datastream"]::after {
+    animation: qm-fx-datastream 18s linear infinite;
+  }
+  /* Two 74px column periods per loop. */
+  @keyframes qm-fx-datastream {
+    from { background-position: 0 0; }
+    to   { background-position: 148px 0; }
+  }
+
+  html[data-fx="radar"]::after {
+    animation: qm-fx-radar 14s linear infinite;
+  }
+  @keyframes qm-fx-radar {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  html[data-fx="crt"]::after {
+    animation: qm-fx-crt 8s linear infinite;
+  }
+  /* 100%→0% with a 300%-tall image moves the bright line downscreen. */
+  @keyframes qm-fx-crt {
+    from { background-position: 0 100%, 0 0; }
+    to   { background-position: 0 0%, 0 0; }
+  }
+}

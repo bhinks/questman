@@ -16,8 +16,9 @@
  * .btn-primary / kicker / mono / .fade-up and CSS color vars. No hardcoded hex.
  */
 import { useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import type { CategoriesResponse, FinanceCategory } from '../lib/api';
 import type { Transaction } from '../types';
 import { Icon } from './Icon';
 
@@ -29,20 +30,44 @@ interface TransactionsViewProps {
 /** Cap rendered rows for perf — the log can run to thousands of records. */
 const RENDER_CAP = 200;
 
-type BulkOp = 'exclude' | 'include' | 'delete';
+type BulkOp = 'exclude' | 'include' | 'delete' | 'categorize';
 
 export function TransactionsView({ transactions, onEdit }: TransactionsViewProps) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // ACCOUNT filter — '' means all accounts.
+  const [accountFilter, setAccountFilter] = useState('');
 
-  const total = transactions.length;
+  // Categories for the bulk RECATEGORIZE picker (shared cache).
+  const catsQ = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get<CategoriesResponse>('/api/categories').then(r => r.categories),
+    staleTime: 5 * 60_000,
+  });
+
+  // Distinct source-account labels for the filter dropdown.
+  const accountsQ = useQuery({
+    queryKey: ['transactions', 'accounts'],
+    queryFn: () => api.get<{ accounts: string[] }>('/api/transactions/accounts').then(r => r.accounts),
+    staleTime: 5 * 60_000,
+  });
+  const accounts = accountsQ.data ?? [];
+
+  // The component receives transactions as props — the ACCOUNT filter is
+  // applied client-side; count chips reflect the filtered set.
+  const filtered = useMemo(
+    () => (accountFilter ? transactions.filter(t => t.account === accountFilter) : transactions),
+    [transactions, accountFilter],
+  );
+
+  const total = filtered.length;
   const excludedCount = useMemo(
-    () => transactions.reduce((n, t) => n + (t.excluded ? 1 : 0), 0),
-    [transactions],
+    () => filtered.reduce((n, t) => n + (t.excluded ? 1 : 0), 0),
+    [filtered],
   );
 
   // Only the rows we actually paint are selectable via "select all (visible)".
-  const visible = useMemo(() => transactions.slice(0, RENDER_CAP), [transactions]);
+  const visible = useMemo(() => filtered.slice(0, RENDER_CAP), [filtered]);
   const hiddenCount = total - visible.length;
 
   const bulk = useMutation({
@@ -98,18 +123,35 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
     bulk.mutate({ operation, data });
   };
 
+  if (transactions.length === 0) {
+    return (
+      <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <Header total={0} excluded={0} accounts={[]} account="" onAccount={setAccountFilter} />
+        <Empty>NO TRANSACTIONS LOADED — import a statement to populate the log.</Empty>
+      </div>
+    );
+  }
+
+  // Data exists but the account filter matched nothing — keep the filter
+  // visible so it can be switched back.
   if (total === 0) {
     return (
       <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-        <Header total={0} excluded={0} />
-        <Empty>NO TRANSACTIONS LOADED — import a statement to populate the log.</Empty>
+        <Header total={0} excluded={0} accounts={accounts} account={accountFilter} onAccount={setAccountFilter} />
+        <Empty>NO RECORDS ON THIS ACCOUNT — switch the filter to see the rest of the log.</Empty>
       </div>
     );
   }
 
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Header total={total} excluded={excludedCount} />
+      <Header
+        total={total}
+        excluded={excludedCount}
+        accounts={accounts}
+        account={accountFilter}
+        onAccount={setAccountFilter}
+      />
 
       <BulkBar
         count={selected.size}
@@ -118,6 +160,8 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
         onInclude={() => runBulk('exclude', { excluded: false })}
         onDelete={() => runBulk('delete')}
         onClear={() => setSelected(new Set())}
+        categories={catsQ.data ?? []}
+        onCategorize={categoryId => runBulk('categorize', { categoryId })}
       />
 
       <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
@@ -175,7 +219,15 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
 
 /* ---------------------------------------------------------------- header -- */
 
-function Header({ total, excluded }: { total: number; excluded: number }) {
+function Header({
+  total, excluded, accounts, account, onAccount,
+}: {
+  total: number;
+  excluded: number;
+  accounts: string[];
+  account: string;
+  onAccount: (account: string) => void;
+}) {
   return (
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
@@ -190,6 +242,21 @@ function Header({ total, excluded }: { total: number; excluded: number }) {
         </div>
       </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+        {accounts.length > 0 && (
+          <select
+            value={account}
+            onChange={e => onAccount(e.target.value)}
+            title="Filter the log by source account"
+            style={{
+              padding: '7px 10px', fontSize: 11, fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.05em',
+              background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)',
+            }}
+          >
+            <option value="">ALL ACCOUNTS</option>
+            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        )}
         <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>
           {total.toLocaleString()} RECORDS
         </span>
@@ -210,7 +277,7 @@ function Header({ total, excluded }: { total: number; excluded: number }) {
 /* -------------------------------------------------------------- bulk bar -- */
 
 function BulkBar({
-  count, busy, onExclude, onInclude, onDelete, onClear,
+  count, busy, onExclude, onInclude, onDelete, onClear, categories, onCategorize,
 }: {
   count: number;
   busy: boolean;
@@ -218,7 +285,10 @@ function BulkBar({
   onInclude: () => void;
   onDelete: () => void;
   onClear: () => void;
+  categories: FinanceCategory[];
+  onCategorize: (categoryId: string) => void;
 }) {
+  const [catId, setCatId] = useState('');
   if (count === 0) return null;
   return (
     <div
@@ -235,7 +305,29 @@ function BulkBar({
         {count.toLocaleString()} SELECTED
       </span>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
+        {/* Bulk re-categorize: pick a category, apply to the selection. */}
+        <select
+          value={catId}
+          onChange={e => setCatId(e.target.value)}
+          disabled={busy}
+          style={{
+            padding: '7px 10px', fontSize: 11, fontFamily: 'var(--font-mono)',
+            background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)',
+          }}
+        >
+          <option value="">RECATEGORIZE TO…</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <button
+          className="btn"
+          disabled={busy || !catId}
+          onClick={() => catId && onCategorize(catId)}
+          title="Set the selected category on every selected transaction"
+          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--cyan)' }}
+        >
+          <Icon name="layers" size={13} /> RECAT
+        </button>
         <button
           className="btn"
           disabled={busy}
@@ -339,8 +431,28 @@ function Row({
         )}
       </div>
 
-      <div style={{ ...cell, color: tx.category ? 'var(--text-dim)' : 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>
-        {tx.category || 'Uncategorized'}
+      <div style={{ ...cell, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: 160 }}>
+        <span style={{ color: tx.category ? 'var(--text-dim)' : 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {tx.category || 'Uncategorized'}
+        </span>
+        {tx.account && (
+          <span
+            className="mono"
+            title={`Account: ${tx.account}`}
+            style={{
+              flexShrink: 0,
+              fontSize: 9,
+              color: 'var(--text-faint)',
+              padding: '1px 6px',
+              border: '1px solid var(--line-2)',
+              background: 'rgba(150,168,224,0.05)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              maxWidth: 84,
+            }}
+          >
+            {tx.account}
+          </span>
+        )}
       </div>
 
       <div

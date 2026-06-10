@@ -6,6 +6,8 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
+import type { PrismaClient } from '@prisma/client';
+import type { QuestCandidate } from '../services/anthropic';
 
 const router = express.Router();
 let _game: GamificationService | null = null;
@@ -105,6 +107,92 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
       metrics: parseJson(w.metrics),
     })),
   });
+}));
+
+// ---------------------------------------------------------------------
+// Weekly workout plan ("push day every Monday"). NOTE: these routes MUST
+// be registered before '/:id' so 'plan' isn't captured as a workout id.
+// ---------------------------------------------------------------------
+
+const planCreateSchema = z.object({
+  dayOfWeek: z.number().int().min(0).max(6), // 0=Sunday .. 6=Saturday (JS getDay)
+  title:     z.string().min(1).max(200),
+  type:      TYPE,
+  targetMin: z.number().int().min(1).max(720).nullable().optional(),
+  notes:     z.string().max(2000).nullable().optional(),
+});
+
+const planUpdateSchema = planCreateSchema.partial().extend({
+  isActive:  z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+/** GET /api/workouts/plan — the user's weekly protocol, day-ordered. */
+router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
+  const plans = await prisma.workoutPlan.findMany({
+    where: { userId: req.user!.id },
+    orderBy: [{ dayOfWeek: 'asc' }, { sortOrder: 'asc' }],
+  });
+  res.json({ plans });
+}));
+
+/** POST /api/workouts/plan — add a planned slot to a weekday. */
+router.post('/plan', asyncHandler(async (req: AuthRequest, res) => {
+  const data = planCreateSchema.parse(req.body);
+  const userId = req.user!.id;
+
+  // Append within the day: next sortOrder after the day's existing slots.
+  const last = await prisma.workoutPlan.findFirst({
+    where: { userId, dayOfWeek: data.dayOfWeek },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  });
+
+  const plan = await prisma.workoutPlan.create({
+    data: {
+      userId,
+      dayOfWeek: data.dayOfWeek,
+      title: data.title,
+      type: data.type,
+      targetMin: data.targetMin ?? null,
+      notes: data.notes ?? null,
+      sortOrder: (last?.sortOrder ?? -1) + 1,
+    },
+  });
+  res.status(201).json({ plan });
+}));
+
+/** PUT /api/workouts/plan/:id — partial edit (incl. isActive toggle). */
+router.put('/plan/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const data = planUpdateSchema.parse(req.body);
+  const existing = await prisma.workoutPlan.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+    select: { id: true },
+  });
+  if (!existing) throw new AppError('Plan slot not found', 404);
+
+  const plan = await prisma.workoutPlan.update({
+    where: { id: existing.id },
+    data: {
+      ...(data.dayOfWeek !== undefined ? { dayOfWeek: data.dayOfWeek } : {}),
+      ...(data.title     !== undefined ? { title: data.title } : {}),
+      ...(data.type      !== undefined ? { type: data.type } : {}),
+      ...(data.targetMin !== undefined ? { targetMin: data.targetMin } : {}),
+      ...(data.notes     !== undefined ? { notes: data.notes } : {}),
+      ...(data.isActive  !== undefined ? { isActive: data.isActive } : {}),
+      ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+    },
+  });
+  res.json({ plan });
+}));
+
+/** DELETE /api/workouts/plan/:id */
+router.delete('/plan/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const result = await prisma.workoutPlan.deleteMany({
+    where: { id: req.params.id, userId: req.user!.id },
+  });
+  if (result.count === 0) throw new AppError('Plan slot not found', 404);
+  res.json({ deleted: true });
 }));
 
 /** GET /api/workouts/:id */
@@ -276,5 +364,60 @@ router.delete('/:id', asyncHandler(async (req: AuthRequest, res) => {
 
   res.status(204).end();
 }));
+
+/**
+ * QuestEngine candidate builder for the fitness pool.
+ *
+ *  - A session already logged today → [] (the day's training is handled).
+ *  - Active WorkoutPlan slots for today's weekday → one "Scheduled: <title>"
+ *    candidate PER slot (sourceId = plan.id), so the day's protocol shows up
+ *    as concrete quests and logging auto-completes the pending one.
+ *  - No plan for today → the legacy generic "Log a workout" candidate
+ *    (sourceId null), preserving pre-plan behavior.
+ */
+export async function buildWorkoutCandidates(
+  prisma: PrismaClient,
+  userId: string,
+  date: Date,
+  nextId: () => string,
+): Promise<QuestCandidate[]> {
+  const dayStart = startOfLocalDay(date);
+
+  const session = await prisma.workoutSession.findFirst({
+    where: { userId, performedAt: { gte: dayStart } },
+    select: { id: true },
+  });
+  if (session) return [];
+
+  const plans = await prisma.workoutPlan.findMany({
+    where: { userId, isActive: true, dayOfWeek: dayStart.getDay() },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  if (plans.length === 0) {
+    return [{
+      candidateId: nextId(),
+      source: 'workout',
+      sourceId: null,
+      moduleKey: 'fitness',
+      baseTitle: 'Log a workout',
+      difficulty: 'medium',
+      xpReward: 30,
+    }];
+  }
+
+  return plans.map((plan): QuestCandidate => ({
+    candidateId: nextId(),
+    source: 'workout',
+    sourceId: plan.id,
+    moduleKey: 'fitness',
+    baseTitle: `Scheduled: ${plan.title}`,
+    difficulty: 'medium',
+    xpReward: 30,
+    context: plan.notes ?? plan.type,
+    estMinutes: plan.targetMin ?? undefined,
+    carryOver: false,
+  }));
+}
 
 export default router;
