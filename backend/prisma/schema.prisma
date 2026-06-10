@@ -112,6 +112,9 @@ model UserSettings {
   aiAccessFinance    Boolean @default(true)  // Vault: transactions, budgets, bills
   aiAccessHealth     Boolean @default(true)  // Vitals + Workouts
   aiAccessSocial     Boolean @default(true)  // Social: contacts/NPCs
+  // Calendar defaults SEALED: unlike the three above, it never flowed to
+  // the AI before this grant existed, so off preserves prior behavior.
+  aiAccessCalendar   Boolean @default(false) // ICS agenda: counts, times, free/busy
   aiProvider         String  @default("anthropic") // "anthropic" | "ollama"
   aiModelQuests      String?                 // cloud model override (null = server default)
   aiModelHandler     String?                 // cloud model override (null = server default)

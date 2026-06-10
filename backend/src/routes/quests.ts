@@ -6,6 +6,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { QuestEngine } from '../services/QuestEngine';
 import { GamificationService } from '../services/GamificationService';
 import { WeatherService } from '../services/WeatherService';
+import { calendarService } from '../services/CalendarService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
@@ -474,9 +475,19 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   });
   const boostActive = profile?.budgetBoostOn != null
     && startOfLocalDay(profile.budgetBoostOn).getTime() === today.getTime();
+  // Calendar uplink (roadmap §integrations): real commitments shrink the
+  // day's "go" budget. Applied only to the DEFAULT budget — an explicit
+  // ?budget= override is the user saying "I know my day"; leave it alone.
+  // Best-effort: unconfigured / feed down → 0 and the planner behaves as
+  // before.
+  let calendarBusyMin = 0;
+  if (!req.query.budget) {
+    const cal = await calendarService.getToday().catch(() => null);
+    if (cal) calendarBusyMin = Math.min(cal.busyMin, defaultBudget);
+  }
   const budgetMin = (req.query.budget
     ? Math.max(0, Number(req.query.budget))
-    : defaultBudget) + (boostActive ? 120 : 0);
+    : defaultBudget - calendarBusyMin) + (boostActive ? 120 : 0);
 
   const quests = await prisma.quest.findMany({
     where: { userId, questDate: today, status: 'pending' },
@@ -575,6 +586,7 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   res.json({
     budgetMin,
     budgetBoostMin: boostActive ? 120 : 0,
+    calendarBusyMin,
     isWeekend,
     plannedMin,
     totalEstMin,

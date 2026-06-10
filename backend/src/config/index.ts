@@ -53,8 +53,20 @@ const configSchema = z.object({
     lon: z.number().min(-180).max(180).optional()
   }),
 
+  // Calendar uplink: private ICS URLs (e.g. Google Calendar's "secret
+  // address in iCal format"), comma-separated. When set, today's busy
+  // time shrinks the day-planner budget and feeds the Today agenda.
+  calendar: z.object({
+    icsUrls: z.array(z.string().url()).default([])
+  }),
+
   // Single-user self-hosted hub: public signup is off by default.
-  allowRegistration: z.boolean().default(false)
+  allowRegistration: z.boolean().default(false),
+
+  // Long-lived shared secret for POST /api/ingest/* (phone-side health
+  // bridges that can't do the JWT login dance). Min 16 chars — fail fast
+  // on a guessable token rather than expose an unauthenticated writer.
+  ingestToken: z.string().min(16).optional()
 });
 
 const env = {
@@ -106,7 +118,15 @@ const env = {
     lon: process.env.HUB_LON ? Number(process.env.HUB_LON) : undefined
   },
 
-  allowRegistration: process.env.ALLOW_REGISTRATION === 'true'
+  calendar: {
+    icsUrls: process.env.CALENDAR_ICS_URL
+      ? process.env.CALENDAR_ICS_URL.split(',').map(s => s.trim()).filter(Boolean)
+      : []
+  },
+
+  allowRegistration: process.env.ALLOW_REGISTRATION === 'true',
+
+  ingestToken: process.env.INGEST_TOKEN || undefined
 };
 
 export const config = configSchema.parse(env);

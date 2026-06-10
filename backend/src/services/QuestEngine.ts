@@ -34,6 +34,7 @@ import { generateInsightsForWeek, insightAllowedForAi } from './insights';
 // AI Calibration: per-user AI settings (master switch, feature toggles,
 // data-access grants, provider, token cap) — read once per generation pass.
 import { AiSettings, getAiSettings, aiAvailable, modelFor } from './llm';
+import { CalendarService, calendarService } from './CalendarService';
 import { isHabitDueToday } from '../routes/habits';
 // Pluggable per-pool candidate builders (phase 2+). Each is owned by its
 // domain route; the engine just concatenates their output.
@@ -266,6 +267,23 @@ export class QuestEngine {
       const persona = asPersona(ai.handlerPersona);
 
       const digest = await buildDailyDigest(this.prisma, userId, today);
+      // Calendar grant (SYS//CAL): a sealed calendar is never even fetched
+      // for the AI path. Counts/times only — titles stay out of the brief.
+      if (ai.aiAccessCalendar && CalendarService.configured()) {
+        const cal = await calendarService.getToday().catch(() => null);
+        if (cal) {
+          const now = Date.now();
+          const next = cal.events.find(e => !e.allDay && e.startsAt.getTime() > now);
+          digest.calendar = {
+            eventCount: cal.events.length,
+            busyMin: cal.busyMin,
+            freeMin: cal.freeMin,
+            nextLabel: next
+              ? next.startsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+              : null,
+          };
+        }
+      }
       const text = await narrateDailyRundown(this.prisma, userId, ai, digest, persona);
       if (!text) return;
 

@@ -55,6 +55,12 @@ export interface DailyDigest {
   topBoss: { name: string; pct: number } | null;
   neglectedContact: { name: string; days: number } | null;
   breachedYesterday: string[];
+  /**
+   * Calendar uplink facts (counts/times only, no event titles). NOT set
+   * here — QuestEngine attaches it only when the user's aiAccessCalendar
+   * grant is on, so a sealed calendar is never even fetched for the AI.
+   */
+  calendar?: { eventCount: number; busyMin: number; freeMin: number; nextLabel: string | null } | null;
 }
 
 export async function buildDailyDigest(db: Db, userId: string, day: Date): Promise<DailyDigest> {

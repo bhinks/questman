@@ -357,6 +357,8 @@ export interface DayPlan {
   budgetMin: number;
   /** Time Dilation: extra minutes already folded into budgetMin (0 = none). */
   budgetBoostMin?: number;
+  /** Calendar uplink: busy minutes already subtracted from budgetMin (0 = none). */
+  calendarBusyMin?: number;
   isWeekend: boolean;
   plannedMin: number;
   totalEstMin: number;
@@ -656,6 +658,22 @@ export interface QuestChain {
   createdAt: string;
 }
 
+// ---- calendar uplink (private ICS feed → planner budget + Today agenda) ---
+
+export interface CalEvent {
+  title: string;
+  startsAt: string;  // ISO
+  endsAt: string;    // ISO
+  allDay: boolean;
+}
+export interface CalendarToday {
+  events: CalEvent[];      // today's events, sorted by start
+  busyMin: number;         // timed-event overlap with the waking window, merged
+  freeMin: number;         // waking window minus busy
+  nextEvent: CalEvent | null; // first timed event still ahead of now
+}
+export interface CalendarTodayResponse { configured: boolean; calendar: CalendarToday | null; }
+
 // ---- Night City display calibration (per-user, design handoff) -----------
 
 export interface DisplaySettings {
@@ -674,6 +692,7 @@ export interface AiSettings {
   aiAccessFinance: boolean;  // grant: Vault (finance) data
   aiAccessHealth: boolean;   // grant: Vitals + Workouts data
   aiAccessSocial: boolean;   // grant: Social (contacts) data
+  aiAccessCalendar: boolean; // grant: calendar counts/free-busy (default sealed)
   aiProvider: AiProviderKind;
   aiModelQuests: string | null;  // cloud model override; null = server default
   aiModelHandler: string | null; // cloud model override; null = server default

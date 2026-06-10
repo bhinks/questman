@@ -37,6 +37,7 @@ const updateSchema = z.object({
   aiAccessFinance: z.boolean().optional(),
   aiAccessHealth: z.boolean().optional(),
   aiAccessSocial: z.boolean().optional(),
+  aiAccessCalendar: z.boolean().optional(),
   aiProvider: z.enum(['anthropic', 'ollama']).optional(),
   aiModelQuests: z.string().min(1).max(80).nullable().optional(),
   aiModelHandler: z.string().min(1).max(80).nullable().optional(),
@@ -49,6 +50,7 @@ const SETTINGS_SELECT = {
   displayCut: true, displayChroma: true, displayCrt: true,
   aiEnabled: true, aiQuestsEnabled: true, handlerEnabled: true,
   aiAccessFinance: true, aiAccessHealth: true, aiAccessSocial: true,
+  aiAccessCalendar: true,
   aiProvider: true, aiModelQuests: true, aiModelHandler: true,
   ollamaUrl: true, ollamaModel: true, aiDailyTokenCap: true,
   aiTokensUsed: true, aiTokensUsedOn: true,
@@ -58,6 +60,7 @@ type SettingsRow = {
   displayCut: number; displayChroma: number; displayCrt: number;
   aiEnabled: boolean; aiQuestsEnabled: boolean; handlerEnabled: boolean;
   aiAccessFinance: boolean; aiAccessHealth: boolean; aiAccessSocial: boolean;
+  aiAccessCalendar: boolean;
   aiProvider: string; aiModelQuests: string | null; aiModelHandler: string | null;
   ollamaUrl: string; ollamaModel: string; aiDailyTokenCap: number;
   aiTokensUsed: number; aiTokensUsedOn: Date | null;
@@ -72,6 +75,7 @@ function project(s: SettingsRow | null) {
     aiAccessFinance: AI_DEFAULTS.aiAccessFinance,
     aiAccessHealth: AI_DEFAULTS.aiAccessHealth,
     aiAccessSocial: AI_DEFAULTS.aiAccessSocial,
+    aiAccessCalendar: AI_DEFAULTS.aiAccessCalendar,
     aiProvider: AI_DEFAULTS.aiProvider,
     aiModelQuests: AI_DEFAULTS.aiModelQuests,
     aiModelHandler: AI_DEFAULTS.aiModelHandler,

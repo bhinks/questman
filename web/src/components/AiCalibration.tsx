@@ -201,6 +201,14 @@ export function AiCalibrationPanel() {
               readoutOff="SEALED"
               onSet={v => apply({ aiAccessSocial: v })}
             />
+            <ToggleRow
+              label="GRID SCHEDULE"
+              hint="CALENDAR · COUNTS + FREE/BUSY ONLY"
+              on={local.aiAccessCalendar}
+              readoutOn="OPEN"
+              readoutOff="SEALED"
+              onSet={v => apply({ aiAccessCalendar: v })}
+            />
 
             <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)' }}>
               <span className="ncx-serial">

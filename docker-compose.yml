@@ -47,6 +47,12 @@ services:
       # WeatherService to gate outdoor habits; unset → interval-only.
       HUB_LAT: ${HUB_LAT:-}
       HUB_LON: ${HUB_LON:-}
+      # Calendar uplink: private ICS feed URL(s), comma-separated.
+      # Unset → planner uses the static day budget, agenda panel hidden.
+      CALENDAR_ICS_URL: ${CALENDAR_ICS_URL:-}
+      # Shared secret (16+ chars) for POST /api/ingest/metrics — lets
+      # phone-side health bridges push DailyMetrics without a JWT.
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
     volumes:
       - questman-data:/data
     expose:

@@ -133,6 +133,13 @@ export async function narrateDailyRundown(
   if (d.topBoss) lines.push(`Boss in play: ${d.topBoss.name}, ${d.topBoss.pct}% down.`);
   if (d.neglectedContact && settings.aiAccessSocial) lines.push(`${d.neglectedContact.name} has gone ${d.neglectedContact.days} days without a ping.`);
   if (d.breachedYesterday.length) lines.push(`ICE breached yesterday: ${d.breachedYesterday.join(', ')}.`);
+  // Calendar grant: counts and free time only — event titles never leave.
+  if (d.calendar && settings.aiAccessCalendar) {
+    const c = d.calendar;
+    lines.push(c.eventCount === 0
+      ? 'The grid is clear: no calendar commitments today.'
+      : `Calendar: ${c.eventCount} commitment(s) today${c.nextLabel ? `, next at ${c.nextLabel}` : ''}; roughly ${Math.round(c.freeMin / 60)}h of free runway.`);
+  }
 
   const brief = [
     'Write ONE short daily rundown (about 40-70 words) from the brief below.',

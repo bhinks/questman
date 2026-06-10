@@ -36,6 +36,7 @@ export interface AiSettings {
   aiAccessFinance: boolean;
   aiAccessHealth: boolean;
   aiAccessSocial: boolean;
+  aiAccessCalendar: boolean;
   aiProvider: AiProvider;
   aiModelQuests: string | null;
   aiModelHandler: string | null;
@@ -55,6 +56,7 @@ export const AI_DEFAULTS: AiSettings = {
   aiAccessFinance: true,
   aiAccessHealth: true,
   aiAccessSocial: true,
+  aiAccessCalendar: false, // never flowed to the AI pre-grant — off preserves that
   aiProvider: 'anthropic',
   aiModelQuests: null,
   aiModelHandler: null,
@@ -73,6 +75,7 @@ export const AI_SETTINGS_SELECT = {
   aiAccessFinance: true,
   aiAccessHealth: true,
   aiAccessSocial: true,
+  aiAccessCalendar: true,
   aiProvider: true,
   aiModelQuests: true,
   aiModelHandler: true,

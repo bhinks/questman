@@ -25,6 +25,8 @@ import workoutRoutes from './routes/workouts';
 import goalRoutes from './routes/goals';
 import questRoutes from './routes/quests';
 import weatherRoutes from './routes/weather';
+import calendarRoutes from './routes/calendar';
+import ingestRoutes from './routes/ingest';
 import projectRoutes from './routes/projects';
 import mediaRoutes from './routes/media';
 import metricRoutes from './routes/metrics';
@@ -89,6 +91,10 @@ app.use('/api/workouts', authMiddleware, workoutRoutes);
 app.use('/api/goals', authMiddleware, goalRoutes);
 app.use('/api/quests', authMiddleware, questRoutes);
 app.use('/api/weather', authMiddleware, weatherRoutes);
+app.use('/api/calendar', authMiddleware, calendarRoutes);
+// Ingest does its own auth (JWT OR the INGEST_TOKEN header) so phone-side
+// automations can push health metrics without a short-lived login token.
+app.use('/api/ingest', ingestRoutes);
 app.use('/api/projects', authMiddleware, projectRoutes);
 app.use('/api/media', authMiddleware, mediaRoutes);
 app.use('/api/metrics', authMiddleware, metricRoutes);

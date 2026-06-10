@@ -30,6 +30,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "node-ical": "^0.26.1",
     "papaparse": "^5.4.1",
     "socket.io": "^4.7.4",
     "winston": "^3.11.0",

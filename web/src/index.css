@@ -455,10 +455,46 @@ input, textarea, select { font-family: inherit; }
 /* ============================================================
    Responsive
    ============================================================ */
+
+/* Today: ledger | rail (+ city feed). Below 1600px the feed panels stack
+   under the rail in the same 330px column; on big monitors they get their
+   own third column so the page actually uses the width. */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-areas: "main rail" "main feed";
+  gap: 16px;
+  align-items: start;
+}
+.today-main { grid-area: main; min-width: 0; }
+.today-rail { grid-area: rail; min-width: 0; }
+.today-feed { grid-area: feed; min-width: 0; }
+
+/* ---- Scale-UP: Brent's big monitors. The app was capped at 1320px with
+   no upward breakpoints — a sea of margin on 1440p/4K. Widen the cap, give
+   Today its third column, and gently zoom the whole content plane on very
+   wide displays (inline styles are px-based, so zoom is the one lever that
+   makes everything "a little bigger" without retouching every panel). */
+@media (min-width: 1600px) {
+  :root { --maxw: 1720px; }
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr) 330px 330px;
+    grid-template-areas: "main rail feed";
+  }
+}
+@media (min-width: 2100px) {
+  :root { --maxw: 1880px; }
+  .content { zoom: 1.08; }
+}
+
 @media (max-width: 1100px) {
   .split-grid { grid-template-columns: 1fr !important; }
   .hero-grid { grid-template-columns: 1fr !important; }
   .hero-grid > div:last-child { border-left: none !important; border-top: 1px solid var(--line); }
+  .today-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "main" "rail" "feed";
+  }
 }
 @media (max-width: 860px) {
   .ncx-shell { grid-template-columns: 1fr; }

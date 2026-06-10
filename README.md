@@ -17,6 +17,10 @@ briefing, weather-aware scheduling for outdoor chores, and the live session log.
 2. `docker compose up -d --build`
 3. Open `http://localhost:8080`.
 
+Optional hookups — weather, calendar, and health sync — are covered in
+[Integrations](#integrations); what any of it shares with an LLM (spoiler:
+nothing without your say-so) is covered in [What the AI sees](#what-the-ai-sees).
+
 ## Features
 
 ### 🎯 **Quest System**
@@ -46,7 +50,8 @@ briefing, weather-aware scheduling for outdoor chores, and the live session log.
 - Weekly retrospective debriefs
 - **Fully optional and user-governed**: the AI Calibration panel (SYS // CALIBRATION)
   has a master kill-switch, per-feature toggles, and per-domain data-access grants
-  (finance / health / contacts) — sealed domains are never sent to any model
+  (finance / health / contacts / calendar) — sealed domains are never sent to any
+  model. Details: [What the AI sees](#what-the-ai-sees)
 - Bring your own brain: Anthropic cloud (per-tier model selection) or a local
   LLM via [Ollama](https://ollama.com), plus a configurable daily token cap
 
@@ -108,11 +113,87 @@ The finance module accepts CSV or Excel files (.csv, .xlsx, .xls) with three req
 - **Advanced Filtering**: Search by date, amount, category, or description
 
 ### Privacy & Security
-- **Local Processing**: All data processing happens in your browser
-- **No Server Storage**: Financial data never leaves your device  
-- **No Tracking**: No analytics or tracking of financial information
-- **Open Source**: Full transparency in data handling
+- **Self-hosted**: transactions live in your own SQLite volume on your own
+  hardware — no third-party service ever sees them
+- **No Tracking**: no analytics or telemetry of any kind
+- **AI is opt-in**: finance data only reaches a model if the Vault grant is
+  open in AI Calibration — and even then only summaries, never raw
+  transactions (see [What the AI sees](#what-the-ai-sees))
+- **Open Source**: full transparency in data handling
 
-## Weather Integration
+## Integrations
 
-Set `HUB_LAT` and `HUB_LON` in your `.env` file to enable weather-aware quest scheduling for outdoor chores and habits. Uses Open-Meteo (no API key required).
+All integrations are optional, configured in `.env` (each variable is
+documented in `.env.example`), and degrade gracefully when unset or
+unreachable — the app never blocks on an external feed.
+
+### Weather (Open-Meteo)
+
+- **Setup**: set `HUB_LAT` and `HUB_LON`. No API key — uses Open-Meteo.
+- **What it fetches**: today's + tomorrow's forecast for your hub location
+  (temps, rain, wind, hourly windows), cached ~2h server-side.
+- **What it powers**: outdoor chores/habits only generate quests when their
+  weather rule passes; the planner boosts "last clear day" quests; Today
+  shows the ENV.SCAN panel.
+- **AI exposure**: when Quest Synthesis is on, an outdoor quest's
+  best-window hint (e.g. "1–3pm") rides along with the candidate so the
+  model can theme the timing. Nothing else.
+
+### Calendar (private ICS feed)
+
+- **Setup**: set `CALENDAR_ICS_URL` to one or more (comma-separated)
+  private ICS URLs. For Google Calendar: Settings → *your calendar* →
+  "Integrate calendar" → **Secret address in iCal format**. Treat that URL
+  like a password — anyone holding it can read your calendar.
+- **What it fetches**: today's events (recurrence-aware), polled with a
+  15-minute cache. Read-only; Questman never writes to your calendar.
+- **What it powers**: the day planner subtracts your real busy time from
+  the daily time budget, and Today's GRID SCHEDULE panel shows the agenda
+  with a FREE/BUSY readout.
+- **AI exposure**: **sealed by default.** Opening the GRID SCHEDULE grant
+  in AI Calibration lets the Handler's daily rundown mention commitment
+  *counts*, the *next start time*, and *free minutes* — event titles never
+  reach any model, grant or no grant.
+
+### Health ingest (Pixel Watch / Health Connect / anything)
+
+- **Setup**: set `INGEST_TOKEN` (16+ chars, e.g. `openssl rand -hex 24`).
+  That arms a source-agnostic bulk endpoint:
+
+  ```sh
+  curl -X POST https://your-hub/api/ingest/metrics \
+    -H "X-Ingest-Token: $INGEST_TOKEN" -H "Content-Type: application/json" \
+    -d '{"entries":[{"date":"2026-06-10","key":"steps","value":9182},
+                    {"date":"2026-06-10","key":"sleepHours","value":7.5}]}'
+  ```
+
+  Pair it with a phone-side bridge such as
+  [health-connect-webhook](https://github.com/mcnaveen/health-connect-webhook)
+  (Health Connect → your webhook, on a schedule) to auto-fill steps, sleep,
+  heart rate, and weight.
+- **What it stores**: plain daily metrics (`date`/`key`/`value` upserts) —
+  identical to logging vitals by hand. Re-sending a window is idempotent.
+- **What it powers**: vitals quests, the energy tier (from sleep), and the
+  cross-domain insights engine.
+- **AI exposure**: ingested metrics are ordinary Vitals data, so they are
+  governed by the **Biometrics** grant like everything else health-shaped.
+
+## What the AI sees
+
+Nothing, unless you let it. The master switch in SYS // CALIBRATION kills
+every model call; below it, per-domain grants control what may be included
+in prompts. The AI only ever receives **server-computed summaries** — it
+never reads tables, files, or raw history, and it cannot mint XP or eddies.
+
+| Grant | Default | When OPEN, prompts may include |
+|---|---|---|
+| **Vault** (finance) | open | wasteful-pattern summaries ("subscription, ~$45"), budget/bill reminder candidates, weekly spend total + top category totals. Never raw transactions or imports. |
+| **Biometrics** (health) | open | vitals/workout quest prompts, energy tier, weekly sleep/mood averages + weight delta, workout count. Never full metric history. |
+| **Contacts** (social) | open | the most-neglected contact's name + days since contact, "reach out" candidates. |
+| **Grid Schedule** (calendar) | **sealed** | commitment count, next start time, free/busy minutes. Event titles: never, even when open. |
+
+Provider choice (Anthropic cloud vs. local [Ollama](https://ollama.com)) and
+the daily token cap apply on top — at the cap, AI yields to the deterministic
+fallbacks until midnight. With the master switch off, or no provider
+available, every feature still works; quests just use rule-based titles and
+the Handler goes quiet.

@@ -20,6 +20,7 @@ import { api } from '../lib/api';
 import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry, FocusSession, HandlerLatestResponse, HandlerPersona } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
+import { CityFeed } from './TodayFeed';
 import type { FocusSeed } from './FocusView';
 
 /** Module key → outline icon. NO emoji in this direction (meta.emoji unused). */
@@ -385,9 +386,9 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
           </div>
         </div>
       ) : (
-        <div className="split-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 330px', gap: 16, alignItems: 'start' }}>
+        <div className="today-grid">
           {/* ---- left: priority contract + ledger ---- */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          <div className="today-main" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {priority ? (
               <Ticks focal>
                 <div className="panel hud ncx-scan" style={{ padding: '20px 24px' }}>
@@ -500,7 +501,7 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
           </div>
 
           {/* ---- right column ---- */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="today-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <ChronoPanel />
             {weather && (
               <div className="panel" style={{ padding: '15px 18px' }}>
@@ -616,6 +617,12 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                 {today.xpEarned}/{xpDayTotal} XP BANKED
               </div>
             </div>
+          </div>
+
+          {/* ---- city feed: agenda / bosses / patterns / cold contacts.
+               Third column at ≥1600px; stacks under the rail below that. ---- */}
+          <div className="today-feed" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <CityFeed />
           </div>
         </div>
       )}
