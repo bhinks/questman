@@ -1,399 +1,148 @@
 import { useState } from 'react';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from 'recharts';
-import { format } from 'date-fns';
 
 interface SpendingChartProps {
   monthlyData: Array<{ month: string; spending: number; income: number; net: number }>;
   dailyData: Array<{ date: string; amount: number }>;
 }
 
-export function SpendingChart({ monthlyData, dailyData }: SpendingChartProps) {
-  const [viewType, setViewType] = useState<'monthly' | 'daily'>('monthly');
-  const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
+const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-  const formatMonthlyData = monthlyData.map(item => ({
-    ...item,
-    monthLabel: format(new Date(item.month + '-01'), 'MMM yyyy')
-  }));
+/** "YYYY-MM" → "MMM" without Date parsing (avoids UTC off-by-one). */
+function monthLabel(month: string): string {
+  const m = Number(month.slice(5, 7));
+  return MONTH_ABBR[m - 1] ?? month.toUpperCase();
+}
 
-  const formatDailyData = dailyData.map(item => ({
-    ...item,
-    dateLabel: format(new Date(item.date), 'MMM dd')
-  }));
+export function SpendingChart({ monthlyData }: SpendingChartProps) {
+  const [chart, setChart] = useState<'bar' | 'line'>('bar');
 
-  const renderChart = () => {
-    const data = viewType === 'monthly' ? formatMonthlyData : formatDailyData.slice(-30) as any; // Last 30 days
-    
-    if (chartType === 'area') {
-      return (
-        <AreaChart data={data}>
-          <CartesianGrid 
-            strokeDasharray="1 3" 
-            stroke="var(--line)" 
-            strokeOpacity={0.3}
-          />
-          <XAxis 
-            dataKey={viewType === 'monthly' ? 'monthLabel' : 'dateLabel'}
-            tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-            axisLine={{ stroke: 'var(--line)' }}
-            tickLine={{ stroke: 'var(--line)' }}
-          />
-          <YAxis 
-            tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-            tickFormatter={(value) => `$${value.toLocaleString()}`}
-            axisLine={{ stroke: 'var(--line)' }}
-            tickLine={{ stroke: 'var(--line)' }}
-          />
-          <Tooltip 
-            formatter={(value, name) => [
-              `$${Number(value).toLocaleString()}`,
-              name === 'spending' ? 'Spending' :
-              name === 'income' ? 'Income' :
-              name === 'net' ? 'Net' : 'Amount'
-            ]}
-            labelFormatter={(label) => label}
-          />
-          {viewType === 'monthly' ? (
-            <>
-              <Area 
-                type="monotone" 
-                dataKey="spending" 
-                stackId="1"
-                stroke="var(--red)" 
-                fill="var(--red)" 
-                fillOpacity={0.2}
-                strokeWidth={2}
-                style={{ filter: 'drop-shadow(0 0 4px var(--red))' }}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="income" 
-                stackId="2"
-                stroke="var(--lime)" 
-                fill="var(--lime)" 
-                fillOpacity={0.2}
-                strokeWidth={2}
-                style={{ filter: 'drop-shadow(0 0 4px var(--lime))' }}
-              />
-            </>
-          ) : (
-            <Area 
-              type="monotone" 
-              dataKey="amount" 
-              stroke="var(--cyan)" 
-              fill="var(--cyan)" 
-              fillOpacity={0.2}
-              strokeWidth={2}
-              style={{ filter: 'drop-shadow(0 0 4px var(--cyan))' }}
-            />
-          )}
-        </AreaChart>
-      );
-    }
-    
-    if (chartType === 'bar') {
-      return (
-        <BarChart data={data}>
-          <CartesianGrid 
-            strokeDasharray="1 3" 
-            stroke="var(--line)" 
-            strokeOpacity={0.3}
-          />
-          <XAxis 
-            dataKey={viewType === 'monthly' ? 'monthLabel' : 'dateLabel'}
-            tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-            axisLine={{ stroke: 'var(--line)' }}
-            tickLine={{ stroke: 'var(--line)' }}
-          />
-          <YAxis 
-            tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-            tickFormatter={(value) => `$${value.toLocaleString()}`}
-            axisLine={{ stroke: 'var(--line)' }}
-            tickLine={{ stroke: 'var(--line)' }}
-          />
-          <Tooltip 
-            formatter={(value, name) => [
-              `$${Number(value).toLocaleString()}`,
-              name === 'spending' ? 'Spending' :
-              name === 'income' ? 'Income' :
-              name === 'net' ? 'Net' : 'Amount'
-            ]}
-          />
-          {viewType === 'monthly' ? (
-            <>
-              <Bar 
-                dataKey="spending" 
-                fill="var(--red)"
-                style={{ filter: 'drop-shadow(0 0 4px var(--red))' }}
-              />
-              <Bar 
-                dataKey="income" 
-                fill="var(--lime)"
-                style={{ filter: 'drop-shadow(0 0 4px var(--lime))' }}
-              />
-            </>
-          ) : (
-            <Bar 
-              dataKey="amount" 
-              fill="var(--cyan)"
-              style={{ filter: 'drop-shadow(0 0 4px var(--cyan))' }}
-            />
-          )}
-        </BarChart>
-      );
-    }
-    
-    // Default: line chart
-    return (
-      <LineChart data={data}>
-        <CartesianGrid 
-          strokeDasharray="1 3" 
-          stroke="var(--line)" 
-          strokeOpacity={0.3}
-        />
-        <XAxis 
-          dataKey={viewType === 'monthly' ? 'monthLabel' : 'dateLabel'}
-          tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-          axisLine={{ stroke: 'var(--line)' }}
-          tickLine={{ stroke: 'var(--line)' }}
-        />
-        <YAxis 
-          tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-          tickFormatter={(value) => `$${value.toLocaleString()}`}
-          axisLine={{ stroke: 'var(--line)' }}
-          tickLine={{ stroke: 'var(--line)' }}
-        />
-        <Tooltip 
-          formatter={(value, name) => [
-            `$${Number(value).toLocaleString()}`,
-            name === 'spending' ? 'Spending' :
-            name === 'income' ? 'Income' :
-            name === 'net' ? 'Net' : 'Amount'
-          ]}
-        />
-        {viewType === 'monthly' ? (
-          <>
-            <Line 
-              type="monotone" 
-              dataKey="spending" 
-              stroke="var(--red)" 
-              strokeWidth={2}
-              dot={{ fill: 'var(--red)', strokeWidth: 2, r: 4 }}
-              style={{ filter: 'drop-shadow(0 0 4px var(--red))' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="income" 
-              stroke="var(--lime)" 
-              strokeWidth={2}
-              dot={{ fill: 'var(--lime)', strokeWidth: 2, r: 4 }}
-              style={{ filter: 'drop-shadow(0 0 4px var(--lime))' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="net" 
-              stroke="var(--cyan)" 
-              strokeWidth={2}
-              strokeDasharray="4 4"
-              dot={{ fill: 'var(--cyan)', strokeWidth: 2, r: 4 }}
-              style={{ filter: 'drop-shadow(0 0 4px var(--cyan))' }}
-            />
-          </>
-        ) : (
-          <Line 
-            type="monotone" 
-            dataKey="amount" 
-            stroke="var(--cyan)" 
-            strokeWidth={2}
-            dot={{ fill: 'var(--cyan)', strokeWidth: 2, r: 4 }}
-            style={{ filter: 'drop-shadow(0 0 4px var(--cyan))' }}
-          />
-        )}
-      </LineChart>
-    );
-  };
+  const data = monthlyData.slice(-12);
+  const maxMon = Math.max(...data.map(d => d.spending), 1);
+  const lastIdx = data.length - 1;
+  const step = data.length > 1 ? 480 / (data.length - 1) : 0;
 
   return (
-    <div className="panel hud" style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, var(--violet), var(--magenta))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+    <div className="ncx-ticks">
+      <span className="tick" style={{ top: -4, left: -4 }}></span>
+      <span className="tick" style={{ bottom: -4, right: -4 }}></span>
+      <div className="panel" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', marginBottom: 16, alignItems: 'center', gap: 10 }}>
+          <span
+            className="mono"
+            style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
           >
-            <span style={{ color: 'white', fontSize: 16, fontWeight: 600 }}>📈</span>
-          </div>
-          <h3 style={{
-            fontSize: 18, 
-            fontWeight: 600, 
-            margin: 0,
-            color: 'var(--text)',
-            fontFamily: 'var(--font-display)'
-          }}>
-            Spending Trends
-          </h3>
+            MONTHLY BURN — 12 MO
+          </span>
+          <span style={{ flex: 1 }}></span>
+          <button
+            key={'bar-' + (chart === 'bar')}
+            className={'btn' + (chart === 'bar' ? ' btn-primary' : '')}
+            style={{ padding: '5px 12px', fontSize: 10 }}
+            onClick={() => setChart('bar')}
+          >
+            BAR
+          </button>
+          <button
+            key={'line-' + (chart === 'line')}
+            className={'btn' + (chart === 'line' ? ' btn-primary' : '')}
+            style={{ padding: '5px 12px', fontSize: 10 }}
+            onClick={() => setChart('line')}
+          >
+            LINE
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line)' }}>
-            <button
-              className={viewType === 'monthly' ? 'btn-primary' : 'btn'}
-              style={{
-                padding: '6px 12px',
-                fontSize: 11,
-                borderRadius: 0,
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.05em'
-              }}
-              onClick={() => setViewType('monthly')}
-            >
-              MONTHLY
-            </button>
-            <button
-              className={viewType === 'daily' ? 'btn-primary' : 'btn'}
-              style={{
-                padding: '6px 12px',
-                fontSize: 11,
-                borderRadius: 0,
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.05em'
-              }}
-              onClick={() => setViewType('daily')}
-            >
-              DAILY
-            </button>
+
+        {chart === 'bar' ? (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 140 }}>
+            {data.map((d, i) => {
+              const last = i === lastIdx;
+              return (
+                <div
+                  key={d.month}
+                  style={{
+                    flex: 1,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'flex-end',
+                    gap: 5,
+                    alignItems: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      height: (d.spending / maxMon * 100) + '%',
+                      background: last ? 'linear-gradient(180deg, var(--cyan), var(--cyan-deep))' : '#181b2e',
+                      boxShadow: last
+                        ? '0 0 18px rgba(var(--accent-rgb),0.4)'
+                        : 'inset 0 0 0 1px var(--line)',
+                      clipPath: 'polygon(0 4px, 100% 0, 100% 100%, 0 100%)',
+                    }}
+                  ></div>
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: 8,
+                      color: last ? 'var(--cyan)' : 'var(--text-ghost)',
+                      letterSpacing: '0.1em',
+                    }}
+                  >
+                    {monthLabel(d.month)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          
-          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line)' }}>
-            <button
-              className={chartType === 'line' ? 'btn-primary' : 'btn'}
-              style={{
-                padding: '6px 12px',
-                fontSize: 11,
-                borderRadius: 0,
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.05em'
-              }}
-              onClick={() => setChartType('line')}
+        ) : (
+          <div style={{ height: 140, position: 'relative' }}>
+            <svg
+              width="100%"
+              height="122"
+              viewBox="0 0 480 122"
+              preserveAspectRatio="none"
+              style={{ display: 'block', overflow: 'visible' }}
             >
-              LINE
-            </button>
-            <button
-              className={chartType === 'area' ? 'btn-primary' : 'btn'}
-              style={{
-                padding: '6px 12px',
-                fontSize: 11,
-                borderRadius: 0,
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.05em'
-              }}
-              onClick={() => setChartType('area')}
-            >
-              AREA
-            </button>
-            <button
-              className={chartType === 'bar' ? 'btn-primary' : 'btn'}
-              style={{
-                padding: '6px 12px',
-                fontSize: 11,
-                borderRadius: 0,
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.05em'
-              }}
-              onClick={() => setChartType('bar')}
-            >
-              BAR
-            </button>
+              {[0.25, 0.5, 0.75].map(g => (
+                <line key={g} x1="0" x2="480" y1={122 * g} y2={122 * g} stroke="var(--line)" strokeWidth="1" />
+              ))}
+              <polyline
+                points={data.map((d, i) => `${i * step},${118 - (d.spending / maxMon) * 100}`).join(' ')}
+                fill="none"
+                stroke="var(--cyan)"
+                strokeWidth="2"
+                style={{ filter: 'drop-shadow(0 0 6px rgba(var(--accent-rgb),0.7))' }}
+              />
+              {data.map((d, i) => (
+                <circle
+                  key={d.month}
+                  cx={i * step}
+                  cy={118 - (d.spending / maxMon) * 100}
+                  r={i === lastIdx ? 4 : 2.5}
+                  fill={i === lastIdx ? 'var(--cyan)' : '#181b2e'}
+                  stroke="var(--cyan)"
+                  strokeWidth="1.5"
+                />
+              ))}
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              {data.map((d, i) => (
+                <span
+                  key={d.month}
+                  className="mono"
+                  style={{
+                    fontSize: 8,
+                    color: i === lastIdx ? 'var(--cyan)' : 'var(--text-ghost)',
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  {monthLabel(d.month)}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      
-      <div style={{ height: 320 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          {renderChart()}
-        </ResponsiveContainer>
-      </div>
-      
-      {viewType === 'monthly' && (
-        <div style={{ 
-          marginTop: 16, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          gap: 24 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ 
-              width: 10, 
-              height: 10, 
-              background: 'var(--red)', 
-              borderRadius: 2,
-              boxShadow: '0 0 6px var(--red)60'
-            }} />
-            <span style={{ 
-              fontSize: 12, 
-              color: 'var(--text-dim)',
-              fontFamily: 'var(--font-mono)'
-            }}>
-              SPENDING
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ 
-              width: 10, 
-              height: 10, 
-              background: 'var(--lime)', 
-              borderRadius: 2,
-              boxShadow: '0 0 6px var(--lime)60'
-            }} />
-            <span style={{ 
-              fontSize: 12, 
-              color: 'var(--text-dim)',
-              fontFamily: 'var(--font-mono)'
-            }}>
-              INCOME
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ 
-              width: 10, 
-              height: 10, 
-              background: 'var(--cyan)', 
-              borderRadius: 2,
-              boxShadow: '0 0 6px var(--cyan)60'
-            }} />
-            <span style={{ 
-              fontSize: 12, 
-              color: 'var(--text-dim)',
-              fontFamily: 'var(--font-mono)'
-            }}>
-              NET
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

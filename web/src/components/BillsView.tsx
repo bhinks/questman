@@ -193,17 +193,11 @@ function Header({ monthlyTotal, activeCount }: { monthlyTotal: number; activeCou
   const annual = monthlyTotal * 12;
   return (
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-      <div style={{
-        width: 46, height: 46, borderRadius: 10, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'color-mix(in srgb, var(--magenta) 10%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--magenta) 35%, transparent)',
-        color: 'var(--magenta)',
-      }}>
-        <Icon name="repeat" size={22} />
+      <div className="ncx-chip" style={{ width: 46, height: 46, color: 'var(--magenta)' }}>
+        <Icon name="repeat" size={20} />
       </div>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
+        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
           LEECH PROCESSES
         </h2>
         <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
@@ -211,7 +205,7 @@ function Header({ monthlyTotal, activeCount }: { monthlyTotal: number; activeCou
         </div>
       </div>
       <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-        <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--magenta)', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
+        <div className="ncx-val" style={{ fontSize: 28, color: 'var(--magenta)', lineHeight: 1 }}>
           {money(monthlyTotal)}<span style={{ fontSize: 14, color: 'var(--text-faint)', fontWeight: 600 }}>/mo</span>
         </div>
         <div className="mono" style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>
@@ -392,10 +386,11 @@ function BillCard({
     >
       {/* sigil */}
       <div style={{
-        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+        width: 44, height: 44, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: `color-mix(in srgb, ${accent} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${accent} 35%, transparent)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 35%, transparent)`,
+        clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
         color: accent,
       }}>
         <Icon name={bill.isSubscription ? 'repeat' : 'wallet'} size={20} />
@@ -408,13 +403,8 @@ function BillCard({
           {bill.isSubscription && <Chip color="var(--violet)">SUB</Chip>}
           {bill.category && (
             <span
-              className="mono"
-              style={{
-                fontSize: 10, color: bill.category.color || 'var(--text-dim)',
-                padding: '2px 8px', borderRadius: 5,
-                background: `color-mix(in srgb, ${bill.category.color || 'var(--text-dim)'} 12%, transparent)`,
-                border: `1px solid color-mix(in srgb, ${bill.category.color || 'var(--line-2)'} 30%, transparent)`,
-              }}
+              className="ncx-stamp flat"
+              style={{ fontSize: 8.5, color: bill.category.color || 'var(--text-dim)' }}
             >
               {bill.category.name}
             </span>
@@ -459,12 +449,7 @@ function BillCard({
             disabled={pay.isPending}
             onClick={() => pay.mutate()}
             title="Mark this cycle paid — advances the next due date"
-            style={{
-              padding: '8px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
-              color: 'var(--lime)',
-              borderColor: 'color-mix(in srgb, var(--lime) 45%, transparent)',
-              background: 'color-mix(in srgb, var(--lime) 8%, transparent)',
-            }}
+            style={{ padding: '8px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--lime)' }}
           >
             <Icon name="check" size={13} /> {pay.isPending ? 'PAID…' : 'PAID'}
           </button>
@@ -551,7 +536,7 @@ function AuditStat({ label, value, color, icon }: { label: string; value: string
       <span className="kicker" style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-faint)' }}>
         <Icon name={icon} size={11} style={{ color }} /> {label}
       </span>
-      <span style={{ fontSize: 20, fontWeight: 700, color, fontFamily: 'var(--font-display)' }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: 20, color }}>{value}</span>
     </div>
   );
 }
@@ -583,17 +568,11 @@ function AuditRow({ sub, onChanged }: { sub: RecurringExpense; onChanged: () => 
         </div>
       </div>
       <button
-        className="btn"
+        className="ncx-btn danger"
         disabled={cancel.isPending}
         onClick={() => cancel.mutate()}
         title="Cancel this subscription — stop the drain"
-        style={{
-          padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-          color: 'var(--red)',
-          borderColor: 'color-mix(in srgb, var(--red) 50%, transparent)',
-          background: 'color-mix(in srgb, var(--red) 10%, transparent)',
-          flexShrink: 0,
-        }}
+        style={{ padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', flexShrink: 0 }}
       >
         <Icon name="bolt" size={13} /> {cancel.isPending ? 'KILLING…' : 'CANCEL'}
       </button>
@@ -751,26 +730,21 @@ function BillForm({
 function SectionLabel({ icon, color, title, sub }: { icon: string; color: string; title: string; sub: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 2, flexWrap: 'wrap' }}>
-      <Icon name={icon} size={16} style={{ color }} />
-      <span className="kicker" style={{ color }}>{title}</span>
-      <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>· {sub}</span>
+      <Icon name={icon} size={14} style={{ color }} />
+      <span
+        className="mono"
+        style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
+      >
+        {title}
+      </span>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>// {sub}</span>
     </div>
   );
 }
 
 function Chip({ children, color }: { children: React.ReactNode; color: string }) {
   return (
-    <span
-      className="mono"
-      style={{
-        flexShrink: 0,
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
-        color,
-        padding: '2px 6px', borderRadius: 5,
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-      }}
-    >
+    <span className="ncx-stamp flat" style={{ flexShrink: 0, fontSize: 8.5, color }}>
       {children}
     </span>
   );
@@ -788,9 +762,9 @@ function Splash({ children, color }: { children: React.ReactNode; color?: string
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,

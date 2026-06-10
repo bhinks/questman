@@ -93,17 +93,12 @@ function Header({ total, active }: { total: number; active: number }) {
   return (
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
       <Icon name="layers" size={20} style={{ color: 'var(--cyan)' }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Questlines</h2>
-      <div
-        className="mono"
-        style={{
-          marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-          padding: '4px 8px', background: 'var(--panel-2)',
-          borderRadius: 6, border: '1px solid var(--line)',
-        }}
-      >
+      <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+        Questlines
+      </h2>
+      <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
         {active} ACTIVE · {total} TOTAL
-      </div>
+      </span>
     </div>
   );
 }
@@ -112,15 +107,8 @@ function StatusPill({ status }: { status: QuestChain['status'] }) {
   const meta = STATUS_META[status];
   return (
     <span
-      className="mono"
-      style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-        color: meta.color,
-        padding: '3px 8px',
-        borderRadius: 6,
-        background: `color-mix(in srgb, ${meta.color} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${meta.color} 35%, transparent)`,
-      }}
+      className="ncx-stamp flat"
+      style={{ color: meta.color, background: `color-mix(in srgb, ${meta.color} 10%, transparent)` }}
     >
       {meta.label}
     </span>
@@ -191,22 +179,21 @@ function ChainCard({ chain, onDelete }: { chain: QuestChain; onDelete: () => voi
 
       {/* Progress bar */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="kicker"><Icon name="trend" size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />PROGRESS</span>
-          <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>{doneCount}/{total} STEPS</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="trend" size={11} />PROGRESS
+          </span>
+          <span className="ncx-serial">{doneCount}/{total} STEPS</span>
         </div>
-        <div style={{
-          height: 8, borderRadius: 6, background: 'var(--panel-2)',
-          border: '1px solid var(--line)', overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${pct}%`, height: '100%',
+        <div className="ncx-bar slim">
+          <i style={{
+            width: `${pct}%`,
             background: chain.status === 'done'
               ? 'linear-gradient(90deg, var(--cyan), var(--teal))'
               : 'linear-gradient(90deg, var(--lime), var(--teal))',
             boxShadow: pct > 0 ? 'var(--glow-cyan)' : 'none',
-            transition: 'width 0.3s ease',
           }} />
+          <span className="seg-mask" />
         </div>
       </div>
 
@@ -236,7 +223,6 @@ function StepRow({ step, isLast }: { step: ChainStep; isLast: boolean }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 26 }}>
         <div style={{
           width: 26, height: 26, flexShrink: 0,
-          borderRadius: 7,
           border: `1px solid ${nodeColor}`,
           background: done
             ? 'linear-gradient(135deg, var(--lime), var(--teal))'
@@ -272,14 +258,8 @@ function StepRow({ step, isLast }: { step: ChainStep; isLast: boolean }) {
 
           {available && (
             <span
-              className="mono"
-              style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-                color: 'var(--cyan)',
-                padding: '2px 7px', borderRadius: 6,
-                background: 'color-mix(in srgb, var(--cyan) 12%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--cyan) 35%, transparent)',
-              }}
+              className="ncx-stamp flat"
+              style={{ fontSize: 8.5, padding: '2px 7px', color: 'var(--cyan)', background: 'rgba(var(--accent-rgb), 0.12)' }}
             >
               CURRENT
             </span>
@@ -296,8 +276,13 @@ function StepRow({ step, isLast }: { step: ChainStep; isLast: boolean }) {
         )}
 
         {/* Meta chips: difficulty / xp / est. XP only highlighted on the current step. */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-          <MetaChip color={DIFF_COLOR[step.difficulty]} label={step.difficulty.toUpperCase()} />
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span
+            className="ncx-stamp flat"
+            style={{ fontSize: 8.5, padding: '2px 7px', color: DIFF_COLOR[step.difficulty] }}
+          >
+            {step.difficulty.toUpperCase()}
+          </span>
           <MetaChip
             color={available ? 'var(--amber)' : 'var(--text-faint)'}
             icon="bolt"
@@ -318,7 +303,7 @@ function MetaChip({ color, icon, label }: { color: string; icon?: string; label:
       className="mono"
       style={{
         fontSize: 10, color,
-        padding: '2px 7px', borderRadius: 6,
+        padding: '2px 7px',
         background: `color-mix(in srgb, ${color} 8%, transparent)`,
         border: `1px solid color-mix(in srgb, ${color} 28%, transparent)`,
         display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -366,34 +351,38 @@ function ChainForm({ onClose }: { onClose: () => void }) {
     <div className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, borderLeft: '3px solid var(--cyan)' }}>
       <input
         autoFocus
+        className="ncx-input"
         placeholder="Questline name (e.g. Operation Clean Slate)"
         value={name}
         onChange={e => setName(e.target.value)}
-        style={inputStyle}
       />
       <input
+        className="ncx-input"
         placeholder="Brief (optional)"
         value={description}
         onChange={e => setDescription(e.target.value)}
-        style={inputStyle}
       />
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'flex-start' }}>
         <span className="kicker">ACCENT</span>
         <input
+          className="ncx-input"
           placeholder="#48d1ff"
           value={color}
           onChange={e => setColor(e.target.value)}
-          style={{ ...inputStyle, width: 110 }}
+          style={{ width: 110 }}
         />
       </label>
 
       {/* Steps editor */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span className="kicker"><Icon name="layers" size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />STEPS</span>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="layers" size={11} />STEPS
+        </span>
         {steps.map((s, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', width: 20, textAlign: 'right' }}>{i + 1}.</span>
             <input
+              className="ncx-input"
               placeholder={`Step ${i + 1} title`}
               value={s}
               onChange={e => setStep(i, e.target.value)}
@@ -403,7 +392,7 @@ function ChainForm({ onClose }: { onClose: () => void }) {
                   if (i === steps.length - 1) addStep();
                 }
               }}
-              style={{ ...inputStyle, flex: 1, minWidth: 140 }}
+              style={{ flex: 1, minWidth: 140, width: 'auto' }}
             />
             <button
               className="btn btn-ghost"
@@ -446,14 +435,3 @@ function Empty({ children, color }: { children: React.ReactNode; color?: string 
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: '8px 12px',
-  background: 'var(--panel-2)',
-  border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 13,
-  outline: 'none',
-};

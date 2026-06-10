@@ -136,26 +136,24 @@ function Header({ review }: { review: WeeklyReview | null }) {
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <Icon name="file" size={20} style={{ color: 'var(--cyan)' }} />
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
+        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>
           {review ? `AFTER-ACTION // WEEK OF ${fmtWeekOf(review.weekOf)}` : 'AFTER-ACTION'}
         </h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--text-faint)', marginTop: 3 }}>
           weekly debrief · the run, reviewed
         </div>
       </div>
       {review && (
-        <div
-          className="mono"
+        <span
+          className="ncx-stamp flat"
           style={{
-            marginLeft: 'auto', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+            marginLeft: 'auto',
             color: chipColor,
-            padding: '4px 10px', borderRadius: 6,
             background: `color-mix(in srgb, ${chipColor} 10%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${chipColor} 40%, transparent)`,
           }}
         >
           {chipLabel}
-        </div>
+        </span>
       )}
     </div>
   );
@@ -168,8 +166,10 @@ function WeekSelector({
 }: { reviews: WeeklyReview[]; activeId: string; onPick: (id: string) => void }) {
   return (
     <div className="panel" style={{ padding: 14 }}>
-      <div className="kicker" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name="clock" size={12} style={{ color: 'var(--text-faint)' }} /> PAST CYCLES
+      <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name="clock" size={12} style={{ color: 'var(--text-faint)' }} />
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>PAST CYCLES</span>
+        <span className="ncx-serial">{reviews.length} ON FILE</span>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {reviews.map(r => {
@@ -183,9 +183,9 @@ function WeekSelector({
               title={filed ? 'Filed' : 'Awaiting debrief'}
               style={{
                 padding: '6px 12px', fontSize: 11,
-                borderColor: active ? 'var(--cyan)' : 'var(--line)',
                 color: active ? 'var(--cyan)' : 'var(--text-dim)',
-                background: active ? 'color-mix(in srgb, var(--cyan) 10%, transparent)' : undefined,
+                background: active ? 'rgba(var(--accent-rgb), 0.10)' : undefined,
+                boxShadow: active ? 'inset 0 0 0 1px rgba(var(--accent-rgb), 0.5)' : undefined,
               }}
             >
               <span style={{ color: filed ? 'var(--lime)' : 'var(--amber)', marginRight: 6 }}>
@@ -213,7 +213,7 @@ function HandlerNarrative({ text }: { text: string | null }) {
         background: 'linear-gradient(180deg, color-mix(in srgb, var(--violet) 7%, transparent), transparent)',
       }}
     >
-      <div className="kicker" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--violet)' }}>
+      <div className="mono" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--violet)' }}>
         <Icon name="eye" size={12} style={{ color: 'var(--violet)' }} /> &gt; HANDLER
       </div>
       <div
@@ -235,7 +235,7 @@ function StatsGrid({ stats }: { stats: WeeklyStats | null }) {
   if (!stats) {
     return (
       <div className="panel" style={{ padding: 24 }}>
-        <div className="kicker" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="mono" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
           <Icon name="trend" size={13} style={{ color: 'var(--cyan)' }} /> MISSION STATS
         </div>
         <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>
@@ -254,7 +254,7 @@ function StatsGrid({ stats }: { stats: WeeklyStats | null }) {
 
   return (
     <div className="panel" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div className="kicker" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
         <Icon name="trend" size={13} style={{ color: 'var(--cyan)' }} /> MISSION STATS
       </div>
 

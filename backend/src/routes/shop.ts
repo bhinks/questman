@@ -21,6 +21,7 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
 import { SHOP_ITEMS, ShopItem, LootDrop, COSMETIC_THEME_KEYS } from '../services/shopCatalog';
+import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
 
@@ -132,8 +133,10 @@ router.post('/buy', asyncHandler(async (req: AuthRequest, res) => {
       meta: { itemKey: item.key },
     }, tx);
 
-    // 4) Apply the grant by updating PlayerProfile in the same tx.
-    const granted = await applyGrant(tx, userId, item, owned);
+    // 4) Apply the grant by updating PlayerProfile in the same tx. A guard
+    //    throw here (shield rack full / overdrive already running / dilation
+    //    already active) rolls the whole tx back, so the spend never lands.
+    const granted = await applyGrant(tx, userId, item, owned, profile);
 
     // 5) Record the receipt.
     const purchase = await tx.purchase.create({
@@ -166,8 +169,36 @@ async function applyGrant(
   userId: string,
   item: ShopItem,
   owned: string[],
+  profile: { streakShields: number; boosterUntil: Date | null; budgetBoostOn: Date | null },
 ): Promise<{ grant: Record<string, unknown>; message: string }> {
   switch (item.category) {
+    case 'consumable': {
+      const kind = item.payload?.kind as string | undefined;
+      const now = new Date();
+      if (kind === 'shield') {
+        // Cap the rack so shields can't trivialize streak upkeep.
+        if (profile.streakShields >= 3) throw new AppError('Shield rack full (max 3)', 400);
+        await tx.playerProfile.update({ where: { userId }, data: { streakShields: { increment: 1 } } });
+        return { grant: { streakShields: 1 }, message: '+1 Streak Shield — auto-fires on your next missed day' };
+      }
+      if (kind === 'booster') {
+        if (profile.boosterUntil && profile.boosterUntil > now) {
+          throw new AppError('Overdrive already running — wait for it to burn out', 400);
+        }
+        const until = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        await tx.playerProfile.update({ where: { userId }, data: { boosterUntil: until } });
+        return { grant: { boosterUntil: until.toISOString() }, message: 'OVERDRIVE ENGAGED — 2× eddies for 24 hours' };
+      }
+      if (kind === 'budget') {
+        const today = startOfLocalDay();
+        if (profile.budgetBoostOn && startOfLocalDay(profile.budgetBoostOn).getTime() === today.getTime()) {
+          throw new AppError('Time dilation already active today', 400);
+        }
+        await tx.playerProfile.update({ where: { userId }, data: { budgetBoostOn: today } });
+        return { grant: { budgetBoostMin: 120 }, message: '+2h planner budget for today' };
+      }
+      throw new AppError('Unknown consumable', 400);
+    }
     case 'token_skip': {
       const n = Number(item.payload?.tokens ?? 1);
       await tx.playerProfile.update({ where: { userId }, data: { skipTokens: { increment: n } } });

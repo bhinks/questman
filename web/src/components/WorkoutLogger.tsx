@@ -80,7 +80,7 @@ export function WorkoutLogger() {
         style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}
         onSubmit={e => { e.preventDefault(); log.mutate(); }}
       >
-        <div className="kicker">LOG A WORKOUT</div>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>LOG A WORKOUT</div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
           <Select label="TYPE" value={type} onChange={v => setType(v as WorkoutType)} options={[
@@ -159,9 +159,14 @@ export function WorkoutLogger() {
 
 function Header() {
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Icon name="spark" size={20} style={{ color: 'var(--cyan)' }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Workouts</h2>
+    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
+        <Icon name="spark" size={18} />
+      </div>
+      <div>
+        <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>WORKOUTS</h2>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3 }}>TRAINING SESSIONS · XP BANKED ON LOG</div>
+      </div>
     </div>
   );
 }
@@ -179,11 +184,11 @@ function ExercisesEditor({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span className="kicker">EXERCISES (OPTIONAL)</span>
         <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={addExercise}>
-          + ADD
+          <Icon name="plus" size={12} /> ADD
         </button>
       </div>
       {exercises.map((ex, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, background: 'var(--bg-2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--line)' }}>
+        <div key={i} className="panel-inset" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               placeholder="Exercise (e.g. Bench Press)"
@@ -242,7 +247,7 @@ function SetsEditor({ ex, onChange }: { ex: ExerciseRow; onChange: (x: ExerciseR
         style={{ padding: '4px 8px', fontSize: 11 }}
         onClick={() => update([...ex.sets, {}])}
       >
-        + SET
+        <Icon name="plus" size={11} /> SET
       </button>
     </div>
   );
@@ -260,7 +265,11 @@ function RecentList({ workouts, loading, onDelete }: { workouts: Workout[]; load
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="kicker" style={{ paddingLeft: 4 }}>RECENT</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', paddingLeft: 4, paddingRight: 4 }}>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>RECENT</span>
+        <span style={{ flex: 1 }} />
+        <span className="ncx-serial">{workouts.length} RECORDS</span>
+      </div>
       {workouts.map(w => (
         <WorkoutRow
           key={w.id}
@@ -303,12 +312,9 @@ function WorkoutRow({
         onClick={onToggle}
         style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
       >
-        <div style={{
-          width: 38, height: 38, flexShrink: 0,
-          borderRadius: 8,
-          background: 'linear-gradient(135deg, var(--cyan), var(--violet))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.02em',
+        <div className="ncx-chip mono" style={{
+          width: 38, height: 38,
+          color: 'var(--cyan)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
         }}>
           {w.type.slice(0, 3).toUpperCase()}
         </div>
@@ -424,11 +430,13 @@ function Select({
   );
 }
 
+// Chamfered field, mirrors .ncx-input (kept inline so width overrides stay easy).
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
+  clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,

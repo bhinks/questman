@@ -84,6 +84,10 @@ export interface PlayerSnapshot {
   skipTokens: number;
   rerollTokens: number;
   rrCredits: number;
+  // Night Market consumables.
+  streakShields: number;
+  boosterUntil: Date | null;    // Overdrive Chip expiry (2× eddies while future)
+  budgetBoostOn: Date | null;   // Time Dilation day (+2h planner budget)
   cosmetics: string[];
   equippedTheme: string | null;
   /** Daily capacity/battery (World Mechanics). Optional: only the read path
@@ -193,6 +197,9 @@ export class GamificationService {
       skipTokens: p.skipTokens,
       rerollTokens: p.rerollTokens,
       rrCredits: p.rrCredits,
+      streakShields: p.streakShields,
+      boosterUntil: p.boosterUntil,
+      budgetBoostOn: p.budgetBoostOn,
       cosmetics: parseCosmetics(p.cosmetics),
       equippedTheme: p.equippedTheme,
       energy,
@@ -257,10 +264,13 @@ export class GamificationService {
 
       // Overclock: boost positive eddie EARNS by the multiplier from the
       // full-clear-day streak. Spends/undos/corrections pass through raw.
+      // The Overdrive Chip (Shop consumable) doubles eddie earns on top while
+      // active — eddies only, XP stays honest (Brent's standing rule).
       const rawEddies = opts.eddies ?? 0;
       const mult = overclockMultiplier(before.overclockStreak);
       const earn = isEddieEarn(opts.reason, rawEddies);
-      const eddiesDelta = earn ? Math.round(rawEddies * mult) : rawEddies;
+      const boosted = earn && before.boosterUntil != null && before.boosterUntil > new Date();
+      const eddiesDelta = earn ? Math.round(rawEddies * mult * (boosted ? 2 : 1)) : rawEddies;
 
       const previousLevel = levelFromXp(prevTotalXp);
       const nextTotalXp = prevTotalXp + xpDelta;
@@ -306,7 +316,11 @@ export class GamificationService {
 
       // Parallel eddie ledger entry, when this award moves the wallet.
       if (eddiesDelta !== 0) {
-        const edMeta = { ...(opts.meta ?? {}), ...(earn && mult > 1 ? { overclock: mult, base: rawEddies } : {}) };
+        const edMeta = {
+          ...(opts.meta ?? {}),
+          ...(earn && mult > 1 ? { overclock: mult, base: rawEddies } : {}),
+          ...(boosted ? { booster: 2, base: rawEddies } : {}),
+        };
         await t.walletLedger.create({
           data: {
             userId,
@@ -366,6 +380,9 @@ export class GamificationService {
         skipTokens: before.skipTokens,
         rerollTokens: before.rerollTokens,
         rrCredits: before.rrCredits,
+        streakShields: before.streakShields,
+        boosterUntil: before.boosterUntil,
+        budgetBoostOn: before.budgetBoostOn,
         cosmetics: parseCosmetics(before.cosmetics),
         equippedTheme: before.equippedTheme,
         leveledUp: nextLevel > previousLevel,

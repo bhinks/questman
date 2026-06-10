@@ -17,8 +17,8 @@ const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', marginBottom: 6,
 };
 const fieldStyle: React.CSSProperties = {
-  width: '100%', padding: 10, background: 'var(--panel-2)',
-  border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)',
+  width: '100%', padding: 10, background: '#070811',
+  border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text)',
   fontSize: 14, fontFamily: 'var(--font-ui)',
 };
 
@@ -69,16 +69,13 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: 'linear-gradient(135deg, var(--violet), var(--cyan))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon name="edit" size={16} style={{ color: 'white' }} />
+          <div className="ncx-chip" style={{ width: 34, height: 34, color: 'var(--cyan)' }}>
+            <Icon name="edit" size={15} />
           </div>
-          <h3 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+          <h3 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
             Edit Transaction
           </h3>
+          <span className="ncx-serial">TXN.EDIT</span>
           <button type="button" onClick={onCancel}
             style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4 }}>
             <Icon name="close" size={20} />

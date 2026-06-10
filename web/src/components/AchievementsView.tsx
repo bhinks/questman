@@ -80,37 +80,33 @@ export function AchievementsView() {
 function Header({ unlocked, total, pct }: { unlocked: number; total: number; pct: number }) {
   return (
     <div className="panel hud" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Icon name="trophy" size={20} style={{ color: 'var(--amber)' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="ncx-chip" style={{ color: 'var(--amber)' }}>
+          <Icon name="trophy" size={18} />
+        </div>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Street Cred</h2>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
-            reputation earned across the grid
+          <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>STREET CRED</h2>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3 }}>
+            REPUTATION EARNED ACROSS THE GRID
           </div>
         </div>
-        <div
-          className="mono"
-          style={{
-            marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-            padding: '4px 8px', background: 'var(--panel-2)',
-            borderRadius: 6, border: '1px solid var(--line)',
-          }}
-        >
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
           {unlocked} / {total} UNLOCKED
-        </div>
+        </span>
       </div>
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span className="kicker">COMPLETION</span>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{pct}%</span>
+          <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>COMPLETION</span>
+          <span className="ncx-val" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{pct}%</span>
         </div>
-        <div style={{ height: 10, borderRadius: 5, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden' }}>
-          <div style={{
-            width: `${pct}%`, height: '100%',
+        <div className="ncx-bar">
+          <i style={{
+            width: `${pct}%`,
             background: 'linear-gradient(90deg, var(--amber), var(--cyan))',
-            boxShadow: '0 0 8px rgba(255,196,61,0.4)', transition: 'width 0.5s ease',
+            boxShadow: '0 0 12px rgba(var(--accent-rgb),0.4)',
           }} />
+          <span className="seg-mask" />
         </div>
       </div>
     </div>
@@ -133,27 +129,26 @@ function Card({ a }: { a: Achievement }) {
         flexDirection: 'column',
         gap: 10,
         overflow: 'hidden',
-        border: unlocked ? `1px solid ${color}` : '1px solid var(--line)',
+        borderColor: unlocked ? `color-mix(in srgb, ${color} 55%, transparent)` : undefined,
         background: unlocked
-          ? `linear-gradient(180deg, color-mix(in srgb, ${color} 10%, transparent), color-mix(in srgb, ${color} 3%, transparent))`
-          : 'var(--panel)',
-        boxShadow: unlocked ? `0 0 14px color-mix(in srgb, ${color} 22%, transparent)` : undefined,
-        opacity: unlocked ? 1 : 0.78,
+          ? `linear-gradient(180deg, color-mix(in srgb, ${color} 10%, transparent), color-mix(in srgb, ${color} 3%, transparent)), #0b0c16`
+          : undefined,
+        opacity: unlocked ? 1 : 0.55,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div
           style={{
-            width: 42, height: 42, borderRadius: 8, flexShrink: 0,
+            width: 42, height: 42, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: unlocked ? color : 'var(--text-faint)',
+            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+            color: unlocked ? color : 'var(--text-ghost)',
             background: unlocked
-              ? `color-mix(in srgb, ${color} 14%, transparent)`
-              : 'var(--panel-2)',
-            border: `1px solid ${unlocked ? `color-mix(in srgb, ${color} 40%, transparent)` : 'var(--line)'}`,
+              ? `linear-gradient(150deg, color-mix(in srgb, ${color} 32%, #0b0c16), #0b0c16)`
+              : '#10121f',
           }}
         >
-          <Icon name={unlocked ? a.icon : 'lock'} size={20} />
+          <Icon name={unlocked ? a.icon : 'lock'} size={18} />
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -163,14 +158,10 @@ function Card({ a }: { a: Achievement }) {
           }}>
             {a.name}
           </div>
-          <div
-            className="mono"
-            style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-              color, marginTop: 3,
-            }}
-          >
-            {TIER_META[tier].label}
+          <div style={{ marginTop: 5 }}>
+            <span className="ncx-stamp flat" style={{ color, fontSize: 8 }}>
+              {TIER_META[tier].label}
+            </span>
           </div>
         </div>
 
@@ -196,18 +187,20 @@ function Card({ a }: { a: Achievement }) {
       {/* Footer: unlocked date OR locked progress */}
       {unlocked ? (
         a.unlockedAt && (
-          <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', marginTop: 'auto' }}>
+          <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--lime)', marginTop: 'auto' }}>
+            <Icon name="check" size={10} />
             UNLOCKED {new Date(a.unlockedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         )
       ) : (
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ height: 4, background: 'var(--panel-2)', borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{
-              width: `${Math.round(progress * 100)}%`, height: '100%',
+          <div className="ncx-bar slim">
+            <i style={{
+              width: `${Math.round(progress * 100)}%`,
               background: `linear-gradient(90deg, color-mix(in srgb, ${color} 70%, transparent), ${color})`,
-              transition: 'width 0.3s ease',
+              opacity: 0.85,
             }} />
+            <span className="seg-mask" />
           </div>
           {a.progressLabel && (
             <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
@@ -227,7 +220,7 @@ function Chip({ children, color }: { children: React.ReactNode; color: string })
       style={{
         fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
         color,
-        padding: '2px 7px', borderRadius: 5,
+        padding: '2px 7px',
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
       }}

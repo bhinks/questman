@@ -88,19 +88,16 @@ export function ProjectsView() {
 
 function Header({ total, active }: { total: number; active: number }) {
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Icon name="target" size={20} style={{ color: 'var(--cyan)' }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Operations</h2>
-      <div
-        className="mono"
-        style={{
-          marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-          padding: '4px 8px', background: 'var(--panel-2)',
-          borderRadius: 6, border: '1px solid var(--line)',
-        }}
-      >
-        {active} ACTIVE · {total} TOTAL
+    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
+        <Icon name="grid" size={18} />
       </div>
+      <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+        Operations
+      </h2>
+      <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
+        {active} ACTIVE · {total} TOTAL
+      </span>
     </div>
   );
 }
@@ -108,17 +105,7 @@ function Header({ total, active }: { total: number; active: number }) {
 function StatusPill({ status }: { status: Project['status'] }) {
   const meta = STATUS_META[status];
   return (
-    <span
-      className="mono"
-      style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-        color: meta.color,
-        padding: '3px 8px',
-        borderRadius: 6,
-        background: `color-mix(in srgb, ${meta.color} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${meta.color} 35%, transparent)`,
-      }}
-    >
+    <span className="ncx-stamp flat" style={{ color: meta.color }}>
       {meta.label}
     </span>
   );
@@ -203,9 +190,11 @@ function ProjectCard({
 
       {/* Objectives (tasks) */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="kicker"><Icon name="list" size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />OBJECTIVES</span>
-          <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>{openTasks} OPEN</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="list" size={11} />OBJECTIVES
+          </span>
+          <span className="ncx-serial">{openTasks} OPEN</span>
         </div>
         {tasks.map(t => (
           <TaskRow
@@ -230,7 +219,9 @@ function ProjectCard({
 
       {/* Milestone timeline */}
       <section className="panel-inset" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span className="kicker"><Icon name="flag" size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />MILESTONES</span>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="flag" size={11} />MILESTONES
+        </span>
         {milestones.map(m => (
           <MilestoneRow
             key={m.id}
@@ -263,7 +254,6 @@ function CheckBox({ done, busy, onClick, label }: { done: boolean; busy: boolean
       aria-label={label}
       style={{
         width: 26, height: 26, flexShrink: 0,
-        borderRadius: 7,
         border: done ? '1px solid var(--lime)' : '1px solid var(--line-2)',
         background: done
           ? 'linear-gradient(135deg, var(--lime), var(--teal))'
@@ -272,7 +262,7 @@ function CheckBox({ done, busy, onClick, label }: { done: boolean; busy: boolean
         cursor: busy ? 'wait' : 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: done ? 'var(--glow-lime)' : 'none',
-        transition: 'all 0.15s ease',
+        transition: 'background .15s, box-shadow .15s, border-color .15s, color .15s, opacity .15s',
         opacity: busy ? 0.6 : 1,
       }}
     >
@@ -299,34 +289,18 @@ function TaskRow({
       </div>
 
       {task.priority > 0 && (
-        <span
-          className="mono"
-          title="Priority"
-          style={{
-            fontSize: 10, color: 'var(--magenta)',
-            padding: '3px 7px',
-            background: 'color-mix(in srgb, var(--magenta) 8%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--magenta) 30%, transparent)',
-            borderRadius: 6,
-          }}
-        >
+        <span className="ncx-stamp flat" title="Priority" style={{ color: 'var(--magenta)', fontSize: 9 }}>
           P{task.priority}
         </span>
       )}
 
       {task.estMinutes != null && (
         <span
-          className="mono"
+          className="ncx-stamp flat"
           title="Estimated time"
-          style={{
-            fontSize: 10, color: 'var(--violet)',
-            padding: '3px 7px',
-            background: 'color-mix(in srgb, var(--violet) 8%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--violet) 30%, transparent)',
-            borderRadius: 6,
-          }}
+          style={{ color: 'var(--violet)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
-          ⏱ {task.estMinutes}m
+          <Icon name="clock" size={10} /> {task.estMinutes}m
         </span>
       )}
 
@@ -362,17 +336,11 @@ function MilestoneRow({
       </div>
 
       <span
-        className="mono"
+        className="ncx-stamp flat"
         title="Bonus XP on clear"
-        style={{
-          fontSize: 10, color: 'var(--amber)',
-          padding: '3px 7px',
-          background: 'rgba(255,194,75,0.08)',
-          border: '1px solid rgba(255,194,75,0.3)',
-          borderRadius: 6,
-        }}
+        style={{ color: 'var(--amber)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}
       >
-        <Icon name="trophy" size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+        <Icon name="trophy" size={10} />
         +{milestone.bonusXp}
       </span>
 
@@ -583,9 +551,9 @@ function Empty({ children, color }: { children: React.ReactNode; color?: string 
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,

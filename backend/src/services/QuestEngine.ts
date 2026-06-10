@@ -342,7 +342,7 @@ export class QuestEngine {
   private async updateEconomyForNewDay(userId: string, today: Date, yesterday: Date): Promise<void> {
     const profile = await this.prisma.playerProfile.findUnique({
       where: { userId },
-      select: { overclockStreak: true, skipTokens: true, rerollTokens: true, lastTokenGrantWeek: true },
+      select: { overclockStreak: true, skipTokens: true, rerollTokens: true, lastTokenGrantWeek: true, streakShields: true },
     });
     if (!profile) return;
 
@@ -356,8 +356,17 @@ export class QuestEngine {
 
     let overclockStreak = profile.overclockStreak;
     let rrGrant = 0;
+    let shieldBurned = false;
     if (willExpire.length > 0) {
-      overclockStreak = 0; // a miss breaks the overclock
+      // A miss breaks the overclock — UNLESS a Streak Shield absorbs it.
+      // The shield auto-fires (handoff: "One missed day forgiven") but only
+      // when there's a streak worth saving; it preserves the chain without
+      // counting the day as a clear (no +1, no R&R credit).
+      if (profile.streakShields > 0 && profile.overclockStreak > 0) {
+        shieldBurned = true;
+      } else {
+        overclockStreak = 0;
+      }
     } else if (completed.length > 0) {
       overclockStreak += 1; // full clear
       rrGrant = 1;          // bank a downtime credit
@@ -370,6 +379,7 @@ export class QuestEngine {
       where: { userId },
       data: {
         overclockStreak,
+        ...(shieldBurned ? { streakShields: { decrement: 1 } } : {}),
         ...(rrGrant > 0 ? { rrCredits: { increment: rrGrant } } : {}),
         ...(grantWeek
           ? {
@@ -380,6 +390,9 @@ export class QuestEngine {
           : {}),
       },
     });
+    if (shieldBurned) {
+      logger.info(`[QuestEngine] streak shield absorbed a missed day for user ${userId} (overclock ${overclockStreak} preserved)`);
+    }
   }
 
   /**

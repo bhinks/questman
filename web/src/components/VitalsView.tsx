@@ -32,9 +32,9 @@ interface HistoryResponse {
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,
@@ -118,7 +118,7 @@ export function VitalsView() {
         </Empty>
       ) : (
         <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <span className="kicker">TODAY&rsquo;S READOUT</span>
+          <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
             {enabled.map(def => (
               <MetricField
@@ -166,20 +166,18 @@ function Header({
   configuring: boolean; onToggleConfig: () => void;
 }) {
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Icon name="heart" size={20} style={{ color: submitted ? 'var(--lime)' : 'var(--cyan)' }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Biomonitor</h2>
-      <div
-        className="mono"
-        style={{
-          fontSize: 11, color: 'var(--text-dim)',
-          padding: '4px 8px', background: 'var(--panel-2)',
-          borderRadius: 6, border: '1px solid var(--line)',
-        }}
-      >
-        {loggedCount} / {totalCount} LOGGED
+    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="ncx-chip" style={{ color: submitted ? 'var(--lime)' : 'var(--cyan)' }}>
+        <Icon name="heart" size={18} />
       </div>
+      <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+        Biomonitor
+      </h2>
+      <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
+        {loggedCount} / {totalCount} LOGGED
+      </span>
       <button
+        key={`cfg-${configuring}`}
         className={configuring ? 'btn btn-primary' : 'btn btn-ghost'}
         style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: 11 }}
         onClick={onToggleConfig}
@@ -253,14 +251,14 @@ function ScalePicker({
             style={{
               width: 34, height: 34, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', fontSize: 13, fontWeight: 700,
               border: on ? '1px solid var(--cyan)' : '1px solid var(--line-2)',
               background: on
                 ? 'linear-gradient(135deg, var(--cyan), var(--violet))'
                 : 'var(--panel-2)',
               color: on ? 'white' : 'var(--text-dim)',
               boxShadow: on ? 'var(--glow-cyan)' : 'none',
-              transition: 'all 0.15s ease',
+              transition: 'background .15s, box-shadow .15s, border-color .15s, color .15s',
             }}
           >
             {n}
@@ -288,7 +286,7 @@ function Trends({
     <section className="panel hud" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Icon name="trend" size={16} style={{ color: 'var(--violet)' }} />
-        <span className="kicker">TRENDS</span>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TRENDS</span>
 
         <select
           value={metricKey}
@@ -305,11 +303,12 @@ function Trends({
               onClick={() => setDays(d)}
               className="mono"
               style={{
-                fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                fontSize: 11, padding: '4px 10px', cursor: 'pointer',
                 letterSpacing: '0.06em',
                 border: days === d ? '1px solid var(--violet)' : '1px solid var(--line-2)',
                 background: days === d ? 'color-mix(in srgb, var(--violet) 14%, transparent)' : 'var(--panel-2)',
                 color: days === d ? 'var(--violet)' : 'var(--text-dim)',
+                transition: 'background .15s, border-color .15s, color .15s',
               }}
             >
               {d}D
@@ -420,7 +419,7 @@ function ConfigPanel({ defs }: { defs: MetricDef[] }) {
 
   return (
     <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <span className="kicker">METRIC SET — toggle what shows in your daily readout</span>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>METRIC SET — toggle what shows in your daily readout</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {defs.map(def => (
           <div
@@ -447,11 +446,12 @@ function ConfigPanel({ defs }: { defs: MetricDef[] }) {
               aria-pressed={def.enabled}
               className="mono"
               style={{
-                fontSize: 11, padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
+                fontSize: 11, padding: '6px 14px', cursor: 'pointer',
                 letterSpacing: '0.06em',
                 border: def.enabled ? '1px solid var(--lime)' : '1px solid var(--line-2)',
                 background: def.enabled ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
                 color: def.enabled ? 'var(--lime)' : 'var(--text-dim)',
+                transition: 'background .15s, border-color .15s, color .15s',
               }}
             >
               {def.enabled ? 'ON' : 'OFF'}

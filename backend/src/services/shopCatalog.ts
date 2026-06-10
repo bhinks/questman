@@ -22,9 +22,10 @@ export interface ShopItem {
   key: string;
   name: string;
   description: string;
-  category: 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate';
+  category: 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable';
   priceEddies: number;
-  /** Category-specific payload, e.g. { tokens: 1 } or { themeKey: 'synthwave' }. */
+  /** Category-specific payload, e.g. { tokens: 1 }, { themeKey: 'synthwave' },
+   *  or { kind: 'shield' | 'booster' | 'budget' } for consumables. */
   payload?: Record<string, unknown>;
 }
 
@@ -153,6 +154,32 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'cosmetic',
     priceEddies: 600,
     payload: { themeKey: 'bloodmoon' },
+  },
+
+  // ---- Power consumables (real mechanics, server-enforced) -----------
+  {
+    key: 'shield_1',
+    name: 'Streak Shield',
+    description: 'One missed day forgiven — auto-fires at the roll-over and preserves your overclock chain. Max 3 banked.',
+    category: 'consumable',
+    priceEddies: 400,
+    payload: { kind: 'shield' },
+  },
+  {
+    key: 'booster_1',
+    name: 'Overdrive Chip',
+    description: '2× eddie earnings for 24 hours. Stack a big day — XP stays honest, the wallet runs hot.',
+    category: 'consumable',
+    priceEddies: 600,
+    payload: { kind: 'booster' },
+  },
+  {
+    key: 'time_dilation_1',
+    name: 'Time Dilation',
+    description: '+2 hours of day-planner budget, today only. Bend the schedule, fit the bigger contract.',
+    category: 'consumable',
+    priceEddies: 120,
+    payload: { kind: 'budget' },
   },
 
   // ---- Loot crates (weighted random reward) --------------------------

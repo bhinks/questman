@@ -96,6 +96,14 @@ model UserSettings {
   handlerPersona     String  @default("rogue_ai") // "rogue_ai"|"fixer"|"ripperdoc"
   handlerEnabled     Boolean @default(true)
 
+  // Night City display calibration (design handoff): the four user-tunable
+  // "CRT character" knobs, persisted per user and applied as CSS vars on the
+  // app root. Defaults are the design owner's reviewed baselines.
+  displayCut         Int     @default(24)   // panel corner clip, 0–28px
+  displayChroma      Float   @default(2)    // chroma-split offset, 0–4px
+  displayCrt         Int     @default(75)   // CRT intensity %, 0–100 → scan/sweep alphas
+  tickerEnabled      Boolean @default(true) // topbar handler ticker marquee on/off
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -550,6 +558,17 @@ model PlayerProfile {
   // R&R / downtime credits — earned on clean days + achievements, spent to
   // start a guilt-free media session (earn your downtime).
   rrCredits     Int      @default(0)
+  // --- Shop consumables (Night Market expansion) ---
+  // Streak Shields: each absorbs ONE missed day at the daily roll-over,
+  // preserving the overclock streak instead of resetting it (auto-fires,
+  // only when there's a streak worth saving). Capped at 3.
+  streakShields Int      @default(0)
+  // Overdrive Chip: 2× EDDIE earns until this instant (24h from purchase).
+  // XP stays honest (Brent's rule) — only the spendable currency boosts.
+  boosterUntil  DateTime?
+  // Time Dilation: +2h day-planner budget for the local day stored here
+  // (ignored once the day rolls over). One per day.
+  budgetBoostOn DateTime?
   // ISO-week key (e.g. "2026-W24") of the last weekly token grant, so the
   // allowance refills once per week, lazily, on the first run of the week.
   lastTokenGrantWeek String?

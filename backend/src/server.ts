@@ -39,6 +39,7 @@ import insightRoutes from './routes/insights';
 import debriefRoutes from './routes/debrief';
 import budgetRoutes from './routes/budgets';
 import recurringRoutes from './routes/recurring';
+import settingsRoutes from './routes/settings';
 
 const app = express();
 const server = createServer(app);
@@ -101,6 +102,7 @@ app.use('/api/insights', authMiddleware, insightRoutes);
 app.use('/api/debrief', authMiddleware, debriefRoutes);
 app.use('/api/budgets', authMiddleware, budgetRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

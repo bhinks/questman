@@ -1,27 +1,144 @@
 /**
- * TodayView — landing tab. Player HUD + the DAY PLANNER (roadmap §5).
+ * TodayView — landing tab, NIGHT CITY direction (design handoff).
  *
- * The planner asks the server to rank today's pending quests and fit a
- * subset inside a time budget (4h weekday / 10h weekend by default). We
- * render WHAT to do (ranked, split into "in plan" vs "later"), never
- * WHEN — Brent wants suggestions, not a schedule. Quests support:
- *   - check-in counters (tap +1, drip XP) for targetCount > 1
- *   - a focus timer ("JACK IN/OUT") that logs actual vs estimated time
- *   - must-do / carry-over / best-window badges
+ * Recreates proto-today.jsx bound to real data:
+ *   - HUD strip: hex level badge + segmented XP bar + STREAK/EDDIES/CLEARED
+ *   - PRIORITY CONTRACT: the planner's top-ranked in-plan pending quest,
+ *     with the focus timer ("JACK IN" / "ABORT RUN") and COMPLETE
+ *   - CONTRACT LEDGER: remaining in-plan quests (counters get diamond pips
+ *     + "+1" check-ins; one-shots get complete / skip / reroll) plus the
+ *     day's cleared & skipped rows
+ *   - Right rail: ENV.SCAN weather, POWER CELL energy (tap to override),
+ *     SIDE JOBS (over-budget quests), SESSION LOG (today's XP ledger)
+ *
+ * All gameplay wiring (complete / +1 progress / token-gated skip + reroll /
+ * focus minutes to /focus / energy override / socket refresh) is preserved
+ * from the previous version — only the presentation changed.
  */
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan } from '../lib/api';
+import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
-import { HandlerTicker } from './HandlerTicker';
+
+/** Module key → outline icon. NO emoji in this direction (meta.emoji unused). */
+const MODULE_ICONS: Record<string, string> = {
+  habits: 'check',
+  chores: 'list',
+  fitness: 'spark',
+  finance: 'wallet',
+  projects: 'grid',
+  media: 'play',
+  vitals: 'heart',
+  social: 'flag',
+};
+const moduleIcon = (key: string): string => MODULE_ICONS[key] ?? 'target';
+
+/** Ledger `reason` → terminal-log phrasing (lowercase, diegetic). */
+const REASON_LABELS: Record<string, string> = {
+  quest_complete: 'contract cleared',
+  habit_log: 'habit logged',
+  habit_log_undo: 'habit undone',
+  workout_log: 'workout logged',
+  streak_bonus: 'streak bonus',
+  level_up: 'level up',
+  shop_purchase: 'shop purchase',
+};
+const humanizeReason = (r: string): string => REASON_LABELS[r] ?? r.replace(/_/g, ' ');
+
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
+function hhmm(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/** "3H40" style duration for the ledger header serial. */
+function fmtHm(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h}H${String(m).padStart(2, '0')}` : `${h}H`;
+}
+
+/** ISO week number (Mon-based — matches the server's isoWeekKey / debrief cadence). */
+function isoWeek(d: Date): number {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = (x.getDay() + 6) % 7; // Mon=0 .. Sun=6
+  x.setDate(x.getDate() - day + 3); // this week's Thursday
+  const firstThu = new Date(x.getFullYear(), 0, 4);
+  const ft = (firstThu.getDay() + 6) % 7;
+  firstThu.setDate(firstThu.getDate() - ft + 3);
+  return 1 + Math.round((x.getTime() - firstThu.getTime()) / (7 * 86_400_000));
+}
+
+/**
+ * CHRONO — temporal grounding for the day (Brent's ask): today's date plus
+ * where we sit in the WEEK (ISO, Mon-based — the debrief cadence) and the
+ * MONTH (the budget cycle), highlighting how much runway is left for
+ * week- and month-bound work. Days-left counts INCLUDE today (it's usable).
+ */
+function ChronoPanel() {
+  const now = new Date();
+  const dayOfWeek = ((now.getDay() + 6) % 7) + 1;           // Mon=1 .. Sun=7
+  const weekLeft = 7 - dayOfWeek + 1;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const monthLeft = daysInMonth - dayOfMonth + 1;
+
+  const dateLabel = now.toLocaleDateString(undefined, { weekday: 'short', month: '2-digit', day: '2-digit' }).toUpperCase();
+  const monthName = now.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+
+  // Runway turns amber as a window closes (last 2 days of the week / last 5
+  // of the month) — the "get the bound tasks done" cue.
+  const weekColor = weekLeft <= 2 ? 'var(--amber)' : 'var(--cyan)';
+  const monthColor = monthLeft <= 5 ? 'var(--amber)' : 'var(--violet)';
+
+  const row = (label: string, n: number, total: number, left: number, color: string, leftLabel: string) => (
+    <div style={{ marginTop: 10 }}>
+      <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, letterSpacing: '0.16em', color: 'var(--text-faint)', marginBottom: 5 }}>
+        <span>{label} · DAY {n}/{total}</span>
+        <span style={{ color }}>{left} {leftLabel} LEFT</span>
+      </div>
+      <div className="ncx-bar slim">
+        <i style={{ width: `${Math.min(100, (n / total) * 100)}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 45%, transparent), ${color})` }} />
+        <span className="seg-mask" />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="panel" style={{ padding: '15px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span className="ncx-val" style={{ fontSize: 24 }}>{dateLabel}</span>
+        <span style={{ flex: 1 }} />
+        <span className="ncx-serial">CHRONO // W{String(isoWeek(now)).padStart(2, '0')}</span>
+      </div>
+      {row('WEEK', dayOfWeek, 7, weekLeft, weekColor, weekLeft === 1 ? 'DAY' : 'DAYS')}
+      {row(monthName, dayOfMonth, daysInMonth, monthLeft, monthColor, monthLeft === 1 ? 'DAY' : 'DAYS')}
+    </div>
+  );
+}
+
+/** Corner "+" tick decorations floated outside a panel (design recipe #2). */
+function Ticks({ focal, children }: { focal?: boolean; children: React.ReactNode }) {
+  const c = focal ? 'var(--cyan)' : undefined;
+  return (
+    <div className="ncx-ticks">
+      <span className="tick" style={{ top: -4, left: -4, color: c }} />
+      <span className="tick" style={{ bottom: -4, right: -4, color: c }} />
+      {children}
+    </div>
+  );
+}
 
 export function TodayView() {
   const qc = useQueryClient();
   // The single quest the focus timer is running against (client-side count-up).
   const [focus, setFocus] = useState<{ id: string; start: number } | null>(null);
-  const [, force] = useState(0); // ticks the elapsed display while focusing
 
   const playerQ = useQuery({
     queryKey: ['player'],
@@ -39,6 +156,12 @@ export function TodayView() {
     queryKey: ['weather', 'today'],
     queryFn: () => api.get<WeatherToday>('/api/weather/today'),
     staleTime: 30 * 60 * 1000,
+  });
+  // Today's XP grants for the SESSION LOG terminal. The ['player'] prefix
+  // invalidation below refreshes this feed after every action.
+  const ledgerQ = useQuery({
+    queryKey: ['player', 'ledger', 'today'],
+    queryFn: () => api.get<{ entries: LedgerEntry[] }>('/api/player/ledger?currency=xp&limit=60').then(r => r.entries),
   });
 
   const invalidateAll = () => {
@@ -59,13 +182,6 @@ export function TodayView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qc]);
 
-  // Re-render the focus elapsed clock every second while a timer runs.
-  useEffect(() => {
-    if (!focus) return;
-    const t = setInterval(() => force(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [focus]);
-
   const completeQuest = useMutation({
     mutationFn: (id: string) => api.post(`/api/quests/${id}/complete`),
     onSuccess: invalidateAll,
@@ -75,7 +191,7 @@ export function TodayView() {
     onSuccess: invalidateAll,
   });
   const skipQuest = useMutation({
-    // Skipping now spends a skip token, so refresh the player HUD too.
+    // Skipping spends a skip token, so refresh the player HUD too.
     mutationFn: (id: string) => api.post(`/api/quests/${id}/skip`),
     onSuccess: invalidateAll,
   });
@@ -107,6 +223,12 @@ export function TodayView() {
     if (focus && focus.id !== id) jackOut();
     setFocus({ id, start: Date.now() });
   };
+  /** Complete a quest, flushing the focus timer first if it's running on it —
+   *  otherwise the session's actualMinutes would be silently lost. */
+  const completeWithFlush = (id: string) => {
+    if (focus?.id === id) jackOut();
+    completeQuest.mutate(id);
+  };
 
   if (playerQ.isLoading || todayQ.isLoading) {
     return <Splash>LOADING…</Splash>;
@@ -118,30 +240,272 @@ export function TodayView() {
   const player = playerQ.data!;
   const today = todayQ.data!;
   const plan = planQ.data;
+  const weather = weatherQ.data?.weather ?? null;
+
+  // ---- derive the contract board from real data ----------------------
+  const all = Object.values(today.byModule).flat();
+  const planOrder = new Map((plan?.quests ?? []).map((q, i) => [q.id, i]));
+  const planFlags = new Map((plan?.quests ?? []).map(q => [q.id, q.inPlan]));
+  const pending = all
+    .filter(q => q.status === 'pending')
+    .sort((a, b) => (planOrder.get(a.id) ?? 999) - (planOrder.get(b.id) ?? 999));
+  const inPlanPending = pending.filter(q => planFlags.get(q.id) !== false);
+  // Priority = top-ranked in-plan one-shot; fall back to any pending quest.
+  const priority = inPlanPending.find(q => q.targetCount <= 1) ?? pending[0] ?? null;
+  const doneRows = all.filter(q => q.status === 'completed' || q.status === 'skipped');
+  const ledgerRows = [...inPlanPending.filter(q => q.id !== priority?.id), ...doneRows];
+  const sideJobs: PlanQuest[] = (plan?.quests ?? []).filter(q => !q.inPlan);
+  const bestWindowQuest = pending.find(q => q.meta?.bestWindow) ?? null;
+
+  // SESSION LOG: today's XP grants, oldest → newest (terminal order).
+  const logEntries = (ledgerQ.data ?? []).filter(e => isToday(e.createdAt)).reverse();
+  const xpDayTotal = today.xpEarned + today.xpAvailable;
+  const bankedPct = Math.min(100, (today.xpEarned / Math.max(1, xpDayTotal)) * 100);
+
+  const running = focus != null && priority != null && focus.id === priority.id;
+  const xpPct = Math.min(100, (player.xpIntoLevel / Math.max(1, player.xpForNextLevel)) * 100);
+
+  const hudStats: Array<[string, string, string]> = [
+    ['STREAK', `${player.currentStreak}D`, 'var(--lime)'],
+    ['EDDIES', `€$${player.eddies.toLocaleString()}`, 'var(--amber)'],
+    ['CLEARED', `${today.completedCount}/${today.totalCount}`, 'var(--cyan)'],
+  ];
 
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <HandlerTicker />
-      {weatherQ.data?.weather && <WeatherCard weather={weatherQ.data.weather} />}
-      <PlayerHud
-        player={player}
-        todayXpAvailable={today.xpAvailable}
-        todayXpEarned={today.xpEarned}
-        onSetEnergy={(tier) => setEnergy.mutate(tier)}
-      />
-      <QuestPlanner
-        today={today}
-        plan={plan}
-        focus={focus}
-        skipTokens={player.skipTokens}
-        rerollTokens={player.rerollTokens}
-        onComplete={id => completeQuest.mutate(id)}
-        onProgress={id => progressQuest.mutate(id)}
-        onSkip={id => skipQuest.mutate(id)}
-        onReroll={id => rerollQuest.mutate(id)}
-        onJackIn={jackIn}
-        onJackOut={jackOut}
-      />
+    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ---- HUD strip ---- */}
+      <Ticks focal>
+        <div className="panel hud ncx-scan" style={{ display: 'flex', alignItems: 'center', gap: 26, padding: '18px 24px' }}>
+          <div className="sweep" />
+          <div className="ncx-hex" style={{ width: 58, height: 58, fontSize: 23, flex: 'none', boxShadow: '0 0 24px -4px rgba(var(--accent-rgb),0.6)' }}>
+            {player.level}
+          </div>
+          <div style={{ flex: 1.4, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              <span className="kicker" style={{ fontSize: 10 }}>LEVEL {player.level} → {player.level + 1}</span>
+              <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+                <b style={{ color: 'var(--cyan)' }}>{player.xpIntoLevel}</b>/{player.xpForNextLevel} XP
+              </span>
+            </div>
+            <div className="ncx-bar">
+              <i style={{
+                width: `${xpPct}%`,
+                background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))',
+                boxShadow: '0 0 14px rgba(var(--accent-rgb),0.5)',
+              }} />
+              <span className="seg-mask" />
+            </div>
+            <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.16em', marginTop: 7 }}>
+              {player.totalXp.toLocaleString()} LIFETIME · TODAY <span style={{ color: 'var(--lime)' }}>+{today.xpEarned}</span> · {today.xpAvailable} ON THE TABLE
+            </div>
+          </div>
+          {hudStats.map(([k, v, c]) => (
+            <div key={k} style={{ textAlign: 'right', paddingLeft: 22, borderLeft: '1px solid var(--line)' }}>
+              <div className="kicker" style={{ fontSize: 9 }}>{k}</div>
+              <div className="ncx-val" style={{ fontSize: 24, color: c }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </Ticks>
+
+      {today.totalCount === 0 ? (
+        <div className="panel hud" style={{ padding: '34px 24px', textAlign: 'center' }}>
+          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700 }}>NO CONTRACTS ON FILE</div>
+          <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 10 }}>
+            ADD HABITS, PROJECTS, MEDIA, OR VITALS TO START GENERATING DAILY MISSIONS
+          </div>
+        </div>
+      ) : (
+        <div className="split-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 330px', gap: 16, alignItems: 'start' }}>
+          {/* ---- left: priority contract + ledger ---- */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {priority ? (
+              <Ticks focal>
+                <div className="panel hud ncx-scan" style={{ padding: '20px 24px' }}>
+                  <div className="sweep" style={{ animationDelay: '-3s' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                    <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--cyan)' }}>▸▸ PRIORITY CONTRACT</span>
+                    <span className="ncx-serial">CTR-{priority.id.slice(0, 6).toUpperCase()}</span>
+                    <span style={{ flex: 1 }} />
+                    {running && <span className="ncx-stamp flat" style={{ color: 'var(--lime)' }}>RUNNING</span>}
+                    {priority.mustDo && <span className="ncx-stamp flat" style={{ color: 'var(--red)' }}>MUST-DO</span>}
+                    <span className={`ncx-stamp ${priority.difficulty}`}>{priority.difficulty}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 18 }}>
+                    <div className="ncx-chip" style={{ width: 54, height: 54, color: 'var(--cyan)' }}>
+                      <Icon name={moduleIcon(priority.module.key)} size={26} style={{ filter: 'drop-shadow(0 0 5px var(--cyan))' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'uppercase' }}>
+                        {priority.title}
+                      </div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 13.5, marginTop: 5 }}>{priority.description}</div>
+                      <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 11 }}>
+                        {priority.module.name.toUpperCase()}
+                        {priority.estMinutes != null && <> · EST {priority.estMinutes} MIN</>}
+                        {' '}· REWARD <span style={{ color: 'var(--lime)' }}>+{priority.xpReward} XP</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, justifyContent: 'center' }}>
+                      {/* Keyed by run-state: remount instead of morphing so the
+                          primary↔plain transition can never freeze (handoff pitfall #1). */}
+                      <button
+                        key={priority.id + (running ? '-run' : '-idle')}
+                        className="btn btn-primary"
+                        style={{ padding: '12px 24px' }}
+                        onClick={() => (running ? jackOut() : jackIn(priority.id))}
+                      >
+                        <Icon name="zap" size={14} /> {running ? 'ABORT RUN' : 'JACK IN'}
+                      </button>
+                      <button className="btn" onClick={() => completeWithFlush(priority.id)}>COMPLETE</button>
+                      {/* Burnout relief applies to the top contract too. */}
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ padding: '5px 10px', fontSize: 10 }}
+                          disabled={(player.skipTokens ?? 0) <= 0 || skipQuest.isPending}
+                          title={player.skipTokens > 0 ? `Skip (${player.skipTokens} tokens)` : 'No skip tokens — buy more in the Shop'}
+                          onClick={() => skipQuest.mutate(priority.id)}
+                        >
+                          SKIP
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ padding: '5px 10px', fontSize: 10 }}
+                          disabled={(player.rerollTokens ?? 0) <= 0 || rerollQuest.isPending}
+                          title={player.rerollTokens > 0 ? `Reroll (${player.rerollTokens} tokens)` : 'No reroll tokens — buy more in the Shop'}
+                          onClick={() => rerollQuest.mutate(priority.id)}
+                        >
+                          RR
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Ticks>
+            ) : (
+              <div className="panel hud" style={{ padding: '34px 24px', textAlign: 'center' }}>
+                <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--lime)' }}>
+                  ALL CONTRACTS CLEARED
+                </div>
+                <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 10 }}>
+                  STREAK DAY {player.currentStreak} IN THE BAG · SEE YOU TOMORROW, RUNNER
+                </div>
+              </div>
+            )}
+
+            {/* ---- contract ledger ---- */}
+            <div className="panel">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--line-2)' }}>
+                <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)' }}>CONTRACT LEDGER — IN PLAN</span>
+                <span style={{ flex: 1 }} />
+                {plan && (
+                  <span className="ncx-serial">
+                    BUDGET {Math.round(plan.budgetMin / 60)}H // FIT {fmtHm(plan.plannedMin)}
+                  </span>
+                )}
+              </div>
+              {ledgerRows.length === 0 && (
+                <div className="mono" style={{ padding: '15px 18px', fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
+                  NO FURTHER CONTRACTS ON FILE
+                </div>
+              )}
+              {ledgerRows.map((q, i) => (
+                <LedgerRow
+                  key={q.id}
+                  quest={q}
+                  index={i}
+                  skipTokens={player.skipTokens}
+                  rerollTokens={player.rerollTokens}
+                  onComplete={id => completeWithFlush(id)}
+                  onProgress={id => progressQuest.mutate(id)}
+                  onSkip={id => skipQuest.mutate(id)}
+                  onReroll={id => rerollQuest.mutate(id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* ---- right column ---- */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <ChronoPanel />
+            {weather && (
+              <div className="panel" style={{ padding: '15px 18px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span className="ncx-val" style={{ fontSize: 30 }}>{weather.tempMaxF}°F</span>
+                  <span className="mono" style={{ fontSize: 10, letterSpacing: '0.2em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                    {weather.label}
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <span className="ncx-serial">ENV.SCAN</span>
+                </div>
+                {bestWindowQuest && (
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', marginTop: 8, lineHeight: 1.6 }}>
+                    ▴ BEST WINDOW · {bestWindowQuest.title.toUpperCase()} {bestWindowQuest.meta!.bestWindow}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {player.energy && (
+              <EnergyPanel energy={player.energy} onCycle={tier => setEnergy.mutate(tier)} />
+            )}
+
+            <div className="panel" style={{ padding: '15px 18px' }}>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', marginBottom: 11 }}>
+                SIDE JOBS — NOT IN PLAN
+              </div>
+              {sideJobs.length === 0 ? (
+                <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>
+                  NONE — THE PLAN COVERS EVERYTHING
+                </div>
+              ) : sideJobs.map(q => (
+                <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--text-dim)', padding: '5px 0' }}>
+                  <Icon name={moduleIcon(q.module.key)} size={14} style={{ color: 'var(--text-faint)', flex: 'none' }} />
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</span>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>+{q.xpReward}</span>
+                  {/* Off-plan ≠ unreachable: counters tick +1, one-shots complete. */}
+                  <button
+                    className="btn btn-ghost"
+                    style={{ padding: '3px 7px', fontSize: 10, flex: 'none' }}
+                    title={q.targetCount > 1 ? `Check in (${q.currentCount}/${q.targetCount})` : 'Complete'}
+                    onClick={() => (q.targetCount > 1 ? progressQuest.mutate(q.id) : completeWithFlush(q.id))}
+                  >
+                    {q.targetCount > 1 ? `+1 · ${q.currentCount}/${q.targetCount}` : <Icon name="check" size={11} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="panel" style={{ padding: '15px 18px' }}>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', marginBottom: 11 }}>
+                SESSION LOG
+              </div>
+              <div className="ncx-term" style={{ maxHeight: 180, overflowY: 'auto' }}>
+                {logEntries.map(e => (
+                  <div key={e.id}>
+                    <span className="cy">{hhmm(e.createdAt)}</span>{' '}
+                    {e.amount > 0
+                      ? <span className="ok">✓ {humanizeReason(e.reason)}</span>
+                      : humanizeReason(e.reason)}
+                    {e.amount > 0 && <span> +{e.amount}xp</span>}
+                  </div>
+                ))}
+                <div>
+                  <span className="cy">now</span> awaiting input<span className="cursor-blink" style={{ color: 'var(--cyan)' }}>_</span>
+                </div>
+              </div>
+              <div className="ncx-bar slim" style={{ marginTop: 13 }}>
+                <i style={{ width: `${bankedPct}%`, background: 'linear-gradient(90deg, #1fae5c, var(--lime))' }} />
+                <span className="seg-mask" />
+              </div>
+              <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 6 }}>
+                {today.xpEarned}/{xpDayTotal} XP BANKED
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -149,472 +513,141 @@ export function TodayView() {
 function Splash({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: 13, letterSpacing: '0.18em' }}>{children}</div>
     </div>
   );
 }
 
-function WeatherCard({ weather }: { weather: NonNullable<WeatherToday['weather']> }) {
-  const stat = (label: string, value: string) => (
-    <div className="panel-inset" style={{ padding: '8px 12px', textAlign: 'center', minWidth: 72 }}>
-      <div className="kicker" style={{ marginBottom: 4 }}>{label}</div>
-      <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
-    </div>
-  );
-  return (
-    <div className="panel hud" style={{ padding: 18, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-      <div style={{ fontSize: 40, lineHeight: 1, flexShrink: 0 }}>{weather.emoji}</div>
-      <div style={{ flex: 1, minWidth: 120 }}>
-        <div className="kicker" style={{ marginBottom: 4 }}>TODAY&rsquo;S WEATHER</div>
-        <div style={{ fontSize: 18, fontWeight: 600, fontFamily: 'var(--font-display)' }}>{weather.label}</div>
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-          {weather.tempMaxF}°F <span style={{ color: 'var(--text-faint)' }}>/ {weather.tempMinF}°F low</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {stat('HIGH', `${weather.tempMaxF}°F`)}
-        {stat('RAIN', `${weather.rainTodayIn.toFixed(2)}"`)}
-        {stat('WIND', `${weather.windMaxMph} mph`)}
-      </div>
-    </div>
-  );
-}
-
-function PlayerHud({
-  player, todayXpAvailable, todayXpEarned, onSetEnergy,
-}: {
-  player: PlayerSnapshot;
-  todayXpAvailable: number;
-  todayXpEarned: number;
-  onSetEnergy: (tier: 'low' | 'med' | 'high') => void;
-}) {
-  const pct = Math.round(player.progress * 100);
-  return (
-    <div className="panel hud" style={{ padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 16,
-          background: 'linear-gradient(135deg, var(--cyan), var(--violet))',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          boxShadow: 'var(--glow-cyan)', flexShrink: 0,
-        }}>
-          <div className="kicker" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9 }}>LVL</div>
-          <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'white' }}>
-            {player.level}
-          </div>
-        </div>
-
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span className="kicker">XP</span>
-            <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              {player.xpIntoLevel} / {player.xpForNextLevel}
-            </span>
-          </div>
-          <div style={{
-            height: 10, borderRadius: 5,
-            background: 'var(--panel-2)', border: '1px solid var(--line)',
-            overflow: 'hidden', position: 'relative',
-          }}>
-            <div style={{
-              width: `${pct}%`, height: '100%',
-              background: 'linear-gradient(90deg, var(--cyan), var(--violet))',
-              boxShadow: '0 0 8px rgba(28,226,255,0.5)',
-              transition: 'width 0.5s ease',
-            }} />
-          </div>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
-            TOTAL XP: {player.totalXp.toLocaleString()}
-          </div>
-        </div>
-
-        <div className="panel-inset" style={{ padding: 12, minWidth: 110, textAlign: 'center' }}>
-          <div className="kicker" style={{ marginBottom: 6 }}>EDDIES</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--amber)', fontFamily: 'var(--font-display)' }}>
-            €$ {player.eddies.toLocaleString()}
-          </div>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>SPENDABLE</div>
-        </div>
-
-        <div className="panel-inset" style={{ padding: 12, minWidth: 100, textAlign: 'center' }}>
-          <div className="kicker" style={{ marginBottom: 6 }}>STREAK</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--lime)', fontFamily: 'var(--font-display)' }}>
-            {player.currentStreak}
-          </div>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-            BEST: {player.longestStreak}
-          </div>
-        </div>
-
-        <div className="panel-inset" style={{ padding: 12, minWidth: 120, textAlign: 'center' }}>
-          <div className="kicker" style={{ marginBottom: 6 }}>TODAY</div>
-          <div className="mono" style={{ fontSize: 18, color: 'var(--cyan)', fontWeight: 700 }}>
-            +{todayXpEarned} <span style={{ color: 'var(--text-faint)', fontSize: 13 }}>/ +{todayXpAvailable}</span>
-          </div>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>EARNED / AVAILABLE</div>
-        </div>
-
-        <OverclockTile streak={player.overclockStreak} mult={player.overclockMultiplier} />
-        <ResourcesTile skip={player.skipTokens} reroll={player.rerollTokens} rr={player.rrCredits} />
-        {player.energy && <BatteryTile energy={player.energy} onSetEnergy={onSetEnergy} />}
-      </div>
-    </div>
-  );
-}
-
-/** Daily energy/battery. Tap to cycle a manual override (low→med→high). */
-function BatteryTile({
-  energy, onSetEnergy,
-}: { energy: NonNullable<PlayerSnapshot['energy']>; onSetEnergy: (t: 'low' | 'med' | 'high') => void }) {
-  const color = energy.tier === 'high' ? 'var(--lime)' : energy.tier === 'med' ? 'var(--amber)' : 'var(--red)';
-  const next = energy.tier === 'low' ? 'med' : energy.tier === 'med' ? 'high' : 'low';
-  const label = energy.source === 'sleep' && energy.sleepHours != null
-    ? `${energy.sleepHours}h SLEEP`
-    : energy.source === 'override' ? 'MANUAL' : 'NO DATA';
-  return (
-    <button
-      className="panel-inset"
-      title={`Energy: ${energy.tier.toUpperCase()} (${energy.source}). Click to override → ${next.toUpperCase()}.`}
-      onClick={() => onSetEnergy(next)}
-      style={{ padding: 12, minWidth: 116, textAlign: 'center', cursor: 'pointer', background: 'var(--bg-2)' }}
-    >
-      <div className="kicker" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-        <Icon name="bolt" size={12} style={{ color }} /> BATTERY
-      </div>
-      <div style={{ fontSize: 20, fontWeight: 700, color, fontFamily: 'var(--font-display)' }}>
-        {energy.pct}%
-      </div>
-      <div style={{ height: 5, borderRadius: 3, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden', margin: '6px 0 4px' }}>
-        <div style={{ width: `${energy.pct}%`, height: '100%', background: color, transition: 'width 0.4s ease' }} />
-      </div>
-      <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>{label}</div>
-    </button>
-  );
-}
-
-/** The overclock "heat meter": eddie-earn multiplier that climbs with each
- *  consecutive full-clear day (×1.0 → ×2.0 at a 10-day chain). */
-function OverclockTile({ streak, mult }: { streak: number; mult: number }) {
-  const pct = Math.min(100, streak * 10); // maxes at a 10-day chain (×2.0)
-  const hot = mult >= 1.8 ? 'var(--red)' : mult >= 1.4 ? 'var(--amber)' : mult > 1 ? 'var(--cyan)' : 'var(--text-faint)';
-  return (
-    <div className="panel-inset" style={{ padding: 12, minWidth: 132, textAlign: 'center' }}>
-      <div className="kicker" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-        <Icon name="flame" size={12} style={{ color: hot }} /> OVERCLOCK
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: hot, fontFamily: 'var(--font-display)', textShadow: mult > 1 ? `0 0 10px ${hot}` : undefined }}>
-        ×{mult.toFixed(1)}
-      </div>
-      <div style={{ height: 5, borderRadius: 3, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden', margin: '6px 0 4px' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, var(--cyan), var(--amber), var(--red))', transition: 'width 0.4s ease' }} />
-      </div>
-      <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-        {streak > 0 ? `${streak}-DAY CHAIN` : 'NO CHAIN'}
-      </div>
-    </div>
-  );
-}
-
-/** Spendable mechanics: skip / reroll tokens + R&R downtime credits. */
-function ResourcesTile({ skip, reroll, rr }: { skip: number; reroll: number; rr: number }) {
-  const row = (label: string, value: number, color: string) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-      <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.05em' }}>{label}</span>
-      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color }}>{value}</span>
-    </div>
-  );
-  return (
-    <div className="panel-inset" style={{ padding: 12, minWidth: 116 }}>
-      <div className="kicker" style={{ marginBottom: 7, textAlign: 'center' }}>RESOURCES</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {row('SKIP', skip, 'var(--text-dim)')}
-        {row('REROLL', reroll, 'var(--violet)')}
-        {row('R&R', rr, 'var(--teal)')}
-      </div>
-    </div>
-  );
-}
-
-function fmtMin(n: number): string {
-  if (n < 60) return `${n}m`;
-  const h = Math.floor(n / 60), m = n % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
-}
-
-/** The day planner: budget bar + quests split into "in plan" / "later". */
-function QuestPlanner({
-  today, plan, focus, skipTokens, rerollTokens, onComplete, onProgress, onSkip, onReroll, onJackIn, onJackOut,
-}: {
-  today: TodayResponse;
-  plan: DayPlan | undefined;
-  focus: { id: string; start: number } | null;
-  skipTokens: number;
-  rerollTokens: number;
-  onComplete: (id: string) => void;
-  onProgress: (id: string) => void;
-  onSkip: (id: string) => void;
-  onReroll: (id: string) => void;
-  onJackIn: (id: string) => void;
-  onJackOut: () => void;
-}) {
-  const all = Object.values(today.byModule).flat();
-  const flavor = all.find(q => q.meta?.flavor)?.meta?.flavor ?? null;
-  const completed = all.filter(q => q.status === 'completed');
-  const skipped = all.filter(q => q.status === 'skipped');
-
-  if (today.totalCount === 0) {
-    return (
-      <div className="panel hud" style={{ padding: 60, textAlign: 'center', color: 'var(--text-faint)' }}>
-        <Icon name="check" size={32} style={{ color: 'var(--lime)', marginBottom: 16 }} />
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No quests today</div>
-        <div className="mono" style={{ fontSize: 13 }}>
-          Add habits, projects, media, or vitals to start generating daily missions.
-        </div>
-      </div>
-    );
-  }
-
-  // Order pending quests by the planner's ranking; tag inPlan from /plan.
-  const planOrder = new Map((plan?.quests ?? []).map((q, i) => [q.id, i]));
-  const planFlags = new Map((plan?.quests ?? []).map(q => [q.id, q.inPlan]));
-  const pending = all
-    .filter(q => q.status === 'pending')
-    .sort((a, b) => (planOrder.get(a.id) ?? 999) - (planOrder.get(b.id) ?? 999));
-  const inPlan = pending.filter(q => planFlags.get(q.id) !== false);
-  const later = pending.filter(q => planFlags.get(q.id) === false);
-
-  const renderCard = (q: Quest) => (
-    <QuestCard
-      key={q.id} quest={q} focus={focus}
-      skipTokens={skipTokens} rerollTokens={rerollTokens}
-      onComplete={onComplete} onProgress={onProgress} onSkip={onSkip} onReroll={onReroll}
-      onJackIn={onJackIn} onJackOut={onJackOut}
-    />
-  );
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header + budget bar */}
-      <div className="panel hud" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: flavor ? 8 : 0, flexWrap: 'wrap' }}>
-          <Icon name="target" size={20} style={{ color: 'var(--cyan)' }} />
-          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
-            Today&rsquo;s Plan
-          </h2>
-          <div className="mono" style={{
-            marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-            padding: '4px 8px', background: 'var(--panel-2)', borderRadius: 6, border: '1px solid var(--line)',
-          }}>
-            {completed.length} / {all.length} CLEARED · {today.generator.toUpperCase()}
-          </div>
-        </div>
-        {flavor && (
-          <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: plan ? 12 : 0 }}>
-            {flavor}
-          </div>
-        )}
-        {plan && <BudgetBar plan={plan} />}
-      </div>
-
-      {inPlan.length > 0 && (
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="kicker" style={{ paddingLeft: 4 }}>IN THE PLAN · {fmtMin(plan?.plannedMin ?? 0)}</div>
-          {inPlan.map(renderCard)}
-        </section>
-      )}
-
-      {later.length > 0 && (
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="kicker" style={{ paddingLeft: 4 }}>LATER · OVER BUDGET (OPTIONAL)</div>
-          {later.map(renderCard)}
-        </section>
-      )}
-
-      {(completed.length > 0 || skipped.length > 0) && (
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="kicker" style={{ paddingLeft: 4 }}>DONE</div>
-          {[...completed, ...skipped].map(renderCard)}
-        </section>
-      )}
-    </div>
-  );
-}
-
-function BudgetBar({ plan }: { plan: DayPlan }) {
-  const pct = plan.budgetMin > 0 ? Math.min(100, Math.round((plan.plannedMin / plan.budgetMin) * 100)) : 0;
-  const over = plan.plannedMin > plan.budgetMin;
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-        <span className="kicker">TIME BUDGET · {plan.isWeekend ? 'WEEKEND' : 'WEEKDAY'}</span>
-        <span className="mono" style={{ fontSize: 12, color: over ? 'var(--amber)' : 'var(--text-dim)' }}>
-          {fmtMin(plan.plannedMin)} / {fmtMin(plan.budgetMin)}
-        </span>
-      </div>
-      <div style={{ height: 8, borderRadius: 4, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden' }}>
-        <div style={{
-          width: `${pct}%`, height: '100%',
-          background: over ? 'var(--amber)' : 'linear-gradient(90deg, var(--lime), var(--teal))',
-          transition: 'width 0.4s ease',
-        }} />
-      </div>
-      {plan.estimatedMissing > 0 && (
-        <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', marginTop: 5 }}>
-          {plan.estimatedMissing} quest{plan.estimatedMissing > 1 ? 's' : ''} missing a time estimate (assumed ~20m each)
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuestCard({
-  quest, focus, skipTokens, rerollTokens, onComplete, onProgress, onSkip, onReroll, onJackIn, onJackOut,
+/** One CONTRACT LEDGER row. Numbering starts at 02 (01 is the priority). */
+function LedgerRow({
+  quest, index, skipTokens, rerollTokens, onComplete, onProgress, onSkip, onReroll,
 }: {
   quest: Quest;
-  focus: { id: string; start: number } | null;
+  index: number;
   skipTokens: number;
   rerollTokens: number;
   onComplete: (id: string) => void;
   onProgress: (id: string) => void;
   onSkip: (id: string) => void;
   onReroll: (id: string) => void;
-  onJackIn: (id: string) => void;
-  onJackOut: () => void;
 }) {
-  const isCompleted = quest.status === 'completed';
-  const isSkipped = quest.status === 'skipped';
+  const done = quest.status === 'completed';
+  const skipped = quest.status === 'skipped';
   const isCounter = quest.targetCount > 1;
-  const emoji = quest.meta?.emoji;
-  const focusing = focus?.id === quest.id;
-  const elapsedMin = focusing ? Math.max(0, Math.round((Date.now() - focus!.start) / 60000)) : 0;
 
-  const diffColor = quest.difficulty === 'hard' ? 'var(--red)'
-    : quest.difficulty === 'medium' ? 'var(--amber)' : 'var(--lime)';
+  const meta = skipped
+    ? 'SKIPPED — STREAK SAFE'
+    : done
+      ? 'CLEARED'
+      : [
+          quest.module.name.toUpperCase(),
+          quest.estMinutes != null ? `${quest.estMinutes}M` : null,
+          quest.carryOver ? 'CARRY-OVER' : null,
+          quest.meta?.bestWindow ? `BEST WINDOW ${quest.meta.bestWindow}` : null,
+        ].filter(Boolean).join(' · ');
 
   return (
-    <div className="panel" style={{
-      padding: 18,
-      border: isCompleted ? '1px solid var(--lime)'
-        : quest.mustDo ? '1px solid var(--magenta)' : '1px solid var(--line)',
-      background: isCompleted ? 'linear-gradient(180deg, rgba(67,255,166,0.06), rgba(67,255,166,0.02))' : undefined,
-      opacity: isSkipped ? 0.5 : 1,
-    }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 10,
-          background: isCompleted ? 'linear-gradient(135deg, var(--lime), var(--teal))'
-            : 'linear-gradient(135deg, var(--cyan), var(--violet))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, boxShadow: isCompleted ? 'var(--glow-lime)' : 'var(--glow-cyan)', fontSize: 20,
-        }}>
-          {isCompleted ? <Icon name="check" size={18} style={{ color: 'white' }} /> : (emoji || '•')}
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, color: isCompleted ? 'var(--lime)' : 'var(--text)' }}>
-              {quest.title}
-            </h3>
-            {quest.mustDo && <Badge color="var(--magenta)">MUST-DO</Badge>}
-            <Badge color={diffColor}>{quest.difficulty.toUpperCase()}</Badge>
-            <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-              {quest.module.name.toUpperCase()}
-            </span>
-            {quest.estMinutes != null && <Badge color="var(--violet)">⏱ {fmtMin(quest.estMinutes)}</Badge>}
-            {quest.carryOver && <Badge color="var(--cyan)">↻ CARRIES</Badge>}
-            {quest.meta?.bestWindow && <Badge color="var(--cyan)">🌤 {quest.meta.bestWindow}</Badge>}
-            {quest.originDate && quest.originDate.slice(0, 10) !== quest.questDate.slice(0, 10) && (
-              <Badge color="var(--amber)">CARRIED</Badge>
-            )}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4 }}>{quest.description}</div>
-          {quest.actualMinutes != null && (
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
-              logged {fmtMin(quest.actualMinutes)}{quest.estMinutes != null ? ` of ~${fmtMin(quest.estMinutes)}` : ''}
-            </div>
-          )}
-          {isCounter && (
-            <CounterRing current={quest.currentCount} target={quest.targetCount} />
-          )}
-        </div>
-
-        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-          <div className="mono" style={{ fontSize: 14, fontWeight: 600, color: 'var(--lime)' }}>
-            +{quest.xpReward} XP
-          </div>
-          {!isCompleted && !isSkipped && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {/* Focus timer */}
-              {focusing ? (
-                <button className="btn" style={{ padding: '6px 10px', fontSize: 11, borderColor: 'var(--magenta)', color: 'var(--magenta)' }}
-                  onClick={onJackOut}>
-                  ◼ JACK OUT · {elapsedMin}m
-                </button>
-              ) : (
-                <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => onJackIn(quest.id)} title="Start focus timer">
-                  ▸ JACK IN
-                </button>
-              )}
-              <button
-                className="btn btn-ghost"
-                style={{ padding: '6px 10px', fontSize: 11, opacity: rerollTokens > 0 ? 1 : 0.4, color: 'var(--violet)' }}
-                disabled={rerollTokens <= 0}
-                title={rerollTokens > 0 ? 'Swap for a different quest (1 reroll token)' : 'No reroll tokens — buy more in the Shop'}
-                onClick={() => onReroll(quest.id)}
-              >
-                ↻ REROLL · {rerollTokens}
-              </button>
-              <button
-                className="btn btn-ghost"
-                style={{ padding: '6px 10px', fontSize: 11, opacity: skipTokens > 0 ? 1 : 0.4 }}
-                disabled={skipTokens <= 0}
-                title={skipTokens > 0 ? 'Skip this quest (1 skip token)' : 'No skip tokens — buy more in the Shop'}
-                onClick={() => onSkip(quest.id)}
-              >
-                SKIP · {skipTokens}
-              </button>
-              {isCounter ? (
-                <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} onClick={() => onProgress(quest.id)}>
-                  +1
-                </button>
-              ) : (
-                <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} onClick={() => onComplete(quest.id)}>
-                  COMPLETE
-                </button>
-              )}
-            </div>
-          )}
+    <div className={'ncx-contract' + (done || skipped ? ' ncx-row-done' : '')}>
+      <span className="num">{String(index + 2).padStart(2, '0')}</span>
+      <div className="ncx-chip" style={{ color: done ? 'var(--lime)' : 'var(--cyan)' }}>
+        <Icon name={done ? 'check' : moduleIcon(quest.module.key)} size={18} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="ncx-row-title-text" style={{ fontSize: 14, fontWeight: 500 }}>{quest.title}</div>
+        <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 3 }}>
+          {meta}
         </div>
       </div>
+      {done || skipped ? (
+        <span className="mono" style={{ fontSize: 11, color: done ? 'var(--lime)' : 'var(--text-faint)' }}>
+          {done ? `+${quest.xpReward} XP` : '—'}
+        </span>
+      ) : isCounter ? (
+        <>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {Array.from({ length: quest.targetCount }, (_, j) => (
+              <span key={j} style={{
+                width: 11, height: 11, flex: 'none',
+                background: j < quest.currentCount ? 'var(--teal)' : '#10121f',
+                boxShadow: j < quest.currentCount ? '0 0 6px rgba(47,245,214,0.6)' : 'inset 0 0 0 1px var(--line-2)',
+                clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
+                transition: 'background .2s, box-shadow .2s',
+              }} />
+            ))}
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: 'var(--teal)' }}>{quest.currentCount}/{quest.targetCount}</span>
+          <button
+            className="btn"
+            style={{ padding: '6px 13px', fontSize: 11 }}
+            onClick={() => onProgress(quest.id)}
+            disabled={quest.currentCount >= quest.targetCount}
+          >
+            +1
+          </button>
+        </>
+      ) : (
+        <>
+          <span className={`ncx-stamp flat ${quest.difficulty}`}>{quest.difficulty}</span>
+          <span className="mono" style={{ fontSize: 12, color: 'var(--lime)', width: 44, textAlign: 'right' }}>+{quest.xpReward}</span>
+          <button className="btn" style={{ padding: '6px 11px' }} title="Complete" onClick={() => onComplete(quest.id)}>
+            <Icon name="check" size={12} />
+          </button>
+          <button
+            className="btn"
+            style={{ padding: '6px 11px', fontSize: 10 }}
+            title={skipTokens > 0 ? 'Skip this quest (1 skip token)' : 'No skip tokens — buy more in the Shop'}
+            disabled={skipTokens <= 0}
+            onClick={() => onSkip(quest.id)}
+          >
+            SKIP
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '6px 9px', fontSize: 10 }}
+            title={rerollTokens > 0 ? `Reroll: swap for a different quest (1 token, ${rerollTokens} left)` : 'No reroll tokens — buy more in the Shop'}
+            disabled={rerollTokens <= 0}
+            onClick={() => onReroll(quest.id)}
+          >
+            RR
+          </button>
+        </>
+      )}
     </div>
   );
 }
 
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
+/** Daily energy/battery → POWER CELL. Tap cycles the manual override
+ *  (low→med→high→low) via the existing POST /api/player/energy. */
+function EnergyPanel({
+  energy, onCycle,
+}: {
+  energy: NonNullable<PlayerSnapshot['energy']>;
+  onCycle: (tier: 'low' | 'med' | 'high') => void;
+}) {
+  const tierColor = energy.tier === 'high' ? 'var(--lime)' : energy.tier === 'med' ? 'var(--amber)' : 'var(--red)';
+  const next: 'low' | 'med' | 'high' = energy.tier === 'low' ? 'med' : energy.tier === 'med' ? 'high' : 'low';
+  const source = energy.source === 'sleep' && energy.sleepHours != null
+    ? `${energy.sleepHours}H SLEEP`
+    : energy.source === 'override' ? 'MANUAL OVERRIDE' : 'NO DATA';
   return (
-    <span className="mono" style={{
-      fontSize: 10, padding: '2px 6px', borderRadius: 4, color,
-      background: `color-mix(in srgb, ${color} 12%, transparent)`,
-      border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-      letterSpacing: '0.06em',
-    }}>
-      {children}
-    </span>
-  );
-}
-
-/** A compact progress meter for check-in counter quests (e.g. 5/8). */
-function CounterRing({ current, target }: { current: number; target: number }) {
-  const pct = Math.min(100, Math.round((current / Math.max(1, target)) * 100));
-  return (
-    <div style={{ marginTop: 8, maxWidth: 240 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span className="kicker">PROGRESS</span>
-        <span className="mono" style={{ fontSize: 11, color: 'var(--cyan)' }}>{current} / {target}</span>
+    <button
+      className="panel"
+      title={`Energy: ${energy.tier.toUpperCase()} (${energy.source}). Click to override → ${next.toUpperCase()}.`}
+      onClick={() => onCycle(next)}
+      style={{ display: 'block', width: '100%', padding: '15px 18px', textAlign: 'left', cursor: 'pointer' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+        <span className="kicker" style={{ fontSize: 10 }}>POWER CELL</span>
+        <span style={{ flex: 1 }} />
+        <span className="ncx-val" style={{ fontSize: 16, color: tierColor }}>{energy.pct}%</span>
       </div>
-      <div style={{ height: 6, borderRadius: 3, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, var(--cyan), var(--violet))', transition: 'width 0.3s ease' }} />
+      <div className="ncx-bar slim">
+        <i style={{ width: `${Math.min(100, energy.pct)}%`, background: tierColor }} />
+        <span className="seg-mask" />
       </div>
-    </div>
+      <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 8 }}>
+        <span style={{ color: tierColor }}>{energy.tier.toUpperCase()}</span> · {source}
+      </div>
+    </button>
   );
 }

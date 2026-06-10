@@ -1,16 +1,6 @@
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid
-} from 'recharts';
+import { Icon } from './Icon';
 import type { CategorySpending } from '../types';
+import { fmtMoney } from '../utils/formatters';
 
 interface CategoryChartProps {
   categories: CategorySpending[];
@@ -19,283 +9,121 @@ interface CategoryChartProps {
   showAll?: boolean;
 }
 
-const NEON_COLORS = [
-  '#1ce2ff', '#ff2e9a', '#43ffa6', '#ffc24b', '#9d6bff',
-  '#ff4d6d', '#4d8bff', '#ff77c8', '#2ff5d6', '#969cba'
+/* Positional neon palette — cycled per row (theme-reactive CSS vars). */
+const NEON_VARS = [
+  'var(--cyan)',
+  'var(--magenta)',
+  'var(--violet)',
+  'var(--blue)',
+  'var(--pink)',
+  'var(--lime)',
+  'var(--teal)',
+  'var(--amber)',
 ];
 
-export function CategoryChart({ categories, onCategoryClick, selectedCategory, showAll = false }: CategoryChartProps) {
-  const displayCategories = showAll ? categories : categories.slice(0, 8);
-  
-  const pieData = displayCategories.map((cat, index) => ({
-    ...cat,
-    color: NEON_COLORS[index % NEON_COLORS.length]
-  }));
+const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-  const handlePieClick = (entry: any) => {
-    onCategoryClick(entry.category);
-  };
+/** Serial like "JUN.160" — current month + day-of-year. */
+function monthSerial(): string {
+  const now = new Date();
+  const dayOfYear = Math.floor(
+    (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000,
+  );
+  return `${MONTH_ABBR[now.getMonth()]}.${String(dayOfYear).padStart(3, '0')}`;
+}
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div 
-          className="panel-inset" 
-          style={{ 
-            padding: 12, 
-            border: '1px solid var(--line-bright)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
-          }}
-        >
-          <div style={{ 
-            fontWeight: 600, 
-            color: 'var(--text)', 
-            marginBottom: 6,
-            fontFamily: 'var(--font-ui)'
-          }}>
-            {data.category}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-            <div className="mono">${data.amount.toLocaleString()}</div>
-            <div>{data.percentage.toFixed(1)}% of spending</div>
-            <div>{data.transactions} transactions</div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+/** Outline icon for a spending category (no emoji in this direction). */
+function categoryIcon(category: string): string {
+  const c = category.toLowerCase();
+  if (c.includes('grocer')) return 'cart';
+  if (c.includes('coffee')) return 'coffee';
+  if (c.includes('food') || c.includes('dining') || c.includes('restaurant')) return 'food';
+  if (c.includes('transport') || c.includes('auto') || c.includes('car') || c.includes('gas')) return 'car';
+  if (c.includes('travel') || c.includes('flight')) return 'plane';
+  if (c.includes('shop')) return 'bag';
+  if (c.includes('subscri')) return 'repeat';
+  if (c.includes('entertain') || c.includes('stream') || c.includes('media')) return 'tv';
+  if (c.includes('bill') || c.includes('utilit')) return 'bolt';
+  if (c.includes('health') || c.includes('medical') || c.includes('fitness')) return 'heart';
+  if (c.includes('rent') || c.includes('hous') || c.includes('home')) return 'shield';
+  if (c.includes('income') || c.includes('salary')) return 'trend';
+  return 'wallet';
+}
 
-  const renderCustomLabel = (entry: any) => {
-    if (entry.percentage < 5) return '';
-    return `${entry.percentage.toFixed(1)}%`;
-  };
+export function CategoryChart({
+  categories,
+  onCategoryClick,
+  selectedCategory,
+  showAll = false,
+}: CategoryChartProps) {
+  const displayCategories = showAll ? categories : categories.slice(0, 6);
+  const maxCat = Math.max(...displayCategories.map(c => c.amount), 1);
 
   return (
-    <div className="panel hud" style={{ padding: 24 }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 12, 
-        marginBottom: 20 
-      }}>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, var(--cyan), var(--violet))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
+    <div className="panel" style={{ padding: 20 }}>
+      <div style={{ display: 'flex', marginBottom: 16 }}>
+        <span
+          className="mono"
+          style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
         >
-          <span style={{ color: 'white', fontSize: 16, fontWeight: 600 }}>📊</span>
-        </div>
-        <h3 style={{
-          fontSize: 18, 
-          fontWeight: 600, 
-          margin: 0,
-          color: 'var(--text)',
-          fontFamily: 'var(--font-display)'
-        }}>
-          Category Breakdown
-        </h3>
+          CATEGORY BREAKDOWN
+        </span>
+        <span style={{ flex: 1 }}></span>
+        <span className="ncx-serial">{monthSerial()}</span>
       </div>
-      
-      {showAll ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Bar Chart for all categories */}
-          <div style={{ height: 320 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={displayCategories} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid 
-                  strokeDasharray="1 3" 
-                  stroke="var(--line)" 
-                  strokeOpacity={0.3}
-                />
-                <XAxis 
-                  dataKey="category" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-                  axisLine={{ stroke: 'var(--line)' }}
-                  tickLine={{ stroke: 'var(--line)' }}
-                />
-                <YAxis 
-                  tickFormatter={(value) => `$${value.toLocaleString()}`}
-                  tick={{ fontSize: 11, fill: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}
-                  axisLine={{ stroke: 'var(--line)' }}
-                  tickLine={{ stroke: 'var(--line)' }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar 
-                  dataKey="amount" 
-                  fill="var(--cyan)"
-                  onClick={handlePieClick}
-                  style={{ cursor: 'pointer', filter: 'drop-shadow(0 0 4px var(--cyan))' }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          
-          {/* Category List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {displayCategories.map((category, index) => (
-              <div
-                key={category.category}
-                className="panel-inset"
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {displayCategories.map((c, i) => {
+          const color = NEON_VARS[i % NEON_VARS.length];
+          const selected = selectedCategory === c.category;
+          return (
+            <div
+              key={c.category}
+              role="button"
+              tabIndex={0}
+              onClick={() => onCategoryClick(c.category)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onCategoryClick(c.category);
+                }
+              }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '18px 104px 1fr 60px',
+                gap: 10,
+                alignItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name={categoryIcon(c.category)} size={13} style={{ color }} />
+              <span
                 style={{
-                  padding: 12,
-                  cursor: 'pointer',
-                  border: selectedCategory === category.category 
-                    ? '1px solid var(--cyan)' 
-                    : '1px solid var(--line)',
-                  background: selectedCategory === category.category
-                    ? 'linear-gradient(90deg, rgba(28,226,255,0.08), rgba(28,226,255,0.02))'
-                    : undefined,
-                  transition: 'all 0.2s ease'
+                  fontSize: 12,
+                  color: selected ? 'var(--cyan)' : 'var(--text-dim)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
-                onClick={() => onCategoryClick(category.category)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div 
-                      style={{ 
-                        width: 12, 
-                        height: 12, 
-                        borderRadius: 3,
-                        background: NEON_COLORS[index % NEON_COLORS.length],
-                        boxShadow: `0 0 8px ${NEON_COLORS[index % NEON_COLORS.length]}60`
-                      }}
-                    />
-                    <span style={{ 
-                      fontWeight: 500, 
-                      color: 'var(--text)',
-                      fontSize: 13
-                    }}>
-                      {category.category}
-                    </span>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div 
-                      className="mono"
-                      style={{
-                        fontWeight: 600, 
-                        color: 'var(--text)',
-                        fontSize: 13
-                      }}
-                    >
-                      ${category.amount.toLocaleString()}
-                    </div>
-                    <div style={{ 
-                      fontSize: 11, 
-                      color: 'var(--text-faint)',
-                      fontFamily: 'var(--font-mono)'
-                    }}>
-                      {category.percentage.toFixed(1)}% • {category.transactions}tx
-                    </div>
-                  </div>
-                </div>
+                {c.category}
+              </span>
+              <div className="ncx-bar slim">
+                <i
+                  style={{
+                    width: (c.amount / maxCat * 100) + '%',
+                    background: color,
+                    opacity: selected ? 1 : 0.88,
+                  }}
+                ></i>
+                <span className="seg-mask"></span>
               </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Pie Chart */}
-          <div style={{ height: 320 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={renderCustomLabel}
-                  outerRadius={120}
-                  innerRadius={40}
-                  fill="#8884d8"
-                  dataKey="amount"
-                  onClick={handlePieClick}
-                  style={{ cursor: 'pointer', filter: 'drop-shadow(0 0 12px rgba(28,226,255,0.3))' }}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.color}
-                      stroke={selectedCategory === entry.category ? 'var(--cyan)' : 'var(--panel)'}
-                      strokeWidth={selectedCategory === entry.category ? 3 : 1}
-                      style={{ filter: `drop-shadow(0 0 6px ${entry.color}60)` }}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          
-          {/* Legend */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(2, 1fr)', 
-            gap: 8 
-          }}>
-            {pieData.map((category, _index) => (
-              <div
-                key={category.category}
-                className="panel-inset"
-                style={{
-                  padding: 8,
-                  cursor: 'pointer',
-                  border: selectedCategory === category.category
-                    ? '1px solid var(--cyan)'
-                    : '1px solid transparent',
-                  background: selectedCategory === category.category
-                    ? 'rgba(28,226,255,0.05)'
-                    : undefined,
-                  transition: 'all 0.15s ease'
-                }}
-                onClick={() => onCategoryClick(category.category)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div 
-                    style={{ 
-                      width: 10, 
-                      height: 10, 
-                      borderRadius: 2,
-                      background: category.color,
-                      boxShadow: `0 0 6px ${category.color}60`
-                    }}
-                  />
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 500, 
-                    color: 'var(--text)',
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {category.category}
-                  </span>
-                  <span 
-                    className="mono"
-                    style={{ 
-                      fontSize: 11, 
-                      color: 'var(--text-dim)' 
-                    }}
-                  >
-                    ${category.amount.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <span className="mono" style={{ fontSize: 11, textAlign: 'right' }}>
+                {fmtMoney(c.amount)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

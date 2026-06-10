@@ -60,23 +60,27 @@ export function ConfirmDialog({
         aria-modal="true"
         style={{
           width: '100%', maxWidth: 420, padding: 24,
-          border: `1px solid ${accent}`,
-          boxShadow: danger ? '0 0 32px rgba(255,77,109,0.18)' : 'var(--glow-cyan)',
+          borderColor: accent,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `color-mix(in srgb, ${accent} 14%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${accent} 36%, transparent)`,
-            color: accent,
-          }}>
+          <div
+            className="ncx-chip"
+            style={{
+              width: 36, height: 36,
+              color: accent,
+              ...(danger ? {
+                background: 'rgba(255,77,109,0.12)',
+                boxShadow: 'inset 0 0 0 1px rgba(255,77,109,0.35)',
+              } : {}),
+            }}
+          >
             <Icon name={danger ? 'close' : 'spark'} size={18} />
           </div>
-          <h3 style={{
-            fontSize: 16, fontWeight: 600, margin: 0,
+          <h3 className="ncx-chroma" style={{
+            fontSize: 16, fontWeight: 700, margin: 0,
             fontFamily: 'var(--font-display)', color: 'var(--text)',
+            textTransform: 'uppercase', letterSpacing: '0.03em',
           }}>
             {title}
           </h3>
@@ -93,16 +97,11 @@ export function ConfirmDialog({
             {cancelLabel}
           </button>
           <button
-            className="btn"
+            key={danger ? 'confirm-danger' : 'confirm-default'}
+            className={danger ? 'btn ncx-btn danger' : 'btn btn-primary'}
             onClick={onConfirm}
             disabled={busy}
             autoFocus
-            style={{
-              background: danger
-                ? 'linear-gradient(135deg, var(--red), #b3214a)'
-                : 'linear-gradient(135deg, var(--cyan), var(--violet))',
-              color: 'white', border: 'none',
-            }}
           >
             {busy ? 'WORKING…' : confirmLabel}
           </button>

@@ -153,9 +153,11 @@ function Hero({ overview }: { overview: BudgetOverview }) {
   return (
     <div className="panel hud" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <Icon name="wallet" size={20} style={{ color: 'var(--cyan)' }} />
+        <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
+          <Icon name="wallet" size={18} />
+        </div>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
+          <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
             BUDGETS // {fmtMonth(overview.month)}
           </h2>
           <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
@@ -182,10 +184,8 @@ function Hero({ overview }: { overview: BudgetOverview }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker" style={{ color: 'var(--text-faint)' }}>REMAINING BUDGET</span>
           <span
-            style={{
-              fontSize: 38, fontWeight: 800, lineHeight: 1,
-              color: remainingColor, fontFamily: 'var(--font-display)',
-            }}
+            className="ncx-val"
+            style={{ fontSize: 38, lineHeight: 1, color: remainingColor }}
           >
             {signedMoney(remaining)}
           </span>
@@ -201,7 +201,7 @@ function Hero({ overview }: { overview: BudgetOverview }) {
         <div
           style={{
             display: 'flex', alignItems: 'flex-start', gap: 10,
-            padding: '12px 14px', borderRadius: 'var(--r-sm)',
+            padding: '12px 14px',
             background: 'color-mix(in srgb, var(--lime) 9%, transparent)',
             border: '1px solid color-mix(in srgb, var(--lime) 35%, transparent)',
           }}
@@ -220,7 +220,7 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
       <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--text-faint)' }}>
         {label}
       </span>
-      <span style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'var(--font-display)' }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: 18, color }}>{value}</span>
     </div>
   );
 }
@@ -253,7 +253,7 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
           title={`Rank #${rank} — most under budget`}
           style={{
             flexShrink: 0,
-            width: 26, height: 26, borderRadius: 6,
+            width: 26, height: 26,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 700,
             color: rank <= 3 ? 'var(--lime)' : 'var(--text-faint)',
@@ -298,20 +298,15 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
       </div>
 
       {/* fill bar */}
-      <div
-        style={{
-          position: 'relative', height: 8, borderRadius: 5, overflow: 'hidden',
-          background: 'var(--panel-2)', border: '1px solid var(--line)',
-        }}
-      >
-        <div
+      <div className="ncx-bar slim">
+        <i
           style={{
-            position: 'absolute', inset: 0, width: `${fillPct}%`,
+            width: `${fillPct}%`,
             background: accent,
             boxShadow: `0 0 10px color-mix(in srgb, ${accent} 45%, transparent)`,
-            transition: 'width 0.3s ease',
           }}
         />
+        <span className="seg-mask" />
       </div>
     </div>
   );
@@ -376,7 +371,7 @@ function HistoryRow({ cat, months }: { cat: BudgetHistoryCategory; months: strin
         }}
       >
         <span
-          style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: cat.color || 'var(--cyan)' }}
+          style={{ width: 8, height: 8, flexShrink: 0, background: cat.color || 'var(--cyan)' }}
         />
         {cat.name}
       </span>
@@ -400,22 +395,15 @@ function HistoryRow({ cat, months }: { cat: BudgetHistoryCategory; months: strin
             <span className="mono" style={{ fontSize: 11, color: cell.under ? 'var(--text-dim)' : 'var(--red)' }}>
               {money(cell.spent)}
             </span>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot }} />
+            <span style={{ width: 8, height: 3, background: dot }} />
           </span>
         );
       })}
 
       <span
-        className="mono"
+        className="ncx-stamp flat"
         title="Share of completed months that came in under cap"
-        style={{
-          justifySelf: 'end',
-          fontSize: 11, fontWeight: 700,
-          color: rateColor,
-          padding: '2px 8px', borderRadius: 5,
-          background: `color-mix(in srgb, ${rateColor} 12%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${rateColor} 30%, transparent)`,
-        }}
+        style={{ justifySelf: 'end', color: rateColor }}
       >
         {rate == null ? '—' : `${Math.round(rate)}%`}
       </span>
@@ -442,7 +430,7 @@ function ManageCategories({
   return (
     <div className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+        <span className="ncx-serial">
           {categories.length} categor{categories.length === 1 ? 'y' : 'ies'}
         </span>
         {!adding && (
@@ -532,7 +520,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
               value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#7c5cff'}
               onChange={e => setColor(e.target.value)}
               title="Category color"
-              style={{ width: 44, height: 34, padding: 2, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 8, cursor: 'pointer' }}
+              style={{ width: 44, height: 34, padding: 2, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 0, cursor: 'pointer' }}
             />
             <button
               className="btn btn-primary"
@@ -625,7 +613,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
         <div
           style={{
             display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-            padding: '10px 12px', borderRadius: 'var(--r-sm)',
+            padding: '10px 12px',
             background: 'color-mix(in srgb, var(--red) 8%, transparent)',
             border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',
           }}
@@ -636,12 +624,8 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button
-              className="btn"
-              style={{
-                padding: '6px 12px', fontSize: 11, color: 'var(--red)',
-                borderColor: 'color-mix(in srgb, var(--red) 50%, transparent)',
-                background: 'color-mix(in srgb, var(--red) 10%, transparent)',
-              }}
+              className="ncx-btn danger"
+              style={{ padding: '6px 12px', fontSize: 11 }}
               disabled={remove.isPending}
               onClick={() => remove.mutate()}
             >
@@ -702,7 +686,7 @@ function NewCategoryForm({ onClose, onDone }: { onClose: () => void; onDone: () 
             value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#19d3ff'}
             onChange={e => setColor(e.target.value)}
             title="Category color"
-            style={{ width: 48, height: 38, padding: 2, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 8, cursor: 'pointer' }}
+            style={{ width: 48, height: 38, padding: 2, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 0, cursor: 'pointer' }}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 120 }}>
@@ -755,26 +739,21 @@ function SectionLabel({
 }: { icon: string; color: string; title: string; sub: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 2, flexWrap: 'wrap' }}>
-      <Icon name={icon} size={16} style={{ color }} />
-      <span className="kicker" style={{ color }}>{title}</span>
-      <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>· {sub}</span>
+      <Icon name={icon} size={14} style={{ color }} />
+      <span
+        className="mono"
+        style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
+      >
+        {title}
+      </span>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>// {sub}</span>
     </div>
   );
 }
 
 function Chip({ children, color }: { children: React.ReactNode; color: string }) {
   return (
-    <span
-      className="mono"
-      style={{
-        flexShrink: 0,
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
-        color,
-        padding: '3px 8px', borderRadius: 6,
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-      }}
-    >
+    <span className="ncx-stamp flat" style={{ flexShrink: 0, color }}>
       {children}
     </span>
   );
@@ -805,9 +784,9 @@ function fmtMonthShort(ym: string): string {
 
 const inputStyle: React.CSSProperties = {
   padding: '7px 10px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,

@@ -1,54 +1,39 @@
-import { AlertTriangle, TrendingDown, ShoppingCart, Repeat, Zap } from 'lucide-react';
 import type { WastefulSpending, WastefulPattern } from '../types';
 import { format } from 'date-fns';
+import { Icon } from './Icon';
 
 interface WastefulSpendingPanelProps {
   wastefulSpending: WastefulSpending;
 }
 
 export function WastefulSpendingPanel({ wastefulSpending }: WastefulSpendingPanelProps) {
-  const getPatternIcon = (type: WastefulPattern['type']) => {
+  const getPatternIcon = (type: WastefulPattern['type']): string => {
     switch (type) {
       case 'frequent_small':
-        return Repeat;
+        return 'repeat';
       case 'large_discretionary':
-        return ShoppingCart;
+        return 'cart';
       case 'subscription_overlap':
-        return TrendingDown;
+        return 'trend';
       case 'impulse_buy':
-        return Zap;
+        return 'zap';
       default:
-        return AlertTriangle;
+        return 'flame';
     }
   };
 
-  const getPatternColor = (type: WastefulPattern['type']) => {
+  const getPatternColor = (type: WastefulPattern['type']): string => {
     switch (type) {
       case 'frequent_small':
-        return 'text-orange-600';
+        return 'var(--amber)';
       case 'large_discretionary':
-        return 'text-red-600';
+        return 'var(--red)';
       case 'subscription_overlap':
-        return 'text-purple-600';
+        return 'var(--violet)';
       case 'impulse_buy':
-        return 'text-yellow-600';
+        return 'var(--magenta)';
       default:
-        return 'text-gray-600';
-    }
-  };
-
-  const getPatternBg = (type: WastefulPattern['type']) => {
-    switch (type) {
-      case 'frequent_small':
-        return 'bg-orange-50';
-      case 'large_discretionary':
-        return 'bg-red-50';
-      case 'subscription_overlap':
-        return 'bg-purple-50';
-      case 'impulse_buy':
-        return 'bg-yellow-50';
-      default:
-        return 'bg-gray-50';
+        return 'var(--text-dim)';
     }
   };
 
@@ -67,29 +52,68 @@ export function WastefulSpendingPanel({ wastefulSpending }: WastefulSpendingPane
     }
   };
 
+  const wastePct = Math.max(0, Math.min(100, wastefulSpending.percentage));
+
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {/* Overview Card */}
-      <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-6">
-        <div className="flex items-center space-x-4 mb-4">
-          <div className="p-3 bg-red-100 rounded-full">
-            <AlertTriangle className="h-6 w-6 text-red-600" />
+      <div className="panel hud" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div
+            className="ncx-chip"
+            style={{
+              width: 46,
+              height: 46,
+              color: 'var(--red)',
+              background: 'color-mix(in srgb, var(--red) 10%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--red) 35%, transparent)',
+            }}
+          >
+            <Icon name="flame" size={20} />
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Wasteful Spending Analysis</h2>
-            <p className="text-gray-600">
-              We've identified ${wastefulSpending.total.toLocaleString()} ({wastefulSpending.percentage.toFixed(1)}%) 
-              in potentially wasteful spending patterns
-            </p>
+          <div style={{ minWidth: 0 }}>
+            <h2
+              className="ncx-chroma"
+              style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}
+            >
+              Wasteful Spending Analysis
+            </h2>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 3 }}>
+              <span style={{ color: 'var(--red)', fontWeight: 700 }}>
+                ${wastefulSpending.total.toLocaleString()}
+              </span>
+              {' '}({wastefulSpending.percentage.toFixed(1)}%) flagged as potentially wasteful
+            </div>
           </div>
+          <span className="ncx-serial" style={{ marginLeft: 'auto' }}>
+            WST-{String(wastefulSpending.patterns.length).padStart(2, '0')}
+          </span>
         </div>
-        
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="ncx-bar slim" style={{ flex: 1 }}>
+            <i
+              style={{
+                width: `${wastePct}%`,
+                background: 'linear-gradient(90deg, color-mix(in srgb, var(--red) 60%, #200008), var(--red))',
+                boxShadow: '0 0 10px color-mix(in srgb, var(--red) 45%, transparent)',
+              }}
+            />
+            <span className="seg-mask" />
+          </div>
+          <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>
+            {wastefulSpending.percentage.toFixed(1)}% OF SPEND
+          </span>
+        </div>
+
         {wastefulSpending.total > 0 && (
-          <div className="bg-white rounded-lg p-4 border border-red-200">
-            <h3 className="font-medium text-gray-900 mb-2">💡 Quick Wins</h3>
-            <p className="text-sm text-gray-600">
+          <div className="panel-inset" style={{ padding: 14 }}>
+            <div className="kicker" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--lime)', marginBottom: 6 }}>
+              <Icon name="spark" size={12} style={{ color: 'var(--lime)' }} /> QUICK WINS
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
               By addressing these patterns, you could potentially save{' '}
-              <span className="font-semibold text-green-600">
+              <span className="mono" style={{ fontWeight: 700, color: 'var(--lime)' }}>
                 ${(wastefulSpending.total * 0.8).toLocaleString()}
               </span>{' '}
               per year.
@@ -100,66 +124,92 @@ export function WastefulSpendingPanel({ wastefulSpending }: WastefulSpendingPane
 
       {/* Patterns */}
       {wastefulSpending.patterns.length > 0 ? (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Identified Patterns ({wastefulSpending.patterns.length})
-          </h3>
-          
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 2 }}>
+            <span
+              className="mono"
+              style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}
+            >
+              Identified Patterns
+            </span>
+            <span className="ncx-serial">// {wastefulSpending.patterns.length} FLAGGED</span>
+          </div>
+
           {wastefulSpending.patterns.map((pattern, index) => {
-            const Icon = getPatternIcon(pattern.type);
-            
+            const color = getPatternColor(pattern.type);
+
             return (
-              <div 
-                key={index} 
-                className={`border border-gray-200 rounded-lg p-6 ${getPatternBg(pattern.type)}`}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className={`p-2 rounded-full ${getPatternBg(pattern.type)}`}>
-                    <Icon className={`h-5 w-5 ${getPatternColor(pattern.type)}`} />
+              <div key={index} className="panel" style={{ padding: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                  <div
+                    className="ncx-chip"
+                    style={{
+                      color,
+                      background: `color-mix(in srgb, ${color} 10%, transparent)`,
+                      boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 35%, transparent)`,
+                    }}
+                  >
+                    <Icon name={getPatternIcon(pattern.type)} size={18} />
                   </div>
-                  
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-gray-900">
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
                         {getPatternTitle(pattern.type)}
                       </h4>
-                      <span className="text-lg font-bold text-gray-900">
+                      <span className="ncx-stamp flat" style={{ fontSize: 8.5, color: 'var(--amber)' }}>
+                        WASTE
+                      </span>
+                      <span className="ncx-val" style={{ marginLeft: 'auto', fontSize: 18, color }}>
                         ${pattern.amount.toLocaleString()}
                       </span>
                     </div>
-                    
-                    <p className="text-gray-700 mb-3">{pattern.description}</p>
-                    
-                    <div className="bg-white rounded-lg p-3 border border-gray-200 mb-4">
-                      <h5 className="font-medium text-gray-900 mb-1">💡 Suggestion</h5>
-                      <p className="text-sm text-gray-600">{pattern.suggestion}</p>
+
+                    <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      {pattern.description}
+                    </p>
+
+                    <div className="panel-inset" style={{ padding: 12, marginBottom: 12 }}>
+                      <div className="kicker" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--lime)', marginBottom: 4 }}>
+                        <Icon name="spark" size={11} style={{ color: 'var(--lime)' }} /> SUGGESTION
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                        {pattern.suggestion}
+                      </p>
                     </div>
-                    
+
                     {/* Transaction Details */}
-                    <details className="mt-4">
-                      <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+                    <details>
+                      <summary
+                        className="mono"
+                        style={{ cursor: 'pointer', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-faint)' }}
+                      >
                         View {pattern.transactions.length} related transactions
                       </summary>
-                      <div className="mt-3 space-y-2">
-                        {pattern.transactions.slice(0, 10).map((transaction, _txIndex) => (
-                          <div 
-                            key={transaction.id} 
-                            className="flex justify-between items-center text-sm bg-white p-2 rounded border border-gray-100"
+                      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {pattern.transactions.slice(0, 10).map(transaction => (
+                          <div
+                            key={transaction.id}
+                            className="panel-inset"
+                            style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              gap: 12, padding: '8px 12px', fontSize: 13,
+                            }}
                           >
-                            <div>
-                              <span className="font-medium">{transaction.description}</span>
-                              <span className="text-gray-500 ml-2">
+                            <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ color: 'var(--text)' }}>{transaction.description}</span>
+                              <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>
                                 {format(transaction.date, 'MMM dd, yyyy')}
                               </span>
                             </div>
-                            <span className="font-medium text-gray-900">
+                            <span className="mono" style={{ fontWeight: 600, color: 'var(--text)', flexShrink: 0 }}>
                               ${Math.abs(transaction.amount).toFixed(2)}
                             </span>
                           </div>
                         ))}
                         {pattern.transactions.length > 10 && (
-                          <p className="text-sm text-gray-500 text-center py-2">
-                            ... and {pattern.transactions.length - 10} more transactions
+                          <p className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', margin: '4px 0 0' }}>
+                            … and {pattern.transactions.length - 10} more transactions
                           </p>
                         )}
                       </div>
@@ -171,14 +221,26 @@ export function WastefulSpendingPanel({ wastefulSpending }: WastefulSpendingPane
           })}
         </div>
       ) : (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-          <div className="p-3 bg-green-100 rounded-full w-12 h-12 mx-auto mb-4 flex items-center justify-center">
-            <TrendingDown className="h-6 w-6 text-green-600 transform rotate-180" />
+        <div className="panel hud" style={{ padding: 40, textAlign: 'center' }}>
+          <div
+            className="ncx-chip"
+            style={{
+              width: 46,
+              height: 46,
+              margin: '0 auto 14px',
+              color: 'var(--lime)',
+              background: 'color-mix(in srgb, var(--lime) 10%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--lime) 35%, transparent)',
+            }}
+          >
+            <Icon name="check" size={20} />
           </div>
-          <h3 className="text-lg font-medium text-green-900 mb-2">Great job! 🎉</h3>
-          <p className="text-green-700">
-            We didn't detect any obvious wasteful spending patterns in your data. 
-            Your spending habits look quite disciplined!
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--lime)', marginBottom: 6 }}>
+            NO WASTE DETECTED
+          </div>
+          <p className="mono" style={{ fontSize: 12, color: 'var(--text-faint)', margin: '0 auto', maxWidth: 440, lineHeight: 1.6 }}>
+            We didn't detect any obvious wasteful spending patterns in your data.
+            Your spending habits look quite disciplined.
           </p>
         </div>
       )}

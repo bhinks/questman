@@ -158,16 +158,14 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
 
         {hiddenCount > 0 && (
           <div
-            className="mono"
+            className="ncx-serial"
             style={{
               padding: '10px 16px',
-              fontSize: 11,
-              color: 'var(--text-faint)',
               borderTop: '1px solid var(--line)',
-              background: 'var(--panel-2)',
+              background: 'rgba(150,168,224,0.03)',
             }}
           >
-            showing first {visible.length.toLocaleString()} of {total.toLocaleString()} records
+            SHOWING FIRST {visible.length.toLocaleString()} OF {total.toLocaleString()} RECORDS
           </div>
         )}
       </div>
@@ -180,39 +178,26 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
 function Header({ total, excluded }: { total: number; excluded: number }) {
   return (
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <Icon name="list" size={20} style={{ color: 'var(--cyan)' }} />
+      <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
+        <Icon name="list" size={18} />
+      </div>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
+        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
           TRANSACTION LOG
         </h2>
         <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
           every movement on the ledger · select to bulk-mark transfers
         </div>
       </div>
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span
-          className="mono"
-          style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
-            color: 'var(--cyan)',
-            padding: '4px 10px', borderRadius: 6,
-            background: 'color-mix(in srgb, var(--cyan) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--cyan) 40%, transparent)',
-          }}
-        >
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>
           {total.toLocaleString()} RECORDS
         </span>
         {excluded > 0 && (
           <span
-            className="mono"
+            className="ncx-stamp flat"
             title="Excluded from all totals (transfers, refunds, etc.)"
-            style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
-              color: 'var(--text-faint)',
-              padding: '4px 10px', borderRadius: 6,
-              background: 'var(--panel-2)',
-              border: '1px solid var(--line)',
-            }}
+            style={{ color: 'var(--text-faint)' }}
           >
             {excluded.toLocaleString()} EXCLUDED
           </span>
@@ -246,16 +231,7 @@ function BulkBar({
         boxShadow: '0 0 18px color-mix(in srgb, var(--magenta) 18%, transparent)',
       }}
     >
-      <span
-        className="mono"
-        style={{
-          fontSize: 12, fontWeight: 700, letterSpacing: '0.05em',
-          color: 'var(--magenta)',
-          padding: '4px 10px', borderRadius: 6,
-          background: 'color-mix(in srgb, var(--magenta) 12%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--magenta) 35%, transparent)',
-        }}
-      >
+      <span className="ncx-stamp" style={{ color: 'var(--magenta)' }}>
         {count.toLocaleString()} SELECTED
       </span>
 
@@ -265,7 +241,7 @@ function BulkBar({
           disabled={busy}
           onClick={onExclude}
           title="Mark as inter-account transfer — drops these from all totals"
-          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--amber)', borderColor: 'color-mix(in srgb, var(--amber) 45%, transparent)' }}
+          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--amber)' }}
         >
           <Icon name="repeat" size={13} /> MARK TRANSFER (EXCLUDE)
         </button>
@@ -274,16 +250,16 @@ function BulkBar({
           disabled={busy}
           onClick={onInclude}
           title="Re-include in totals"
-          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--lime)', borderColor: 'color-mix(in srgb, var(--lime) 45%, transparent)' }}
+          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--lime)' }}
         >
           <Icon name="check" size={13} /> INCLUDE
         </button>
         <button
-          className="btn"
+          className="ncx-btn danger"
           disabled={busy}
           onClick={onDelete}
           title="Delete selected"
-          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--red)', borderColor: 'color-mix(in srgb, var(--red) 45%, transparent)' }}
+          style={{ padding: '7px 14px', fontSize: 11 }}
         >
           <Icon name="close" size={13} /> DELETE
         </button>
@@ -321,7 +297,7 @@ function Row({
         ...gridRow,
         borderTop: '1px solid var(--line)',
         opacity: excluded ? 0.5 : 1,
-        background: selected ? 'color-mix(in srgb, var(--cyan) 8%, transparent)' : undefined,
+        background: selected ? 'rgba(var(--accent-rgb),0.08)' : undefined,
       }}
     >
       <div style={cellCenter}>
@@ -345,15 +321,7 @@ function Row({
             {tx.description || '—'}
           </span>
           {excluded && (
-            <span
-              className="mono"
-              style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-                color: 'var(--text-faint)',
-                padding: '1px 6px', borderRadius: 4,
-                border: '1px dashed var(--line-2)',
-              }}
-            >
+            <span className="ncx-stamp flat" style={{ fontSize: 8, color: 'var(--text-faint)' }}>
               EXCLUDED
             </span>
           )}
@@ -410,7 +378,7 @@ function LinkChip({ icon, color, label }: { icon: string; color: string; label: 
         display: 'inline-flex', alignItems: 'center', gap: 4,
         fontSize: 10,
         color,
-        padding: '1px 7px', borderRadius: 5,
+        padding: '1px 7px',
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${color} 28%, transparent)`,
         maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -481,14 +449,14 @@ const gridRow: React.CSSProperties = {
 };
 
 const headerRow: React.CSSProperties = {
-  background: 'var(--panel-2)',
-  borderBottom: '1px solid var(--line)',
+  background: 'rgba(150,168,224,0.03)',
+  borderBottom: '1px solid var(--line-2)',
   position: 'sticky',
   top: 0,
 };
 
 const cell: React.CSSProperties = { padding: '0 2px' };
-const cellHead: React.CSSProperties = { ...cell, color: 'var(--text-faint)' };
+const cellHead: React.CSSProperties = { ...cell, fontSize: 9.5, color: 'var(--text-faint)' };
 const cellCenter: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 };

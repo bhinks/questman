@@ -32,6 +32,9 @@ import { DebriefView } from './components/DebriefView';
 import { BudgetsView } from './components/BudgetsView';
 import { BillsView } from './components/BillsView';
 import { TransactionsView } from './components/TransactionsView';
+import { CalibrationView } from './components/CalibrationView';
+import { LevelUpOverlay } from './components/LevelUpOverlay';
+import type { SettingsResponse } from './lib/api';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -90,14 +93,44 @@ function HubApp() {
   });
   const equippedTheme = playerQuery.data?.equippedTheme ?? null;
   const energyTier = playerQuery.data?.energy?.tier ?? null;
+  const themeInitRef = useRef(false);
   useEffect(() => {
     const el = document.documentElement;
     if (equippedTheme) el.dataset.theme = equippedTheme;
     else delete el.dataset.theme;
+    // Theme-equip pulse (design handoff): a ~450ms global color transition so
+    // the reskin sweeps rather than snaps. Skipped on the initial mount.
+    if (themeInitRef.current) {
+      el.classList.add('theming');
+      const t = setTimeout(() => el.classList.remove('theming'), 450);
+      return () => { clearTimeout(t); el.classList.remove('theming'); };
+    }
+    themeInitRef.current = true;
+  }, [equippedTheme]);
+  useEffect(() => {
+    const el = document.documentElement;
     // World mechanics: a low battery visibly dims the UI (index.css).
     if (energyTier) el.dataset.energy = energyTier;
     else delete el.dataset.energy;
-  }, [equippedTheme, energyTier]);
+  }, [energyTier]);
+
+  // Night City display calibration: apply the per-user CRT knobs as CSS vars
+  // on the root. CRT % fans out to the scanline/sweep alphas (handoff formula).
+  const settingsQuery = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<SettingsResponse>('/api/settings').then(r => r.settings),
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => {
+    const s = settingsQuery.data;
+    if (!s) return;
+    const el = document.documentElement;
+    el.style.setProperty('--cut', `${s.displayCut}px`);
+    el.style.setProperty('--cut-sm', `${Math.round(s.displayCut * 0.56)}px`);
+    el.style.setProperty('--chroma', `${s.displayChroma}px`);
+    el.style.setProperty('--scan-a', String((s.displayCrt / 100) * 0.035));
+    el.style.setProperty('--sweep-a', String((s.displayCrt / 100) * 0.14));
+  }, [settingsQuery.data]);
 
   // Transactions now live in the DB. Pull the full set (single-user hub;
   // a high limit is fine) and map to the presentational shape the finance
@@ -413,6 +446,9 @@ function HubApp() {
           />
         );
 
+      case 'calibration':
+        return <CalibrationView />;
+
       default:
         return null;
     }
@@ -420,7 +456,6 @@ function HubApp() {
 
   return (
     <AppShell
-      analysis={analysis}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onUpload={handleUpload}
@@ -434,7 +469,12 @@ function HubApp() {
         style={{ display: 'none' }}
       />
 
-      {renderTabContent()}
+      {/* Keyed by screen so the entrance stagger re-runs on every nav. */}
+      <div key={activeTab} className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {renderTabContent()}
+      </div>
+
+      <LevelUpOverlay />
 
       {/* Import status toast (success / in-flight). */}
       {importStatus && errors.length === 0 && (

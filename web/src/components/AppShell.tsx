@@ -1,218 +1,316 @@
-import { useState, useEffect } from 'react';
+/**
+ * AppShell — the NIGHT CITY deck (design handoff, pixel-faithful).
+ *
+ * Layout: [ 240px deck | main(topbar / content) ] over a bottom status rail.
+ *   - Deck: brand lockup, 5 nav groups (OPS / LIFE / PROGRESSION / VAULT /
+ *     SYSTEM), arrow-wedge items, and the runner ID card pinned bottom
+ *     (hex level badge, handle, slim segmented XP bar, LVL/streak/eddies).
+ *   - Topbar: 3 hairline-divided cells — screen title + DAY serial, the
+ *     handler TICKER (marquee, duplicated track for a seamless loop; gated
+ *     by reduced-motion and the user's tickerEnabled setting), and the live
+ *     clock + bell + import button (import survives the redesign here).
+ *   - Status rail: uplink (live socket state), vault/ICE status, cleared
+ *     count + token counts + serial.
+ *
+ * All data is bound from shared react-query caches (player / today / handler
+ * / antigoals / bosses / settings) so the shell stays live everywhere.
+ */
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from './Icon';
-import { Brandmark } from './Brandmark';
-import type { SpendingAnalysis } from '../types';
+import { api } from '../lib/api';
+import type {
+  PlayerResponse, PlayerSnapshot, TodayResponse, HandlerLatestResponse,
+  AntiGoal, Boss, SettingsResponse,
+} from '../lib/api';
+import { getSocket } from '../lib/socket';
+import { useAuth } from '../context/AuthContext';
 
 interface AppShellProps {
-  analysis?: SpendingAnalysis;
   activeTab: string;
   onTabChange: (tab: string) => void;
   children: React.ReactNode;
   onUpload: () => void;
 }
 
-interface NavItem {
-  id: string;
-  label: string;
-  icon: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { id: 'today', label: 'Today', icon: 'target' },
-  { id: 'habits', label: 'Habits', icon: 'check' },
-  { id: 'chores', label: 'Chores', icon: 'list' },
-  { id: 'workouts', label: 'Workouts', icon: 'spark' },
-  { id: 'projects', label: 'Projects', icon: 'grid' },
-  { id: 'media', label: 'Media', icon: 'play' },
-  { id: 'vitals', label: 'Vitals', icon: 'heart' },
-  { id: 'social', label: 'Social', icon: 'flag' },
-  { id: 'progress', label: 'Progress', icon: 'layers' },
-  { id: 'shop', label: 'Shop', icon: 'bag' },
-  { id: 'achievements', label: 'Street Cred', icon: 'trophy' },
-  { id: 'bosses', label: 'Bosses', icon: 'flame' },
-  { id: 'chains', label: 'Questlines', icon: 'repeat' },
-  { id: 'ice', label: 'ICE', icon: 'shield' },
-  { id: 'intel', label: 'Net', icon: 'eye' },
-  { id: 'debrief', label: 'Debrief', icon: 'file' },
-  // Finance group (existing dashboard)
-  { id: 'overview', label: 'Finance', icon: 'grid' },
-  { id: 'categories', label: 'Categories', icon: 'layers' },
-  { id: 'budgets', label: 'Budgets', icon: 'wallet' },
-  { id: 'bills', label: 'Bills', icon: 'clock' },
-  { id: 'savings', label: 'Savings', icon: 'target' },
-  { id: 'transactions', label: 'Transactions', icon: 'list' },
+type NavItem = [id: string, label: string, icon: string];
+const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
+  { group: 'OPS', items: [
+    ['today', 'Today', 'target'], ['chains', 'Questlines', 'repeat'],
+    ['bosses', 'Bosses', 'flame'], ['ice', 'ICE', 'shield'],
+  ]},
+  { group: 'LIFE', items: [
+    ['habits', 'Habits', 'check'], ['chores', 'Chores', 'list'],
+    ['workouts', 'Workouts', 'spark'], ['projects', 'Projects', 'grid'],
+    ['media', 'Media', 'play'], ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
+  ]},
+  { group: 'PROGRESSION', items: [
+    ['progress', 'Progress', 'layers'], ['achievements', 'Street Cred', 'trophy'],
+    ['shop', 'Shop', 'bag'], ['intel', 'Net', 'eye'], ['debrief', 'Debrief', 'file'],
+  ]},
+  { group: 'VAULT', items: [
+    ['overview', 'Finance', 'wallet'], ['categories', 'Categories', 'layers'],
+    ['budgets', 'Budgets', 'target'], ['bills', 'Bills', 'clock'],
+    ['savings', 'Savings', 'trend'], ['transactions', 'Transactions', 'list'],
+  ]},
+  { group: 'SYSTEM', items: [
+    ['calibration', 'Calibration', 'bolt'],
+  ]},
 ];
 
+const SCREEN_TITLES: Record<string, string> = {
+  today: 'TODAY // DAY PLAN', chains: 'OPS // QUESTLINES', bosses: 'OPS // BOSS FIGHTS',
+  ice: 'OPS // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
+  workouts: 'LIFE // WORKOUTS', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
+  vitals: 'LIFE // BIOMONITOR', social: 'LIFE // CREW',
+  progress: 'PROGRESS // STREET CRED', achievements: 'PROGRESS // BADGE WALL',
+  shop: 'SHOP // NIGHT MARKET', intel: 'NET // DATA-SHADOW', debrief: 'PROGRESS // DEBRIEF',
+  overview: 'VAULT // FINANCE', categories: 'VAULT // CATEGORIES', budgets: 'VAULT // BUDGETS',
+  bills: 'VAULT // BILLS', savings: 'VAULT // SAVINGS', transactions: 'VAULT // TRANSACTIONS',
+  calibration: 'SYS // CALIBRATION',
+};
+
 function Clock() {
-  const [time, setTime] = useState(new Date());
-  
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
   }, []);
-  
+  const pad = (n: number) => String(n).padStart(2, '0');
   return (
-    <span 
-      className="mono" 
-      style={{ 
-        fontSize: 11.5, 
-        color: 'var(--text-dim)', 
-        letterSpacing: '0.05em' 
-      }}
-    >
-      {time.toLocaleTimeString('en-US', { hour12: false })}
+    <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+      {pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}
     </span>
   );
 }
 
-export function AppShell({ analysis, activeTab, onTabChange, children, onUpload }: AppShellProps) {
-  const reclaimTotal = analysis?.wastefulSpending.total || 0;
+export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShellProps) {
+  const qc = useQueryClient();
+  const { user, logout } = useAuth();
+  const [uplink, setUplink] = useState(true);
+
+  const playerQ = useQuery({
+    queryKey: ['player'],
+    queryFn: () => api.get<PlayerResponse>('/api/player').then(r => r.player),
+  });
+  const todayQ = useQuery({
+    queryKey: ['quests', 'today'],
+    queryFn: () => api.get<TodayResponse>('/api/quests/today'),
+  });
+  const handlerQ = useQuery({
+    queryKey: ['handler', 'latest'],
+    queryFn: () => api.get<HandlerLatestResponse>('/api/handler/latest'),
+    staleTime: 60_000,
+  });
+  const iceQ = useQuery({
+    queryKey: ['antigoals'],
+    queryFn: () => api.get<{ antigoals: AntiGoal[] }>('/api/antigoals').then(r => r.antigoals),
+    staleTime: 5 * 60_000,
+  });
+  const bossQ = useQuery({
+    queryKey: ['bosses'],
+    queryFn: () => api.get<{ bosses: Boss[] }>('/api/bosses').then(r => r.bosses),
+    staleTime: 5 * 60_000,
+  });
+  const settingsQ = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<SettingsResponse>('/api/settings').then(r => r.settings),
+    staleTime: 5 * 60_000,
+  });
+
+  // Live shell: socket state drives the UPLINK light; handler pushes refresh
+  // the ticker. Other events already invalidate via the views.
+  useEffect(() => {
+    const s = getSocket();
+    if (!s) { setUplink(false); return; }
+    setUplink(s.connected);
+    const on = () => setUplink(true);
+    const off = () => setUplink(false);
+    const handlerRefresh = () => qc.invalidateQueries({ queryKey: ['handler', 'latest'] });
+    s.on('connect', on);
+    s.on('disconnect', off);
+    s.on('handler-message', handlerRefresh);
+    return () => { s.off('connect', on); s.off('disconnect', off); s.off('handler-message', handlerRefresh); };
+  }, [qc]);
+
+  const p: PlayerSnapshot | undefined = playerQ.data;
+  const today = todayQ.data;
+  const handle = (user?.name || user?.email?.split('@')[0] || 'RUNNER').toUpperCase();
+  const xpPct = p ? Math.min(100, (p.xpIntoLevel / Math.max(1, p.xpForNextLevel)) * 100) : 0;
+  const streak = p?.currentStreak ?? 0;
+  const activeIce = (iceQ.data ?? []).filter(a => a.isActive).length;
+  const topBoss = (bossQ.data ?? []).find(b => b.status === 'active');
+
+  // Ticker items — real data, no invented numbers. Handler line first.
+  const handlerMsg = handlerQ.data?.message;
+  const tickerEnabled = settingsQ.data?.tickerEnabled ?? true;
+  const tickerItems: React.ReactNode[] = [];
+  if (handlerMsg) {
+    tickerItems.push(
+      <span key="h"><span style={{ color: 'var(--cyan)' }}>HANDLER&gt;</span> {handlerMsg.text}</span>,
+    );
+  }
+  tickerItems.push(<span key="s">STREAK <span style={{ color: 'var(--lime)' }}>{streak}D</span></span>);
+  if (today) {
+    tickerItems.push(
+      <span key="x">XP TODAY <span style={{ color: 'var(--lime)' }}>+{today.xpEarned}</span> · {today.xpAvailable} ON THE TABLE</span>,
+    );
+  }
+  if (p) tickerItems.push(<span key="e">EDDIES <span style={{ color: 'var(--amber)' }}>€${p.eddies.toLocaleString()}</span></span>);
+  if (topBoss) {
+    tickerItems.push(
+      <span key="b">TARGET <span style={{ color: 'var(--magenta)' }}>{topBoss.name.toUpperCase()} · {topBoss.pct}%</span></span>,
+    );
+  }
+
+  const markHandlerSeen = () => {
+    if (handlerMsg && !handlerMsg.seen) {
+      api.post('/api/handler/seen', { ids: [handlerMsg.id] })
+        .then(() => qc.invalidateQueries({ queryKey: ['handler', 'latest'] }))
+        .catch(() => {});
+    }
+  };
 
   return (
-    <div className="app-shell">
-      {/* LEFT NAV RAIL (desktop) */}
-      <aside className="nav-rail">
-        <div style={{ padding: '20px 18px 18px' }}>
-          <Brandmark />
-        </div>
-        
-        <nav style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 4, 
-          padding: '8px 12px', 
-          flex: 1 
-        }}>
-          <div className="kicker" style={{ padding: '10px 10px 8px' }}>
-            MENU
+    <div className={'app-shell' + (tickerEnabled ? '' : ' no-ticker')}>
+      <div className="ncx-shell">
+        {/* ---- DECK ---- */}
+        <aside className="ncx-deck">
+          <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>Q</div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, letterSpacing: '0.02em' }}>
+                QUEST<span className="ncx-chroma" style={{ color: 'var(--cyan)' }}>MAN</span>
+              </div>
+              <div className="ncx-serial">SYS 2.4.0 // NC-077</div>
+            </div>
           </div>
-          
-          {NAV_ITEMS.map(item => {
-            const isActive = activeTab === item.id;
-            return (
-              <button 
-                key={item.id} 
-                onClick={() => onTabChange(item.id)}
-                className={`nav-item${isActive ? ' active' : ''}`}
-              >
-                <Icon name={item.icon} size={17} />
-                <span>{item.label}</span>
-                
-                {item.id === 'savings' && reclaimTotal > 0 && (
-                  <span 
-                    className="mono" 
-                    style={{ 
-                      marginLeft: 'auto', 
-                      fontSize: 10, 
-                      padding: '2px 6px', 
-                      borderRadius: 5,
-                      background: 'rgba(67,255,166,0.14)', 
-                      color: 'var(--lime)', 
-                      border: '1px solid rgba(67,255,166,0.3)' 
-                    }}
+          <nav>
+            {NAV_GROUPS.map(g => (
+              <div key={g.group}>
+                <div className="ncx-deck-group">{g.group}<i /></div>
+                {g.items.map(([id, label, icon]) => (
+                  <button
+                    key={id}
+                    className={'ncx-deck-item' + (activeTab === id ? ' active' : '')}
+                    onClick={() => onTabChange(id)}
                   >
-                    ${Math.round(reclaimTotal).toLocaleString()}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Privacy footer */}
-        <div style={{ padding: '14px 16px', borderTop: '1px solid var(--line)' }}>
-          <div className="panel-inset" style={{ padding: '12px 13px' }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 8, 
-              marginBottom: 7 
-            }}>
-              <Icon name="lock" size={13} style={{ color: 'var(--lime)' }} />
-              <span 
-                className="mono" 
-                style={{ 
-                  fontSize: 10.5, 
-                  color: 'var(--lime)', 
-                  letterSpacing: '0.08em' 
-                }}
-              >
-                LOCAL VAULT
+                    <Icon name={icon} size={15} />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+          {/* Runner ID card */}
+          <div className="ncx-id">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>{p?.level ?? '—'}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {handle} <span style={{ color: 'var(--text-ghost)' }}>// RUNNER-01</span>
+                </div>
+                <div className="ncx-bar slim" style={{ marginTop: 6 }}>
+                  <i style={{ width: `${xpPct}%`, background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))' }} />
+                  <span className="seg-mask" />
+                </div>
+              </div>
+            </div>
+            <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 7 }}>
+              <span>LVL {p?.level ?? '—'}</span>
+              <span style={{ color: 'var(--lime)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <Icon name="flame" size={10} /> {streak}D
               </span>
-            </div>
-            <div style={{ 
-              fontSize: 11, 
-              color: 'var(--text-faint)', 
-              lineHeight: 1.5 
-            }}>
-              Data never leaves this device. Clear anytime.
+              <span style={{ color: 'var(--amber)' }}>
+                €${p ? (p.eddies >= 1000 ? (p.eddies / 1000).toFixed(1) + 'K' : p.eddies) : '—'}
+              </span>
+              <button
+                onClick={logout}
+                title="Jack out (sign off)"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-ghost)', padding: 0, display: 'inline-flex' }}
+              >
+                <Icon name="close" size={10} />
+              </button>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="main-col">
-        {/* Top bar */}
-        <header className="topbar">
-          <div className="mobile-brand">
-            <Brandmark size="sm" />
-          </div>
-          
-          <div className="searchbox">
-            <Icon name="search" size={15} style={{ color: 'var(--text-faint)' }} />
-            <input placeholder="Search transactions, vendors, categories…" />
-            <span className="mono kbd">⌘K</span>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="topbar-meta">
-              <span 
-                style={{ 
-                  width: 6, 
-                  height: 6, 
-                  borderRadius: '50%', 
-                  background: 'var(--lime)', 
-                  boxShadow: '0 0 6px var(--lime)' 
-                }} 
-                className="cursor-blink" 
+        {/* ---- MAIN ---- */}
+        <main className="main-col">
+          <header className="ncx-topbar">
+            <div className="mobile-brand">
+              <div className="ncx-hex" style={{ width: 28, height: 28, fontSize: 11 }}>Q</div>
+            </div>
+            <div className="ncx-topcell cell-title">
+              <span className="mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--cyan)' }}>
+                ▮ {SCREEN_TITLES[activeTab] || activeTab.toUpperCase()}
+              </span>
+              <span className="ncx-serial">DAY {streak}</span>
+            </div>
+            <div
+              className="ncx-ticker-wrap ncx-topcell"
+              style={{ padding: '0 18px', cursor: handlerMsg && !handlerMsg.seen ? 'pointer' : 'default' }}
+              onClick={markHandlerSeen}
+              title={handlerMsg && !handlerMsg.seen ? 'Mark handler line read' : undefined}
+            >
+              {tickerEnabled && (
+                <div className="ncx-ticker-track">
+                  {[0, 1].map(rep => (
+                    <span key={rep} aria-hidden={rep === 1} style={{ display: 'flex', gap: 56 }}>
+                      {tickerItems.map((it, i) => <span key={`${rep}-${i}`}>{it}</span>)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="ncx-topcell" style={{ borderRight: 'none', gap: 14 }}>
+              <span
+                className="cursor-blink"
+                style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: uplink ? 'var(--lime)' : 'var(--red)',
+                  boxShadow: `0 0 6px ${uplink ? 'var(--lime)' : 'var(--red)'}`,
+                }}
               />
               <Clock />
+              <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
+                <Icon name="upload" size={15} />
+              </button>
+              <Icon name="bell" size={15} style={{ color: 'var(--text-dim)' }} />
             </div>
-            
-            <button 
-              className="btn btn-ghost icon-btn" 
-              title="Notifications"
-            >
-              <Icon name="bell" size={17} />
-            </button>
-            
-            <button 
-              className="btn icon-btn" 
-              onClick={onUpload} 
-              title="New import"
-            >
-              <Icon name="upload" size={16} />
-            </button>
+          </header>
+          <div className="content">
+            {children}
           </div>
-        </header>
+        </main>
+      </div>
 
-        {/* Content */}
-        <div className="content">
-          {children}
-        </div>
-      </main>
+      {/* ---- STATUS RAIL ---- */}
+      <footer className="ncx-statusbar">
+        <span className={uplink ? 'lit' : ''} style={uplink ? undefined : { color: 'var(--red)' }}>
+          ● UPLINK {uplink ? 'STABLE' : 'DOWN'}
+        </span>
+        <span>LOCAL VAULT · ENCRYPTED</span>
+        <span>{activeIce > 0 ? `ICE: ${activeIce} ACTIVE` : 'ICE: NONE DETECTED'}</span>
+        <span style={{ marginLeft: 'auto' }}>
+          CLEARED {today ? `${today.completedCount}/${today.totalCount}` : '—'}
+        </span>
+        <span>SKIPS ×{p?.skipTokens ?? 0}</span>
+        <span>REROLL ×{p?.rerollTokens ?? 0}</span>
+        {(p?.streakShields ?? 0) > 0 && <span style={{ color: 'var(--teal)' }}>SHIELD ×{p!.streakShields}</span>}
+        <span className="ncx-serial">QTM//{String(streak).padStart(3, '0')}.076</span>
+      </footer>
 
-      {/* MOBILE BOTTOM NAV */}
+      {/* MOBILE BOTTOM NAV (preserved from the previous shell) */}
       <nav className="bottom-nav">
-        {NAV_ITEMS.map(item => (
-          <button 
-            key={item.id} 
-            onClick={() => onTabChange(item.id)}
-            className={`bn-item${activeTab === item.id ? ' active' : ''}`}
+        {([['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'], ['overview', 'Vault', 'wallet'], ['progress', 'Cred', 'layers']] as NavItem[]).map(([id, label, icon]) => (
+          <button
+            key={id}
+            onClick={() => onTabChange(id)}
+            className={`bn-item${activeTab === id ? ' active' : ''}`}
           >
-            <Icon name={item.icon} size={20} />
-            <span>{item.label}</span>
+            <Icon name={icon} size={20} />
+            <span>{label}</span>
           </button>
         ))}
       </nav>

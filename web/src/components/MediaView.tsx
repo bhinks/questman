@@ -31,7 +31,7 @@ const TYPE_META: Record<MediaType, { label: string; icon: string; color: string;
   movie: { label: 'Movie', icon: 'play', color: 'var(--magenta)', unitWord: '' },
   show:  { label: 'Show', icon: 'eye', color: 'var(--violet)', unitWord: 'eps' },
   game:  { label: 'Game', icon: 'target', color: 'var(--lime)', unitWord: '' },
-  book:  { label: 'Book', icon: 'book', color: 'var(--amber)', unitWord: 'pages' },
+  book:  { label: 'Book', icon: 'file', color: 'var(--amber)', unitWord: 'pages' },
 };
 
 const STATUS_ORDER: Status[] = ['active', 'backlog', 'done', 'dropped'];
@@ -51,6 +51,12 @@ export function MediaView() {
     queryKey: ['media'],
     queryFn: () => api.get<{ items: MediaItem[] }>('/api/media').then(r => r.items),
   });
+  // Banked R&R credits gate backlog activation (shared cache with the HUD).
+  const playerQ = useQuery({
+    queryKey: ['player'],
+    queryFn: () => api.get<{ player: { rrCredits: number } }>('/api/player').then(r => r.player),
+  });
+  const rrCredits = playerQ.data?.rrCredits ?? 0;
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ['media'] });
@@ -74,6 +80,20 @@ export function MediaView() {
     mutationFn: (vars: { id: string; body: Record<string, unknown> }) =>
       api.put(`/api/media/${vars.id}`, vars.body),
     onSuccess: invalidateAll,
+  });
+
+  // R&R redemption — spend one banked downtime credit to pull a BACKLOG item
+  // onto the active shelf (the economy's earn-your-leisure loop). The server
+  // guards the spend; this closes the loop the Shop's R&R credits feed.
+  const rrSession = useMutation({
+    mutationFn: (id: string) => api.post(`/api/media/${id}/rr-session`),
+    onSuccess: () => {
+      invalidateAll();
+      qc.invalidateQueries({ queryKey: ['player'] });
+    },
+    onError: (err: unknown) => {
+      window.alert(err instanceof Error ? err.message : 'R&R redemption failed');
+    },
   });
 
   const remove = useMutation({
@@ -105,12 +125,14 @@ export function MediaView() {
 
       {grouped.map(g => (
         <section key={g.status} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SectionLabel>{STATUS_LABEL[g.status]} · {g.rows.length}</SectionLabel>
+          <SectionLabel count={g.rows.length}>{STATUS_LABEL[g.status]}</SectionLabel>
           {g.rows.map(item => (
             <Row
               key={item.id}
               item={item}
-              busy={progress.isPending || update.isPending}
+              busy={progress.isPending || update.isPending || rrSession.isPending}
+              rrCredits={rrCredits}
+              onRrSession={() => rrSession.mutate(item.id)}
               onStatus={(status) => progress.mutate({ id: item.id, status })}
               onUnits={(unitsDone) => progress.mutate({ id: item.id, unitsDone })}
               onEst={(estMinutes) => update.mutate({ id: item.id, body: { estMinutes } })}
@@ -140,47 +162,43 @@ export function MediaView() {
 
 function Header({ total, active }: { total: number; active: number }) {
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Icon name="layers" size={20} style={{ color: 'var(--magenta)' }} />
+    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="ncx-chip" style={{ color: 'var(--magenta)' }}>
+        <Icon name="layers" size={18} />
+      </div>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Braindance Queue</h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+        <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+          Braindance Queue
+        </h2>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', textTransform: 'uppercase', marginTop: 3 }}>
           movies · shows · games · books
         </div>
       </div>
-      <div
-        className="mono"
-        style={{
-          marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-          padding: '4px 8px', background: 'var(--panel-2)',
-          borderRadius: 6, border: '1px solid var(--line)',
-        }}
-      >
+      <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
         {active} ACTIVE · {total} TOTAL
-      </div>
+      </span>
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="kicker" style={{ paddingLeft: 4 }}>{children}</div>;
+function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, paddingLeft: 4 }}>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+        {children}
+      </span>
+      {count != null && <span className="ncx-serial">{count} RECORDS</span>}
+    </div>
+  );
 }
 
 function TypeBadge({ type }: { type: MediaType }) {
   const m = TYPE_META[type];
   return (
     <div
-      className="mono"
+      className="ncx-stamp flat"
       title={m.label}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 5,
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-        color: m.color,
-        padding: '4px 8px',
-        background: `color-mix(in srgb, ${m.color} 8%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${m.color} 30%, transparent)`,
-        borderRadius: 6, textTransform: 'uppercase', flexShrink: 0,
-      }}
+      style={{ color: m.color, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
     >
       <Icon name={m.icon as any} size={11} />
       {m.label}
@@ -196,10 +214,12 @@ function timeLabel(min: number): string {
 }
 
 function Row({
-  item, busy, onStatus, onUnits, onEst, onDelete,
+  item, busy, rrCredits, onRrSession, onStatus, onUnits, onEst, onDelete,
 }: {
   item: MediaItem;
   busy: boolean;
+  rrCredits: number;
+  onRrSession: () => void;
   onStatus: (status: Status) => void;
   onUnits: (unitsDone: number) => void;
   onEst: (estMinutes: number) => void;
@@ -229,14 +249,13 @@ function Row({
           <img
             src={item.coverUrl}
             alt=""
-            style={{ width: 38, height: 54, objectFit: 'cover', borderRadius: 6, flexShrink: 0, border: '1px solid var(--line)' }}
+            style={{ width: 38, height: 54, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--line)' }}
           />
         )
         : (
-          <div style={{
-            width: 38, height: 54, borderRadius: 6, flexShrink: 0,
+          <div className="panel-inset" style={{
+            width: 38, height: 54, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--panel-2)', border: '1px solid var(--line)',
             color: m.color,
           }}>
             <Icon name={m.icon as any} size={18} />
@@ -285,11 +304,11 @@ function Row({
               title="Estimated time commitment — click to set"
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 11, color: 'var(--violet)', cursor: 'pointer',
+                fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+                color: 'var(--violet)', cursor: 'pointer',
                 padding: '4px 8px',
                 background: 'color-mix(in srgb, var(--violet) 8%, transparent)',
                 border: '1px solid color-mix(in srgb, var(--violet) 30%, transparent)',
-                borderRadius: 6,
               }}
             >
               <Icon name="clock" size={11} />
@@ -326,12 +345,9 @@ function Row({
         </div>
 
         {hasUnits && (
-          <div style={{ height: 4, background: 'var(--panel-2)', borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{
-              width: `${pct}%`, height: '100%',
-              background: 'linear-gradient(90deg, var(--cyan), var(--violet))',
-              transition: 'width 0.25s ease',
-            }} />
+          <div className="ncx-bar slim">
+            <i style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--cyan), var(--violet))' }} />
+            <span className="seg-mask" />
           </div>
         )}
       </div>
@@ -339,14 +355,31 @@ function Row({
       {/* status-change buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 6 }}>
-          {item.status !== 'active' && item.status !== 'done' && (
+          {item.status === 'backlog' && (
+            // Activating from the backlog SPENDS one R&R credit (the economy's
+            // earn-your-leisure loop) — server-guarded via /rr-session.
             <button
-              className="btn btn-primary"
+              key={`rr-${rrCredits > 0}`}
+              className={rrCredits > 0 ? 'btn btn-primary' : 'btn'}
+              style={{ padding: '6px 10px', fontSize: 11 }}
+              disabled={busy || rrCredits <= 0}
+              onClick={onRrSession}
+              title={rrCredits > 0
+                ? `Spend 1 R&R credit to jack in (${rrCredits} banked)`
+                : 'No R&R credits — bank one with a full-clear day or buy one in the Shop'}
+            >
+              <Icon name="play" size={12} /> JACK IN · 1 R&R
+            </button>
+          )}
+          {item.status === 'dropped' && (
+            <button
+              className="btn"
               style={{ padding: '6px 10px', fontSize: 11 }}
               disabled={busy}
-              onClick={() => onStatus('active')}
+              onClick={() => onStatus('backlog')}
+              title="Back to the queue"
             >
-              <Icon name="play" size={12} /> START
+              <Icon name="repeat" size={12} /> RE-QUEUE
             </button>
           )}
           {item.status !== 'done' && (
@@ -522,7 +555,7 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
           </label>
         )}
         {coverUrl && (
-          <img src={coverUrl} alt="" style={{ width: 36, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line)' }} />
+          <img src={coverUrl} alt="" style={{ width: 36, height: 52, objectFit: 'cover', border: '1px solid var(--line)' }} />
         )}
       </div>
 
@@ -553,9 +586,9 @@ function Empty({ children, color }: { children: React.ReactNode; color?: string 
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,

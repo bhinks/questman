@@ -19,81 +19,35 @@ interface Mission {
 }
 
 function DifficultyBadge({ difficulty }: { difficulty: Mission['difficulty'] }) {
-  const configs = {
-    easy: { color: 'var(--lime)', bg: 'rgba(67,255,166,0.1)', border: 'rgba(67,255,166,0.3)', label: 'EASY' },
-    medium: { color: 'var(--amber)', bg: 'rgba(255,194,75,0.1)', border: 'rgba(255,194,75,0.3)', label: 'MEDIUM' },
-    hard: { color: 'var(--red)', bg: 'rgba(255,77,109,0.1)', border: 'rgba(255,77,109,0.3)', label: 'HARD' }
-  };
-  
-  const config = configs[difficulty];
-  
   return (
-    <span
-      className="mono"
-      style={{
-        fontSize: 10,
-        padding: '3px 7px',
-        borderRadius: 5,
-        background: config.bg,
-        color: config.color,
-        border: `1px solid ${config.border}`,
-        letterSpacing: '0.08em'
-      }}
-    >
-      {config.label}
+    <span className={`ncx-stamp ${difficulty}`} style={{ flexShrink: 0 }}>
+      {difficulty.toUpperCase()}
     </span>
   );
 }
 
-function ProgressRing({ progress, size = 60, strokeWidth = 3 }: { 
-  progress: number; 
-  size?: number; 
-  strokeWidth?: number; 
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (progress / 100) * circumference;
-  
+function ProgressRing({ progress }: { progress: number }) {
+  const pct = Math.max(0, Math.min(100, progress));
+  const done = pct >= 100;
+
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="var(--panel-hi)"
-          strokeWidth={strokeWidth}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="var(--cyan)"
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, width: 96 }}>
+      <span className="ncx-val" style={{ fontSize: 16, color: done ? 'var(--lime)' : 'var(--cyan)' }}>
+        {Math.round(progress)}%
+      </span>
+      <div className="ncx-bar slim" style={{ width: '100%' }}>
+        <i
           style={{
-            transition: 'stroke-dashoffset 0.8s ease',
-            filter: 'drop-shadow(0 0 4px var(--cyan))'
+            width: `${pct}%`,
+            background: done
+              ? 'linear-gradient(90deg, color-mix(in srgb, var(--lime) 70%, #032), var(--lime))'
+              : 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))',
+            boxShadow: done
+              ? '0 0 10px color-mix(in srgb, var(--lime) 45%, transparent)'
+              : '0 0 10px rgba(var(--accent-rgb),0.45)',
           }}
         />
-      </svg>
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--text)'
-        }}
-        className="mono"
-      >
-        {Math.round(progress)}%
+        <span className="seg-mask" />
       </div>
     </div>
   );
@@ -103,71 +57,61 @@ function MissionCard({ mission }: { mission: Mission }) {
   const isCompleted = mission.progress >= 100;
   
   return (
-    <div 
+    <div
       className="panel"
       style={{
         padding: 20,
         position: 'relative',
-        border: isCompleted 
-          ? '1px solid var(--lime)' 
+        border: isCompleted
+          ? '1px solid color-mix(in srgb, var(--lime) 45%, transparent)'
           : '1px solid var(--line)',
         background: isCompleted
-          ? 'linear-gradient(180deg, rgba(67,255,166,0.06), rgba(67,255,166,0.02))'
+          ? 'linear-gradient(180deg, color-mix(in srgb, var(--lime) 6%, transparent), color-mix(in srgb, var(--lime) 2%, transparent))'
           : undefined
       }}
     >
       {/* Mission level badge */}
-      <div
+      <span
+        className="ncx-serial"
         style={{
           position: 'absolute',
-          top: -8,
+          top: 14,
           right: 16,
-          background: 'var(--panel-2)',
-          border: '1px solid var(--line-bright)',
-          borderRadius: 8,
-          padding: '4px 8px',
-          fontSize: 10,
-          color: 'var(--cyan)',
-          fontWeight: 600
+          color: 'rgba(var(--accent-rgb),0.65)'
         }}
-        className="mono"
       >
-        LVL {mission.level}
-      </div>
-      
+        LVL-{String(mission.level).padStart(2, '0')}
+      </span>
+
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
         {/* Mission icon */}
         <div
+          className="ncx-chip"
           style={{
             width: 44,
             height: 44,
-            borderRadius: 10,
-            background: isCompleted 
-              ? 'linear-gradient(135deg, var(--lime), var(--teal))'
-              : 'linear-gradient(135deg, var(--cyan), var(--violet))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: isCompleted
-              ? 'var(--glow-lime)'
-              : '0 4px 20px rgba(28,226,255,0.25)'
+            color: isCompleted ? 'var(--lime)' : 'var(--cyan)',
+            ...(isCompleted ? {
+              background: 'color-mix(in srgb, var(--lime) 10%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--lime) 35%, transparent)',
+            } : {})
           }}
         >
-          <Icon 
-            name={isCompleted ? 'check' : mission.icon} 
-            size={20} 
-            style={{ color: 'white' }} 
+          <Icon
+            name={isCompleted ? 'check' : mission.icon}
+            size={20}
           />
         </div>
         
         {/* Mission details */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ 
-              fontSize: 16, 
-              fontWeight: 600, 
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{
+              fontSize: 16,
+              fontWeight: 700,
               margin: 0,
+              fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
               color: isCompleted ? 'var(--lime)' : 'var(--text)'
             }}>
               {mission.title}
@@ -211,12 +155,11 @@ function MissionCard({ mission }: { mission: Mission }) {
         <div
           style={{
             position: 'absolute',
-            top: -1,
-            left: -1,
-            right: -1,
+            top: 0,
+            left: 0,
+            right: 0,
             height: 2,
-            background: 'linear-gradient(90deg, var(--lime), var(--teal))',
-            borderRadius: '10px 10px 0 0'
+            background: 'linear-gradient(90deg, var(--lime), var(--teal))'
           }}
         />
       )}
@@ -285,34 +228,37 @@ export function SavingsMissions({ analysis }: SavingsMissionsProps) {
       <div className="panel hud" style={{ padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
           <div
+            className="ncx-chip"
             style={{
               width: 48,
               height: 48,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, var(--lime), var(--teal))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: 'var(--glow-lime)'
+              color: 'var(--lime)',
+              background: 'color-mix(in srgb, var(--lime) 10%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--lime) 35%, transparent)'
             }}
           >
-            <Icon name="target" size={24} style={{ color: 'white' }} />
+            <Icon name="target" size={22} />
           </div>
-          
+
           <div>
-            <h2 style={{ 
-              fontSize: 24, 
-              fontWeight: 600, 
-              margin: 0, 
+            <h2 className="ncx-chroma" style={{
+              fontSize: 22,
+              fontWeight: 700,
+              margin: 0,
               marginBottom: 4,
-              fontFamily: 'var(--font-display)'
+              fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase'
             }}>
               Savings Missions
             </h2>
-            <div style={{ fontSize: 14, color: 'var(--text-dim)' }}>
-              Transform spending patterns into actionable missions
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+              transform spending patterns into actionable missions
             </div>
           </div>
+
+          <span className="ncx-serial" style={{ marginLeft: 'auto', alignSelf: 'flex-start' }}>
+            OPS-{String(missions.length).padStart(2, '0')}
+          </span>
         </div>
         
         <div style={{ 
@@ -322,33 +268,21 @@ export function SavingsMissions({ analysis }: SavingsMissionsProps) {
         }}>
           <div className="panel-inset" style={{ padding: 16, textAlign: 'center' }}>
             <div className="kicker" style={{ marginBottom: 8 }}>TOTAL POTENTIAL</div>
-            <div style={{ 
-              fontSize: 28, 
-              fontWeight: 700, 
-              color: 'var(--lime)' 
-            }} className="mono">
+            <div className="ncx-val" style={{ fontSize: 26, color: 'var(--lime)' }}>
               {fmtMoney(totalPotential)}
             </div>
           </div>
-          
+
           <div className="panel-inset" style={{ padding: 16, textAlign: 'center' }}>
             <div className="kicker" style={{ marginBottom: 8 }}>ACTIVE MISSIONS</div>
-            <div style={{ 
-              fontSize: 28, 
-              fontWeight: 700, 
-              color: 'var(--cyan)' 
-            }} className="mono">
+            <div className="ncx-val" style={{ fontSize: 26, color: 'var(--cyan)' }}>
               {missions.length}
             </div>
           </div>
-          
+
           <div className="panel-inset" style={{ padding: 16, textAlign: 'center' }}>
             <div className="kicker" style={{ marginBottom: 8 }}>AVG PROGRESS</div>
-            <div style={{ 
-              fontSize: 28, 
-              fontWeight: 700, 
-              color: 'var(--violet)' 
-            }} className="mono">
+            <div className="ncx-val" style={{ fontSize: 26, color: 'var(--violet)' }}>
               {Math.round(totalProgress)}%
             </div>
           </div>
@@ -358,6 +292,15 @@ export function SavingsMissions({ analysis }: SavingsMissionsProps) {
       {/* Mission cards */}
       {missions.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 2 }}>
+            <span
+              className="mono"
+              style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}
+            >
+              Mission Board
+            </span>
+            <span className="ncx-serial">// {missions.length} ACTIVE</span>
+          </div>
           {missions.map(mission => (
             <MissionCard key={mission.id} mission={mission} />
           ))}

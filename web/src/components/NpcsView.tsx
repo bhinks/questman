@@ -15,9 +15,9 @@ import { ConfirmDialog } from './ConfirmDialog';
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,
@@ -118,25 +118,24 @@ export function NpcsView() {
 
 function Header({ count, dark }: { count: number; dark: number }) {
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Icon name="heart" size={20} style={{ color: 'var(--magenta)' }} />
+    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="ncx-chip" style={{ color: 'var(--magenta)' }}>
+        <Icon name="flag" size={18} />
+      </div>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>Crew</h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+        <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+          Crew
+        </h2>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3 }}>
           STREET CONTACTS · FIXERS
         </div>
       </div>
-      <div
+      <span
         className="mono"
-        style={{
-          marginLeft: 'auto', fontSize: 11,
-          color: dark > 0 ? 'var(--red)' : 'var(--text-dim)',
-          padding: '4px 8px', background: 'var(--panel-2)',
-          borderRadius: 6, border: `1px solid ${dark > 0 ? 'rgba(255,77,90,0.4)' : 'var(--line)'}`,
-        }}
+        style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: dark > 0 ? 'var(--red)' : 'var(--text-dim)' }}
       >
         {dark} DARK · {count} TOTAL
-      </div>
+      </span>
     </div>
   );
 }
@@ -159,9 +158,9 @@ function NpcCard({
       className="panel"
       style={{
         padding: 14,
-        border: `1px solid ${sig.level === 'lost' ? 'rgba(255,77,90,0.4)' : 'var(--line)'}`,
+        border: `1px solid ${sig.level === 'lost' ? 'color-mix(in srgb, var(--red) 40%, transparent)' : 'var(--line)'}`,
         background: sig.level === 'lost'
-          ? 'linear-gradient(180deg, rgba(255,77,90,0.05), rgba(255,77,90,0.01))'
+          ? 'linear-gradient(180deg, color-mix(in srgb, var(--red) 5%, transparent), color-mix(in srgb, var(--red) 1%, transparent))'
           : undefined,
         display: 'flex', flexDirection: 'column', gap: 12,
         // Lost-signal contacts feel dimmer / decayed.
@@ -197,11 +196,11 @@ function NpcCard({
           title={npc.lastContactOn ? `Last contact: ${new Date(npc.lastContactOn).toLocaleDateString()}` : 'Never contacted'}
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            fontSize: 11, color: sig.color,
+            fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+            color: sig.color,
             padding: '4px 8px',
             background: `color-mix(in srgb, ${sig.color} 10%, transparent)`,
             border: `1px solid color-mix(in srgb, ${sig.color} 35%, transparent)`,
-            borderRadius: 6,
           }}
         >
           <Icon name={sig.level === 'lost' ? 'bell' : 'clock'} size={12} />
@@ -209,6 +208,7 @@ function NpcCard({
         </div>
 
         <button
+          key={`log-${logging}`}
           onClick={onToggleLog}
           className={logging ? 'btn' : 'btn btn-primary'}
           style={{ padding: '6px 10px', fontSize: 11 }}
@@ -246,7 +246,7 @@ function NpcCard({
 
       {recent.length > 0 && (
         <div className="panel-inset" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className="kicker" style={{ fontSize: 9 }}>CONTACT LOG</span>
+          <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>CONTACT LOG</span>
           {recent.slice(0, 5).map(i => <InteractionRow key={i.id} interaction={i} />)}
         </div>
       )}
@@ -261,7 +261,7 @@ function InteractionRow({ interaction: i }: { interaction: Interaction }) {
         {new Date(i.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
       </span>
       {i.planned && (
-        <span className="mono" style={{ fontSize: 9, color: 'var(--violet)', border: '1px solid color-mix(in srgb, var(--violet) 35%, transparent)', borderRadius: 4, padding: '1px 5px' }}>
+        <span className="ncx-stamp flat" style={{ fontSize: 8, color: 'var(--violet)' }}>
           PLANNED
         </span>
       )}
@@ -300,7 +300,7 @@ function LogContactForm({ npcId, onClose }: { npcId: string; onClose: () => void
 
   return (
     <div className="panel-inset" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <span className="kicker">LOG CONTACT</span>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>LOG CONTACT</span>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker">MINUTES</span>

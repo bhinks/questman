@@ -463,9 +463,16 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   const defaultBudget = isWeekend
     ? (settings?.weekendBudgetMin ?? 600)
     : (settings?.weekdayBudgetMin ?? 240);
-  const budgetMin = req.query.budget
+  // Time Dilation (Shop consumable): +2h planner budget for the day it was
+  // bought; ignored once the day rolls over.
+  const profile = await prisma.playerProfile.findUnique({
+    where: { userId }, select: { budgetBoostOn: true },
+  });
+  const boostActive = profile?.budgetBoostOn != null
+    && startOfLocalDay(profile.budgetBoostOn).getTime() === today.getTime();
+  const budgetMin = (req.query.budget
     ? Math.max(0, Number(req.query.budget))
-    : defaultBudget;
+    : defaultBudget) + (boostActive ? 120 : 0);
 
   const quests = await prisma.quest.findMany({
     where: { userId, questDate: today, status: 'pending' },
@@ -530,6 +537,7 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
 
   res.json({
     budgetMin,
+    budgetBoostMin: boostActive ? 120 : 0,
     isWeekend,
     plannedMin,
     totalEstMin,

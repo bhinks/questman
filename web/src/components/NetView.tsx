@@ -130,28 +130,23 @@ function Header({ newCount }: { newCount: number }) {
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
       <Icon name="eye" size={20} style={{ color: 'var(--violet)' }} />
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>
+        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>
           NET // DATA-SHADOW
         </h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--text-faint)', marginTop: 3 }}>
           the patterns your own data leaves behind
         </div>
       </div>
-      <div
-        className="mono"
+      <span
+        className="ncx-stamp flat"
         style={{
-          marginLeft: 'auto', fontSize: 11,
+          marginLeft: 'auto',
           color: newCount > 0 ? 'var(--cyan)' : 'var(--text-dim)',
-          padding: '4px 8px',
-          background: newCount > 0
-            ? 'color-mix(in srgb, var(--cyan) 10%, transparent)'
-            : 'var(--panel-2)',
-          borderRadius: 6,
-          border: `1px solid ${newCount > 0 ? 'color-mix(in srgb, var(--cyan) 40%, transparent)' : 'var(--line)'}`,
+          background: newCount > 0 ? 'rgba(var(--accent-rgb), 0.10)' : undefined,
         }}
       >
         {newCount > 0 ? `${newCount} FRESH` : 'NO NEW SIGNAL'}
-      </div>
+      </span>
     </div>
   );
 }
@@ -161,9 +156,9 @@ function SectionLabel({
 }: { icon: string; color: string; title: string; sub: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 2 }}>
-      <Icon name={icon} size={16} style={{ color }} />
-      <span className="kicker" style={{ color }}>{title}</span>
-      <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>· {sub}</span>
+      <Icon name={icon} size={14} style={{ color }} />
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color }}>{title}</span>
+      <span className="ncx-serial">{sub}</span>
     </div>
   );
 }
@@ -222,7 +217,7 @@ function InsightCard({ insight }: { insight: Insight }) {
           alignSelf: 'flex-start',
           fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
           color: 'var(--text-faint)',
-          padding: '2px 7px', borderRadius: 5,
+          padding: '2px 7px',
           border: '1px dashed var(--line-2)',
           textTransform: 'uppercase',
         }}
@@ -267,7 +262,6 @@ function InsightCard({ insight }: { insight: Insight }) {
             padding: '8px 10px',
             background: `color-mix(in srgb, ${confColor} 8%, transparent)`,
             border: `1px solid color-mix(in srgb, ${confColor} 25%, transparent)`,
-            borderRadius: 'var(--r-sm)',
           }}
         >
           <Icon name="spark" size={14} style={{ color: confColor, flexShrink: 0, marginTop: 1 }} />
@@ -334,7 +328,7 @@ function PersonaControl({
   return (
     <div className="panel hud" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span className="kicker">PERSONA</span>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>PERSONA</span>
         <button
           className="btn btn-ghost"
           disabled={busy}
@@ -343,9 +337,6 @@ function PersonaControl({
           style={{
             marginLeft: 'auto', padding: '4px 12px', fontSize: 11,
             color: data.enabled ? 'var(--lime)' : 'var(--text-faint)',
-            borderColor: data.enabled
-              ? 'color-mix(in srgb, var(--lime) 45%, transparent)'
-              : 'var(--line)',
           }}
         >
           <Icon name="bolt" size={12} /> {data.enabled ? 'ONLINE' : 'MUTED'}
@@ -445,14 +436,10 @@ function MessageLog({ messages }: { messages: HandlerMessage[] }) {
 function Chip({ children, color }: { children: React.ReactNode; color: string }) {
   return (
     <span
-      className="mono"
+      className="ncx-stamp flat"
       style={{
-        flexShrink: 0,
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
-        color,
-        padding: '2px 7px', borderRadius: 5,
+        flexShrink: 0, color,
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
       }}
     >
       {children}

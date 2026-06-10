@@ -155,6 +155,10 @@ export interface PlayerSnapshot {
   skipTokens: number;            // free skips remaining
   rerollTokens: number;          // quest rerolls remaining
   rrCredits: number;             // R&R downtime credits (activate backlog media)
+  // Night Market consumables.
+  streakShields: number;         // banked shields (each absorbs one missed day)
+  boosterUntil: string | null;   // Overdrive expiry — 2× eddies while in the future
+  budgetBoostOn: string | null;  // Time Dilation day (+2h planner budget)
   cosmetics: string[];           // owned cosmetic theme keys
   equippedTheme: string | null;  // active cosmetic theme key
   // World mechanics: daily energy/battery (only present on GET /api/player).
@@ -173,7 +177,7 @@ export interface PlayerSnapshot {
 // ---- economy & rewards: shop + achievements ------------------------
 
 export type ShopCategory =
-  | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate';
+  | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable';
 
 export interface ShopItem {
   key: string;
@@ -313,6 +317,8 @@ export interface PlanQuest {
 }
 export interface DayPlan {
   budgetMin: number;
+  /** Time Dilation: extra minutes already folded into budgetMin (0 = none). */
+  budgetBoostMin?: number;
   isWeekend: boolean;
   plannedMin: number;
   totalEstMin: number;
@@ -584,6 +590,16 @@ export interface QuestChain {
   steps: ChainStep[];
   createdAt: string;
 }
+
+// ---- Night City display calibration (per-user, design handoff) -----------
+
+export interface DisplaySettings {
+  displayCut: number;     // panel corner clip 0–28px
+  displayChroma: number;  // chroma-split offset 0–4px
+  displayCrt: number;     // CRT intensity % 0–100 (→ scanline/sweep alphas)
+  tickerEnabled: boolean; // topbar handler ticker marquee
+}
+export interface SettingsResponse { settings: DisplaySettings; }
 
 // ---- intelligence layer (phase 6): Handler, insights, weekly debrief -----
 

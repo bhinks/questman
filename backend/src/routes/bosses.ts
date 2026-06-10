@@ -177,11 +177,14 @@ export async function dealBossDamageForLinkedProject(
 
 // --- list ---------------------------------------------------------------
 
-/** GET /api/bosses — active first, then defeated/abandoned. */
+/** GET /api/bosses — active first, then defeated/abandoned. Includes each
+ *  boss's last 2 hits so the dossier mini hit-log renders without a per-boss
+ *  detail fetch. */
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const bosses = await prisma.boss.findMany({
     where: { userId: req.user!.id },
     orderBy: { createdAt: 'desc' },
+    include: { logs: { take: 2, orderBy: { createdAt: 'desc' } } },
   });
 
   // Active first, then everything else (most-recently-created within each).

@@ -83,7 +83,7 @@ export function RecurringList({ kind }: Props) {
         ? <HabitForm kind={kind} moduleId={moduleId} onClose={() => setCreating(false)} />
         : (
           <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setCreating(true)}>
-            + NEW {kind.toUpperCase()}
+            <Icon name="plus" size={13} /> NEW {kind.toUpperCase()}
           </button>
         )
       )}
@@ -123,27 +123,31 @@ export function RecurringList({ kind }: Props) {
 }
 
 function Header({ kind, count, dueCount }: { kind: 'habit' | 'chore'; count: number; dueCount: number }) {
-  const label = kind === 'chore' ? 'Chores' : 'Habits';
+  const label = kind === 'chore' ? 'CHORES' : 'HABITS';
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Icon name={kind === 'chore' ? 'list' : 'check'} size={20} style={{ color: 'var(--cyan)' }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>{label}</h2>
-      <div
-        className="mono"
-        style={{
-          marginLeft: 'auto', fontSize: 11, color: 'var(--text-dim)',
-          padding: '4px 8px', background: 'var(--panel-2)',
-          borderRadius: 6, border: '1px solid var(--line)',
-        }}
-      >
-        {dueCount} DUE · {count} TOTAL
+    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
+        <Icon name={kind === 'chore' ? 'list' : 'check'} size={18} />
       </div>
+      <div>
+        <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>{label}</h2>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3, textTransform: 'uppercase' }}>
+          {kind === 'chore' ? 'MAINTENANCE ROTATION' : 'DAILY PROTOCOLS'}
+        </div>
+      </div>
+      <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
+        {dueCount} DUE · {count} TOTAL
+      </span>
     </div>
   );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="kicker" style={{ paddingLeft: 4 }}>{children}</div>;
+  return (
+    <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', paddingLeft: 4 }}>
+      {children}
+    </div>
+  );
 }
 
 function Row({
@@ -155,7 +159,7 @@ function Row({
       className="panel"
       style={{
         padding: 14,
-        border: done ? '1px solid var(--lime)' : '1px solid var(--line)',
+        borderColor: done ? 'var(--lime)' : undefined,
         background: done
           ? 'linear-gradient(180deg, rgba(67,255,166,0.06), rgba(67,255,166,0.02))'
           : undefined,
@@ -167,18 +171,17 @@ function Row({
         aria-label={done ? `Uncheck ${habit.title}` : `Check ${habit.title}`}
         style={{
           width: 32, height: 32, flexShrink: 0,
-          borderRadius: 8,
+          clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
           border: done
             ? '1px solid var(--lime)'
             : '1px solid var(--line-bright)',
           background: done
             ? 'linear-gradient(135deg, var(--lime), var(--teal))'
             : 'var(--panel-2)',
-          color: done ? 'white' : 'var(--text-dim)',
+          color: done ? '#03161c' : 'var(--text-dim)',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: done ? 'var(--glow-lime)' : 'none',
-          transition: 'all 0.15s ease',
+          transition: 'background .15s, border-color .15s, color .15s',
         }}
       >
         {done && <Icon name="check" size={16} />}
@@ -204,14 +207,14 @@ function Row({
         <div
           title="Weather-aware: only surfaces as a quest when conditions fit"
           style={{
+            display: 'flex', alignItems: 'center',
             fontSize: 11, color: 'var(--cyan)',
             padding: '4px 8px',
-            background: 'color-mix(in srgb, var(--cyan) 8%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--cyan) 30%, transparent)',
-            borderRadius: 6,
+            background: 'rgba(var(--accent-rgb),0.08)',
+            border: '1px solid rgba(var(--accent-rgb),0.3)',
           }}
         >
-          🌤
+          <Icon name="eye" size={12} />
         </div>
       )}
 
@@ -225,10 +228,9 @@ function Row({
             padding: '4px 8px',
             background: 'color-mix(in srgb, var(--violet) 8%, transparent)',
             border: '1px solid color-mix(in srgb, var(--violet) 30%, transparent)',
-            borderRadius: 6,
           }}
         >
-          ⏱ {habit.estMinutes}m
+          <Icon name="clock" size={12} /> {habit.estMinutes}m
         </div>
       )}
 
@@ -241,7 +243,6 @@ function Row({
             padding: '4px 8px',
             background: 'rgba(255,194,75,0.08)',
             border: '1px solid rgba(255,194,75,0.3)',
-            borderRadius: 6,
           }}
         >
           <Icon name="flame" size={12} />
@@ -252,7 +253,7 @@ function Row({
       <div
         className="mono"
         style={{
-          fontSize: 11, color: 'var(--text-faint)',
+          fontSize: 11, color: 'var(--lime)',
           minWidth: 40, textAlign: 'right',
         }}
       >
@@ -449,7 +450,8 @@ function HabitForm({
             onChange={e => setOutdoor(e.target.checked)}
             style={{ accentColor: 'var(--cyan)', width: 16, height: 16 }}
           />
-          <span style={{ fontSize: 13, color: 'var(--text)' }}>🌤 Outdoor (weather-aware)</span>
+          <Icon name="eye" size={14} style={{ color: 'var(--cyan)' }} />
+          <span style={{ fontSize: 13, color: 'var(--text)' }}>Outdoor (weather-aware)</span>
         </label>
       </div>
 
@@ -506,7 +508,7 @@ function DayOfWeekPicker({
               style={{
                 width: 34, height: 34,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: 8,
+                clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
                 cursor: 'pointer',
                 fontSize: 12, fontWeight: 700,
                 border: on
@@ -515,9 +517,8 @@ function DayOfWeekPicker({
                 background: on
                   ? 'linear-gradient(135deg, var(--cyan), var(--violet))'
                   : 'var(--panel-2)',
-                color: on ? 'white' : 'var(--text-dim)',
-                boxShadow: on ? 'var(--glow-cyan)' : 'none',
-                transition: 'all 0.15s ease',
+                color: on ? '#03161c' : 'var(--text-dim)',
+                transition: 'background .15s, border-color .15s, color .15s',
               }}
             >
               {letter}
@@ -606,11 +607,13 @@ function Empty({ children, color }: { children: React.ReactNode; color?: string 
   );
 }
 
+// Chamfered field, mirrors .ncx-input (kept inline so width overrides stay easy).
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--panel-2)',
+  background: '#070811',
   border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
+  borderRadius: 0,
+  clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
   fontSize: 13,

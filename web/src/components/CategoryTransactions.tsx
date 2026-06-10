@@ -82,36 +82,28 @@ export function CategoryTransactions({ category, transactions, onClose }: Catego
     <div className="panel hud" style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, var(--cyan), var(--lime))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span style={{ color: 'white', fontSize: 16, fontWeight: 600 }}>🧾</span>
+        <div className="ncx-chip" style={{ width: 40, height: 40, color: 'var(--cyan)' }}>
+          <Icon name="file" size={18} />
         </div>
         <div style={{ minWidth: 0 }}>
           <h3
+            className="ncx-chroma"
             style={{
               fontSize: 18,
-              fontWeight: 600,
+              fontWeight: 700,
               margin: 0,
               color: 'var(--text)',
               fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
             }}
           >
             {category}
           </h3>
-          <div
-            className="mono"
-            style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}
-          >
-            {items.length} transactions · ${total.toLocaleString()}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
+            <span className="ncx-serial">{items.length} TXN</span>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              ${total.toLocaleString()}
+            </span>
           </div>
         </div>
 
@@ -126,31 +118,34 @@ export function CategoryTransactions({ category, transactions, onClose }: Catego
         >
           <span
             className="mono"
-            style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.08em' }}
+            style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.26em', textTransform: 'uppercase' }}
           >
             GROUP BY
           </span>
-          <div style={{ display: 'flex', border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
-            {groupButtons.map(btn => (
-              <button
-                key={btn.value}
-                onClick={() => setGroupBy(btn.value)}
-                className="mono"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: 11,
-                  border: 'none',
-                  cursor: 'pointer',
-                  letterSpacing: '0.05em',
-                  background: groupBy === btn.value ? 'var(--cyan)' : 'var(--panel-2)',
-                  color: groupBy === btn.value ? '#06060c' : 'var(--text-dim)',
-                  fontWeight: groupBy === btn.value ? 600 : 400,
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {btn.label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', border: '1px solid var(--line-2)', background: '#070811' }}>
+            {groupButtons.map(btn => {
+              const on = groupBy === btn.value;
+              return (
+                <button
+                  key={`${btn.value}-${on ? 'on' : 'off'}`}
+                  onClick={() => setGroupBy(btn.value)}
+                  className="mono"
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: 10,
+                    border: 'none',
+                    cursor: 'pointer',
+                    letterSpacing: '0.1em',
+                    background: on ? 'rgba(var(--accent-rgb),0.18)' : 'transparent',
+                    color: on ? 'var(--cyan)' : 'var(--text-dim)',
+                    fontWeight: on ? 700 : 400,
+                    transition: 'background .15s, color .15s',
+                  }}
+                >
+                  {btn.label}
+                </button>
+              );
+            })}
           </div>
           <button
             onClick={onClose}
@@ -170,11 +165,10 @@ export function CategoryTransactions({ category, transactions, onClose }: Catego
         </div>
       ) : (
         <div
+          className="panel-inset"
           style={{
             maxHeight: 460,
             overflow: 'auto',
-            border: '1px solid var(--line)',
-            borderRadius: 'var(--r)',
           }}
         >
           {groups.map(group => (
@@ -196,15 +190,18 @@ export function CategoryTransactions({ category, transactions, onClose }: Catego
                 >
                   <span
                     className="mono"
-                    style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}
+                    style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, letterSpacing: '0.06em' }}
                   >
                     {group.label}
                   </span>
-                  <span
-                    className="mono"
-                    style={{ fontSize: 11, color: 'var(--text-dim)' }}
-                  >
-                    {group.items.length}tx · ${group.total.toLocaleString()}
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span className="ncx-serial">{group.items.length} TXN</span>
+                    <span
+                      className="mono"
+                      style={{ fontSize: 11, color: 'var(--text-dim)' }}
+                    >
+                      ${group.total.toLocaleString()}
+                    </span>
                   </span>
                 </div>
               )}

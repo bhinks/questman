@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx tsc)",
+      "Bash(docker compose logs *)",
+      "Bash(docker compose ps *)",
+      "Bash(npx prisma migrate status)"
+    ]
+  }
+}

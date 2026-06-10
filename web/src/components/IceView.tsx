@@ -93,8 +93,11 @@ export function IceView() {
 
       {archived.length > 0 && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="kicker" style={{ paddingLeft: 4, color: 'var(--text-faint)' }}>
-            OFFLINE · {archived.length}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 4 }}>
+            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+              OFFLINE
+            </span>
+            <span className="ncx-serial">{archived.length} ARCHIVED</span>
           </div>
           {archived.map(ag => (
             <IceCard
@@ -152,26 +155,23 @@ function Header({ total, breached }: { total: number; breached: number }) {
     <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
       <Icon name="shield" size={20} style={{ color: allSecure ? 'var(--cyan)' : 'var(--red)' }} />
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: 'var(--font-display)' }}>ICE</h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>ICE</h2>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--text-faint)', marginTop: 3 }}>
           intrusion countermeasures · log only slips
         </div>
       </div>
-      <div
-        className="mono"
+      <span className="ncx-serial" style={{ marginLeft: 'auto' }}>ICE-{String(total).padStart(2, '0')}</span>
+      <span
+        className="ncx-stamp flat"
         style={{
-          marginLeft: 'auto', fontSize: 11,
           color: allSecure ? 'var(--cyan)' : 'var(--red)',
-          padding: '4px 8px',
           background: allSecure
-            ? 'color-mix(in srgb, var(--cyan) 8%, transparent)'
+            ? 'rgba(var(--accent-rgb), 0.08)'
             : 'color-mix(in srgb, var(--red) 10%, transparent)',
-          borderRadius: 6,
-          border: `1px solid ${allSecure ? 'var(--line)' : 'color-mix(in srgb, var(--red) 40%, transparent)'}`,
         }}
       >
         {allSecure ? `${total} SECURE` : `${breached} BREACHED`}
-      </div>
+      </span>
     </div>
   );
 }
@@ -206,15 +206,14 @@ function IceCard({
         background: breached
           ? 'linear-gradient(180deg, color-mix(in srgb, var(--red) 9%, transparent), color-mix(in srgb, var(--red) 3%, transparent))'
           : undefined,
-        boxShadow: breached ? '0 0 18px color-mix(in srgb, var(--red) 22%, transparent)' : undefined,
+        // Inset glow: the panel's clip-path would swallow an outer shadow.
+        boxShadow: breached ? 'inset 0 0 36px color-mix(in srgb, var(--red) 8%, transparent)' : undefined,
       }}
     >
       {/* sigil */}
-      <div style={{
-        width: 46, height: 46, borderRadius: 10, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      <div className="ncx-chip" style={{
         background: `color-mix(in srgb, ${accent} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${accent} 35%, transparent)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 35%, transparent)`,
         color: accent,
       }}>
         <Icon name={(ag.icon as any) || (breached ? 'lock' : 'shield')} size={22} />
@@ -225,14 +224,9 @@ function IceCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{ag.title}</span>
           <span
-            className="mono"
+            className={`ncx-stamp flat ${ag.difficulty}`}
             title="Stakes"
-            style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
-              color: 'var(--text-faint)',
-              padding: '2px 6px', borderRadius: 5,
-              border: '1px solid var(--line)', textTransform: 'uppercase',
-            }}
+            style={{ fontSize: 8.5, padding: '2px 7px' }}
           >
             {DIFFICULTY_LABEL[ag.difficulty]} RISK
           </span>
@@ -241,9 +235,12 @@ function IceCard({
         {breached ? (
           <div
             className="mono"
-            style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--red)', textTransform: 'uppercase' }}
+            style={{
+              fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--red)',
+              textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6,
+            }}
           >
-            ⚠ BREACHED TODAY — defenses down
+            <Icon name="bolt" size={12} /> BREACHED TODAY — defenses down
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -271,16 +268,13 @@ function IceCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         {!archived && (
           <button
-            className="btn"
+            className="ncx-btn danger"
             disabled={busy || breached}
             onClick={onBreach}
             title={breached ? 'Already breached today' : 'Log a slip for today'}
             style={{
               padding: '8px 16px', fontSize: 12, fontWeight: 700, letterSpacing: '0.06em',
-              color: breached ? 'var(--text-faint)' : 'var(--red)',
-              borderColor: breached ? 'var(--line)' : 'color-mix(in srgb, var(--red) 50%, transparent)',
-              background: breached ? undefined : 'color-mix(in srgb, var(--red) 10%, transparent)',
-              cursor: breached ? 'default' : 'pointer',
+              color: breached ? 'var(--text-faint)' : undefined,
             }}
           >
             <Icon name="bolt" size={13} /> {breached ? 'BREACHED' : 'BREACH'}
@@ -330,16 +324,16 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
           <span className="kicker">DEFEND AGAINST</span>
           <input
             autoFocus
+            className="ncx-input"
             placeholder="e.g. No doomscrolling after midnight"
             value={title}
             onChange={e => setTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && title.trim() && !create.isPending) create.mutate(); }}
-            style={inputStyle}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker">RISK</span>
-          <select value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)} style={inputStyle}>
+          <select className="ncx-input" value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)}>
             <option value="easy">Low</option>
             <option value="medium">Medium</option>
             <option value="hard">High</option>
@@ -372,14 +366,3 @@ function Empty({ children, color }: { children: React.ReactNode; color?: string 
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: '8px 12px',
-  background: 'var(--panel-2)',
-  border: '1px solid var(--line-2)',
-  borderRadius: 'var(--r-sm)',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 13,
-  outline: 'none',
-};
