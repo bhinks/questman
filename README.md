@@ -5,6 +5,10 @@ finance, workouts, chores, habits, projects, media consumption, daily vitals,
 and social connections. Self-hosted, single-user, dockerized with a cyberpunk 
 aesthetic. Short for *Quest Manager*, with a nod to the Walkman.
 
+![The Today board — priority contract, day-planner ledger, weather scan, power cell, and session log](docs/screenshots/today.png)
+*The TODAY board: the day's generated quests ranked by the planner, an AI Handler
+briefing, weather-aware scheduling for outdoor chores, and the live session log.*
+
 ## Quick start
 
 1. Copy `.env.example` to `.env` and fill in `JWT_SECRET` (use `openssl rand -base64 48`).
@@ -41,6 +45,17 @@ aesthetic. Short for *Quest Manager*, with a nod to the Walkman.
 - Cross-domain insights and pattern analysis
 - Weekly retrospective debriefs
 
+## Screenshots
+
+| | |
+|:--|:--|
+| ![Focus chamber — distraction-free deep-work timer](docs/screenshots/focus.png) **Focus Chamber** — jack in from anywhere for a distraction-free run: count up open-ended, or count down a 15/25/40/55-min limit. Sessions persist and roll up into actual-time-spent per project, habit, chore, or workout. | ![Night Market shop](docs/screenshots/shop.png) **Night Market** — sink your eddies into burnout-relief tokens, consumables, loot crates, and cosmetics: 15 neon skins, display fonts, ambient FX, and focus-timer styles. |
+| ![Today board reskinned with the Synthwave theme](docs/screenshots/today-synthwave.png) **Live reskins** — every purchased skin remaps the whole HUD's accent palette on equip (Synthwave shown). | ![Finance dashboard](docs/screenshots/finance.png) **The Vault** — CSV/Excel transaction import with auto-categorization, monthly burn trends, budgets, bills, and recurring-drain detection. |
+
+![Progress page — XP velocity, per-module XP, activity grid, data-shard ledger](docs/screenshots/progress.png)
+*Street Cred: XP velocity, per-module lifetime XP, the activity grid, and the
+immutable data-shard ledger every grant is written to.*
+
 ## Layout
 
 | Dir | What |
@@ -61,6 +76,11 @@ docker compose down -v         # stop + wipe the SQLite volume (fresh slate)
 
 Dev mode (without Docker): `npm run dev` in `backend/` and `web/`.
 Backend on `:3001`, Vite on `:5173`. App at `http://localhost:5173`.
+
+Want something to click around in? `npm run db:seed` in `backend/` creates a
+demo account (`demo@questman.app` / `demo123`) with sample data — the same
+account the screenshots above use (dressed up via
+`backend/src/scripts/dress-readme-demo.ts`).
 
 ## Finance Module
 
