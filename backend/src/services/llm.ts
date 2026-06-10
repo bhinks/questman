@@ -47,16 +47,21 @@ export interface AiSettings {
   aiTokensUsedOn: Date | null;
 }
 
-/** Mirrors the schema defaults — used when a user has no settings row yet. */
+/**
+ * Mirrors the schema defaults — used when a user has no settings row yet.
+ * Brent's call (2026-06-10): AI is fully OPT-IN. Master breaker, both
+ * subsystems, and every data grant start OFF/SEALED — a fresh install makes
+ * zero LLM calls and shares zero data until the user enables each layer.
+ */
 export const AI_DEFAULTS: AiSettings = {
-  aiEnabled: true,
-  aiQuestsEnabled: true,
-  handlerEnabled: true,
+  aiEnabled: false,
+  aiQuestsEnabled: false,
+  handlerEnabled: false,
   handlerPersona: 'rogue_ai',
-  aiAccessFinance: true,
-  aiAccessHealth: true,
-  aiAccessSocial: true,
-  aiAccessCalendar: false, // never flowed to the AI pre-grant — off preserves that
+  aiAccessFinance: false,
+  aiAccessHealth: false,
+  aiAccessSocial: false,
+  aiAccessCalendar: false,
   aiProvider: 'anthropic',
   aiModelQuests: null,
   aiModelHandler: null,

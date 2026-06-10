@@ -100,20 +100,23 @@ model UserSettings {
   // character that narrates the day (Brent picked "sardonic rogue AI").
   // handlerEnabled gates the daily-rundown/debrief narration entirely.
   handlerPersona     String  @default("rogue_ai") // "rogue_ai"|"fixer"|"ripperdoc"
-  handlerEnabled     Boolean @default(true)
+  handlerEnabled     Boolean @default(false)
 
   // AI Calibration (SYS//CAL): the user owns every AI decision. AI is flavor,
   // never load-bearing — everything below only narrows what the optional LLM
   // layer may do and see. aiEnabled is the master breaker: off = zero LLM
   // calls anywhere. The access grants control which data domains may be sent
   // to the model (quest candidates, digest lines, insight re-voicing).
-  aiEnabled          Boolean @default(true)
-  aiQuestsEnabled    Boolean @default(true)  // AI-selected + themed daily quests
-  aiAccessFinance    Boolean @default(true)  // Vault: transactions, budgets, bills
-  aiAccessHealth     Boolean @default(true)  // Vitals + Workouts
-  aiAccessSocial     Boolean @default(true)  // Social: contacts/NPCs
-  // Calendar defaults SEALED: unlike the three above, it never flowed to
-  // the AI before this grant existed, so off preserves prior behavior.
+  //
+  // Brent's call (2026-06-10): EVERYTHING here defaults OFF/SEALED. AI is
+  // fully opt-in at every layer — a fresh install makes zero LLM calls and
+  // shares zero data until the user flips the master breaker, enables the
+  // subsystems they want, and opens grants domain by domain.
+  aiEnabled          Boolean @default(false)
+  aiQuestsEnabled    Boolean @default(false) // AI-selected + themed daily quests
+  aiAccessFinance    Boolean @default(false) // Vault: transactions, budgets, bills
+  aiAccessHealth     Boolean @default(false) // Vitals + Workouts
+  aiAccessSocial     Boolean @default(false) // Social: contacts/NPCs
   aiAccessCalendar   Boolean @default(false) // ICS agenda: counts, times, free/busy
   aiProvider         String  @default("anthropic") // "anthropic" | "ollama"
   aiModelQuests      String?                 // cloud model override (null = server default)

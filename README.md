@@ -13,7 +13,8 @@ briefing, weather-aware scheduling for outdoor chores, and the live session log.
 
 1. Copy `.env.example` to `.env` and fill in `JWT_SECRET` (use `openssl rand -base64 48`).
    Optionally set `HUB_USER_EMAIL` / `HUB_USER_PASSWORD` to provision your account,
-   and `ANTHROPIC_API_KEY` to enable Claude-themed daily quests.
+   and `ANTHROPIC_API_KEY` if you plan to turn on the AI features (they ship
+   disabled; enable them in-app under SYS // CALIBRATION).
 2. `docker compose up -d --build`
 3. Open `http://localhost:8080`.
 
@@ -48,9 +49,10 @@ nothing without your say-so) is covered in [What the AI sees](#what-the-ai-sees)
 - Claude-powered quest theming and narrative
 - Cross-domain insights and pattern analysis
 - Weekly retrospective debriefs
-- **Fully optional and user-governed**: the AI Calibration panel (SYS // CALIBRATION)
-  has a master kill-switch, per-feature toggles, and per-domain data-access grants
-  (finance / health / contacts / calendar) — sealed domains are never sent to any
+- **Off by default, opt-in at every layer**: the AI Calibration panel
+  (SYS // CALIBRATION) has a master kill-switch, per-feature toggles, and
+  per-domain data-access grants (finance / health / contacts / calendar) —
+  all of them start disabled, and sealed domains are never sent to any
   model. Details: [What the AI sees](#what-the-ai-sees)
 - Bring your own brain: Anthropic cloud (per-tier model selection) or a local
   LLM via [Ollama](https://ollama.com), plus a configurable daily token cap
@@ -180,20 +182,27 @@ unreachable — the app never blocks on an external feed.
 
 ## What the AI sees
 
-Nothing, unless you let it. The master switch in SYS // CALIBRATION kills
-every model call; below it, per-domain grants control what may be included
-in prompts. The AI only ever receives **server-computed summaries** — it
-never reads tables, files, or raw history, and it cannot mint XP or eddies.
+**Nothing, by default.** Every AI layer ships disabled: the master switch is
+off, both AI features (quest synthesis, the Handler) are off, and all four
+data-access grants are sealed. A fresh install makes zero LLM calls and
+shares zero data. To use AI you opt in deliberately, in SYS // CALIBRATION:
+
+1. Flip the **AI SYSTEMS** master breaker on,
+2. enable the features you want (**Quest Synthesis**, **Handler Uplink**),
+3. open the data grants you're comfortable with — domain by domain.
+
+Even fully enabled, the AI only ever receives **server-computed summaries**
+— it never reads tables, files, or raw history, and it cannot mint XP or
+eddies.
 
 | Grant | Default | When OPEN, prompts may include |
 |---|---|---|
-| **Vault** (finance) | open | wasteful-pattern summaries ("subscription, ~$45"), budget/bill reminder candidates, weekly spend total + top category totals. Never raw transactions or imports. |
-| **Biometrics** (health) | open | vitals/workout quest prompts, energy tier, weekly sleep/mood averages + weight delta, workout count. Never full metric history. |
-| **Contacts** (social) | open | the most-neglected contact's name + days since contact, "reach out" candidates. |
-| **Grid Schedule** (calendar) | **sealed** | commitment count, next start time, free/busy minutes. Event titles: never, even when open. |
+| **Vault** (finance) | sealed | wasteful-pattern summaries ("subscription, ~$45"), budget/bill reminder candidates, weekly spend total + top category totals. Never raw transactions or imports. |
+| **Biometrics** (health) | sealed | vitals/workout quest prompts, energy tier, weekly sleep/mood averages + weight delta, workout count. Never full metric history. |
+| **Contacts** (social) | sealed | the most-neglected contact's name + days since contact, "reach out" candidates. |
+| **Grid Schedule** (calendar) | sealed | commitment count, next start time, free/busy minutes. Event titles: never, even when open. |
 
 Provider choice (Anthropic cloud vs. local [Ollama](https://ollama.com)) and
 the daily token cap apply on top — at the cap, AI yields to the deterministic
-fallbacks until midnight. With the master switch off, or no provider
-available, every feature still works; quests just use rule-based titles and
-the Handler goes quiet.
+fallbacks until midnight. With everything off (the default), every feature
+still works; quests use rule-based titles and the Handler stays quiet.

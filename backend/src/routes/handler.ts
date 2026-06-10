@@ -121,7 +121,7 @@ router.get('/persona', asyncHandler(async (req: AuthRequest, res) => {
   const ownedKeys = parseCosmetics(profile?.cosmetics);
   res.json({
     persona: settings?.handlerPersona ?? 'rogue_ai',
-    enabled: settings?.handlerEnabled ?? true,
+    enabled: settings?.handlerEnabled ?? false, // AI is opt-in — off until enabled
     options: PERSONA_OPTIONS.map(o => ({
       ...o,
       owned: o.free || ownedKeys.includes(`persona_${o.key}`),
