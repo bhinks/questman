@@ -31,6 +31,8 @@ interface AppShellProps {
   onTabChange: (tab: string) => void;
   children: React.ReactNode;
   onUpload: () => void;
+  /** Open the FOCUS CHAMBER (arbitrary pomodoro — no preselected target). */
+  onJackIn: () => void;
 }
 
 type NavItem = [id: string, label: string, icon: string];
@@ -84,7 +86,7 @@ function Clock() {
   );
 }
 
-export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShellProps) {
+export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn }: AppShellProps) {
   const qc = useQueryClient();
   const { user, logout } = useAuth();
   const [uplink, setUplink] = useState(true);
@@ -236,6 +238,15 @@ export function AppShell({ activeTab, onTabChange, children, onUpload }: AppShel
                 }}
               />
               <Clock />
+              {/* JACK IN — start an arbitrary focus run from anywhere. */}
+              <button
+                className="btn btn-primary"
+                style={{ padding: '7px 14px', fontSize: 10.5 }}
+                onClick={onJackIn}
+                title="Jack in — open the focus chamber"
+              >
+                <Icon name="zap" size={12} /> JACK IN
+              </button>
               <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
                 <Icon name="upload" size={15} />
               </button>

@@ -20,7 +20,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
-import { SHOP_ITEMS, ShopItem, LootDrop, COSMETIC_THEME_KEYS, FONT_KEYS, FX_KEYS } from '../services/shopCatalog';
+import { SHOP_ITEMS, ShopItem, LootDrop, COSMETIC_THEME_KEYS, FONT_KEYS, FX_KEYS, TIMER_KEYS } from '../services/shopCatalog';
 import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
@@ -78,9 +78,9 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
       const themeKey = item.payload?.themeKey as string | undefined;
       return { ...item, owned: themeKey ? owned.has(themeKey) : false };
     }
-    // font/fx/persona ownership keys are prefixed and equal the item key
-    // ('font_orbitron', 'fx_rain', 'persona_drill').
-    if (item.category === 'font' || item.category === 'fx' || item.category === 'persona') {
+    // font/fx/persona/timer ownership keys are prefixed and equal the item
+    // key ('font_orbitron', 'fx_rain', 'persona_drill', 'timer_flip').
+    if (item.category === 'font' || item.category === 'fx' || item.category === 'persona' || item.category === 'timer') {
       return { ...item, owned: owned.has(item.key) };
     }
     return { ...item };
@@ -264,6 +264,17 @@ async function applyGrant(
       });
       return { grant: { fxKey }, message: `Ambient FX unlocked + equipped: ${item.name}` };
     }
+    case 'timer': {
+      // Owned key is 'timer_<key>' (== the catalog item key). Auto-equips.
+      const timerKey = item.payload?.timerKey as string;
+      const ownKey = `timer_${timerKey}`;
+      if (owned.includes(ownKey)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, ownKey]), equippedTimer: timerKey },
+      });
+      return { grant: { timerKey }, message: `Timer style unlocked + equipped: ${item.name}` };
+    }
     case 'loot_crate': {
       const table = (item.payload?.table as LootDrop[] | undefined) ?? [];
       const drop = rollLoot(table, owned);
@@ -320,10 +331,11 @@ const equipSchema = z.object({
   themeKey: z.string().max(100).nullable().optional(),
   fontKey: z.string().max(100).nullable().optional(),
   fxKey: z.string().max(100).nullable().optional(),
+  timerKey: z.string().max(100).nullable().optional(),
 });
 
 /**
- * POST /equip { themeKey? | fontKey? | fxKey? }
+ * POST /equip { themeKey? | fontKey? | fxKey? | timerKey? }
  *
  * Set/clear an equipped cosmetic slot. Omitted keys are left untouched;
  * an explicit `null` clears the slot. For the theme slot, 'default' also
@@ -331,7 +343,7 @@ const equipSchema = z.object({
  * owned cosmetic, else 400 'Not owned'.
  */
 router.post('/equip', asyncHandler(async (req: AuthRequest, res) => {
-  const { themeKey, fontKey, fxKey } = equipSchema.parse(req.body);
+  const { themeKey, fontKey, fxKey, timerKey } = equipSchema.parse(req.body);
   const userId = req.user!.id;
 
   await game().ensurePlayer(userId);
@@ -339,12 +351,12 @@ router.post('/equip', asyncHandler(async (req: AuthRequest, res) => {
   // One profile read covers every ownership check this request needs.
   const wantsTheme = themeKey != null && themeKey !== 'default';
   let ownedKeys: string[] = [];
-  if (wantsTheme || fontKey != null || fxKey != null) {
+  if (wantsTheme || fontKey != null || fxKey != null || timerKey != null) {
     const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
     ownedKeys = parseCosmetics(profile.cosmetics);
   }
 
-  const data: { equippedTheme?: string | null; equippedFont?: string | null; equippedFx?: string | null } = {};
+  const data: { equippedTheme?: string | null; equippedFont?: string | null; equippedFx?: string | null; equippedTimer?: string | null } = {};
 
   if (themeKey !== undefined) {
     const isClear = themeKey == null || themeKey === 'default';
@@ -372,6 +384,14 @@ router.post('/equip', asyncHandler(async (req: AuthRequest, res) => {
       if (!ownedKeys.includes(`fx_${fxKey}`)) throw new AppError('Not owned', 400);
     }
     data.equippedFx = fxKey ?? null;
+  }
+
+  if (timerKey !== undefined) {
+    if (timerKey != null) {
+      if (!(TIMER_KEYS as readonly string[]).includes(timerKey)) throw new AppError('Not owned', 400);
+      if (!ownedKeys.includes(`timer_${timerKey}`)) throw new AppError('Not owned', 400);
+    }
+    data.equippedTimer = timerKey ?? null;
   }
 
   if (Object.keys(data).length === 0) throw new AppError('Nothing to equip', 400);

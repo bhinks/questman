@@ -156,9 +156,10 @@ export function ShopView() {
     onSuccess: refreshPlayer,
   });
 
-  // Display-mod slots: { fontKey } / { fxKey }; explicit null clears a slot.
+  // Display-mod slots: { fontKey } / { fxKey } / { timerKey }; explicit null
+  // clears a slot.
   const equipMod = useMutation({
-    mutationFn: (body: { fontKey?: string | null; fxKey?: string | null }) =>
+    mutationFn: (body: { fontKey?: string | null; fxKey?: string | null; timerKey?: string | null }) =>
       api.post<{ player: PlayerSnapshot }>('/api/shop/equip', body),
     onSuccess: refreshPlayer,
   });
@@ -220,7 +221,37 @@ export function ShopView() {
   const consumables = CONSUMABLE_ORDER.flatMap(cat => items.filter(i => i.category === cat));
   const personas = items.filter(i => i.category === 'persona');
   const mods = [...items.filter(i => i.category === 'font'), ...items.filter(i => i.category === 'fx')];
+  const timers = items.filter(i => i.category === 'timer');
   const currentPersona = personaQ.data?.persona ?? null;
+
+  /** Render a display-mod card (font / fx / timer) with slot-aware wiring. */
+  const renderMod = (item: ShopItem) => {
+    const slot: ModSlot = item.category === 'font' ? 'font' : item.category === 'fx' ? 'fx' : 'timer';
+    const payloadKey = `${slot}Key`;
+    const modKey = typeof item.payload?.[payloadKey] === 'string' ? (item.payload[payloadKey] as string) : item.key;
+    const equippedNow =
+      slot === 'font' ? player.equippedFont === modKey :
+      slot === 'fx' ? player.equippedFx === modKey :
+      player.equippedTimer === modKey;
+    const body = (v: string | null) =>
+      slot === 'font' ? { fontKey: v } : slot === 'fx' ? { fxKey: v } : { timerKey: v };
+    return (
+      <ModCard
+        key={item.key}
+        item={item}
+        slot={slot}
+        modKey={modKey}
+        equipped={equippedNow}
+        owned={item.owned === true}
+        affordable={player.eddies >= item.priceEddies}
+        busy={pendingKey === item.key || equipMod.isPending}
+        feedback={feedback?.key === item.key ? feedback : null}
+        onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
+        onEquip={() => equipMod.mutate(body(modKey))}
+        onUnequip={() => equipMod.mutate(body(null))}
+      />
+    );
+  };
 
   return (
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -292,29 +323,15 @@ export function ShopView() {
         DISPLAY MODS — HEADER FONTS &amp; AMBIENT FX · AUTO-EQUIP ON BUY
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-        {mods.map(item => {
-          const isFont = item.category === 'font';
-          const modKey = typeof item.payload?.[isFont ? 'fontKey' : 'fxKey'] === 'string'
-            ? (item.payload[isFont ? 'fontKey' : 'fxKey'] as string)
-            : item.key;
-          const equippedNow = isFont ? player.equippedFont === modKey : player.equippedFx === modKey;
-          return (
-            <ModCard
-              key={item.key}
-              item={item}
-              isFont={isFont}
-              modKey={modKey}
-              equipped={equippedNow}
-              owned={item.owned === true}
-              affordable={player.eddies >= item.priceEddies}
-              busy={pendingKey === item.key || equipMod.isPending}
-              feedback={feedback?.key === item.key ? feedback : null}
-              onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
-              onEquip={() => equipMod.mutate(isFont ? { fontKey: modKey } : { fxKey: modKey })}
-              onUnequip={() => equipMod.mutate(isFont ? { fontKey: null } : { fxKey: null })}
-            />
-          );
-        })}
+        {mods.map(renderMod)}
+      </div>
+
+      {/* ---- timer styles: focus-chamber clock faces ---- */}
+      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
+        TIMER STYLES — FOCUS CHAMBER CLOCK FACES · AUTO-EQUIP ON BUY
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        {timers.map(renderMod)}
       </div>
 
       {/* ---- consumables ---- */}
@@ -462,11 +479,53 @@ function PersonaCard({ item, equipped, owned, affordable, busy, feedback, onBuy,
   );
 }
 
-/* ---------- display mod card (font / ambient fx) ---------- */
+/* ---------- display mod card (font / ambient fx / timer style) ---------- */
 
-function ModCard({ item, isFont, modKey, equipped, owned, affordable, busy, feedback, onBuy, onEquip, onUnequip }: {
+type ModSlot = 'font' | 'fx' | 'timer';
+
+/** Mini clock mocks for the timer-style cards — card-scale approximations
+ *  of the real FocusView faces (the live faces live in index.css). */
+function TimerPreview({ timerKey }: { timerKey: string }) {
+  if (timerKey === 'flip') {
+    return (
+      <div className="mono" style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+        {['2', '5', ':', '0', '0'].map((ch, i) => ch === ':' ? (
+          <span key={i} style={{ color: 'var(--text-faint)', fontSize: 18, fontWeight: 700 }}>:</span>
+        ) : (
+          <span key={i} style={{
+            fontSize: 19, fontWeight: 700, color: 'var(--cyan)', padding: '3px 7px',
+            background: 'linear-gradient(180deg, #14162a 0%, #0d0e1c 49%, #090a14 51%, #101224 100%)',
+            boxShadow: 'inset 0 0 0 1px var(--line-2)',
+            clipPath: 'polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px)',
+          }}>{ch}</span>
+        ))}
+      </div>
+    );
+  }
+  if (timerKey === 'ring') {
+    const C = 2 * Math.PI * 44;
+    return (
+      <div style={{ position: 'relative', width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0 }} aria-hidden>
+          <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(var(--accent-rgb),0.18)" strokeWidth="6" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--cyan)" strokeWidth="7" strokeLinecap="round"
+            strokeDasharray={`${0.68 * C} ${C}`} transform="rotate(-90 50 50)" />
+        </svg>
+        <span className="mono" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--cyan)' }}>25:00</span>
+      </div>
+    );
+  }
+  // pulse — reuses the live face's heartbeat keyframes (index.css)
+  return (
+    <span className="mono qm-preview-pulse" style={{ fontSize: 21, fontWeight: 700, color: 'var(--cyan)' }}>
+      25:00
+    </span>
+  );
+}
+
+function ModCard({ item, slot, modKey, equipped, owned, affordable, busy, feedback, onBuy, onEquip, onUnequip }: {
   item: ShopItem;
-  isFont: boolean;
+  slot: ModSlot;
   modKey: string;
   equipped: boolean;
   owned: boolean;
@@ -479,12 +538,15 @@ function ModCard({ item, isFont, modKey, equipped, owned, affordable, busy, feed
 }) {
   return (
     <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* preview: font cards render their own name IN the face; fx cards a swatch */}
+      {/* preview: font cards render their own name IN the face; fx cards a
+          swatch; timer cards a mini clock mock */}
       <div className="panel-inset" style={{ height: 54, padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-        {isFont ? (
+        {slot === 'font' ? (
           <span style={{ fontFamily: FONT_FAMILIES[modKey] ?? 'var(--font-display)', fontSize: modKey === 'vt323' ? 22 : 16, letterSpacing: '0.06em', color: 'var(--cyan)' }}>
             {item.name.toUpperCase()}
           </span>
+        ) : slot === 'timer' ? (
+          <TimerPreview timerKey={modKey} />
         ) : (
           <div style={{ position: 'absolute', inset: 0, background: FX_PREVIEWS[modKey] ?? FX_PREVIEWS.aurora }} />
         )}

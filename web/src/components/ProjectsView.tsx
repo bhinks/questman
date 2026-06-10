@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { Project, ProjectTask, Milestone } from '../lib/api';
+import { useFocusTotals, fmtFocusMin } from '../lib/useFocusTotals';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -30,6 +31,8 @@ export function ProjectsView() {
     queryKey: ['projects'],
     queryFn: () => api.get<{ projects: Project[] }>('/api/projects').then(r => r.projects),
   });
+  // Actual minutes jacked in against each project (focus-timer rollup).
+  const focusTotals = useFocusTotals(['project']);
 
   const remove = useMutation({
     mutationFn: (id: string) => api.del(`/api/projects/${id}`),
@@ -63,6 +66,7 @@ export function ProjectsView() {
           : <ProjectCard
               key={p.id}
               project={p}
+              focusMin={focusTotals.get(p.id) ?? 0}
               onEdit={() => setEditing(p)}
               onDelete={() => setPendingDelete(p)}
             />,
@@ -112,8 +116,8 @@ function StatusPill({ status }: { status: Project['status'] }) {
 }
 
 function ProjectCard({
-  project, onEdit, onDelete,
-}: { project: Project; onEdit: () => void; onDelete: () => void }) {
+  project, focusMin, onEdit, onDelete,
+}: { project: Project; focusMin: number; onEdit: () => void; onDelete: () => void }) {
   const qc = useQueryClient();
   const [addingTask, setAddingTask] = useState(false);
   const [addingMilestone, setAddingMilestone] = useState(false);
@@ -173,6 +177,11 @@ function ProjectCard({
               {project.name}
             </h3>
             <StatusPill status={project.status} />
+            {focusMin > 0 && (
+              <span className="mono" title={`${focusMin} minutes of logged focus time`} style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--teal)' }}>
+                ⧗ {fmtFocusMin(focusMin)} FOCUSED
+              </span>
+            )}
           </div>
           {project.description && (
             <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>

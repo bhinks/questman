@@ -1000,3 +1000,102 @@ html[data-fx="crt"]::after {
     to   { background-position: 0 0%, 0 0; }
   }
 }
+
+/* ============================================================
+   FOCUS CHAMBER (JACK IN) — the distraction-free deep-work page
+   (FocusView replaces the whole shell) + timer style packs (Shop
+   "Timer Styles"). The clock renders one .qm-digit / .qm-sep span
+   per character; packs restyle via .qm-clock[data-timer="KEY"]
+   from PlayerSnapshot.equippedTimer.
+   ============================================================ */
+
+.qm-focus {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 28px;
+}
+.qm-focus-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  min-height: 0;
+}
+
+.qm-clock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-size: clamp(72px, 16vw, 190px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  user-select: none;
+}
+/* Fixed digit width so the clock doesn't wobble as numbers change. */
+.qm-clock .qm-digit { display: inline-block; min-width: 0.62em; text-align: center; }
+.qm-clock .qm-sep { display: inline-block; color: var(--cyan); padding: 0 0.04em; transform: translateY(-0.06em); }
+.qm-clock.running .qm-sep { animation: blink 1s step-end infinite; }
+
+/* Standard face — soft accent glow */
+.qm-clock[data-timer="default"] {
+  text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45), 0 0 60px rgba(var(--accent-rgb), 0.18);
+}
+
+/* Split-Flap Chrono — departure-board digit panels with a center seam */
+.qm-clock[data-timer="flip"] { gap: 0.06em; }
+.qm-clock[data-timer="flip"] .qm-digit {
+  position: relative;
+  padding: 0.12em 0.02em;
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4);
+  background: linear-gradient(180deg, #14162a 0%, #0d0e1c 49%, #090a14 51%, #101224 100%);
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 10px 26px -12px rgba(0, 0, 0, 0.85);
+  clip-path: polygon(0.08em 0, 100% 0, 100% calc(100% - 0.08em), calc(100% - 0.08em) 100%, 0 100%, 0 0.08em);
+}
+.qm-clock[data-timer="flip"] .qm-digit::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.qm-clock[data-timer="flip"] .qm-sep { color: var(--text-faint); }
+
+/* Orbital Gauge — digits sit inside the FocusView SVG ring, so the type
+   shrinks to fit; the ring drains the countdown / laps the minute. */
+.qm-ring-wrap {
+  position: relative;
+  width: min(64vmin, 440px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qm-ring-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.qm-clock[data-timer="ring"] {
+  font-size: clamp(44px, 9vw, 104px);
+  text-shadow: 0 0 16px rgba(var(--accent-rgb), 0.4);
+}
+
+/* Biorhythm — digits beat like a monitored heart */
+.qm-clock[data-timer="pulse"] { color: var(--cyan); }
+@media (prefers-reduced-motion: no-preference) {
+  .qm-clock[data-timer="pulse"], .qm-preview-pulse {
+    animation: qm-timer-beat 1.15s ease-in-out infinite;
+  }
+}
+@keyframes qm-timer-beat {
+  0%, 55%, 100% { text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.35); transform: scale(1); }
+  12% { text-shadow: 0 0 26px rgba(var(--accent-rgb), 0.75), 0 0 70px rgba(var(--accent-rgb), 0.3); transform: scale(1.012); }
+  24% { text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45); transform: scale(1.004); }
+  36% { text-shadow: 0 0 30px rgba(var(--accent-rgb), 0.8), 0 0 80px rgba(var(--accent-rgb), 0.35); transform: scale(1.018); }
+}

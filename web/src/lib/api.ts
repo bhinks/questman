@@ -163,6 +163,7 @@ export interface PlayerSnapshot {
   equippedTheme: string | null;  // active cosmetic theme key
   equippedFont: string | null;   // active display-font pack key
   equippedFx: string | null;     // active ambient FX pack key
+  equippedTimer: string | null;  // active focus-chamber timer style key
   // World mechanics: daily energy/battery (only present on GET /api/player).
   energy?: {
     tier: 'low' | 'med' | 'high';
@@ -180,7 +181,39 @@ export interface PlayerSnapshot {
 
 export type ShopCategory =
   | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable'
-  | 'font' | 'fx' | 'persona';
+  | 'font' | 'fx' | 'persona' | 'timer';
+
+// ---- focus timer (JACK IN deep-work chamber) -------------------------
+
+export type FocusTargetType = 'quest' | 'project' | 'habit' | 'chore' | 'workout' | 'other';
+
+/** One selectable row from GET /api/focus/targets. */
+export interface FocusTargetOption {
+  type: FocusTargetType;
+  id: string;
+  label: string;
+}
+
+/** A persisted focus run (POST/GET /api/focus/sessions). */
+export interface FocusSession {
+  id: string;
+  targetType: FocusTargetType;
+  targetId: string | null;
+  label: string;
+  startedAt: string;
+  endedAt: string;
+  minutes: number;
+  limitMinutes: number | null;
+  createdAt: string;
+}
+
+/** One row of GET /api/focus/summary — actual minutes per target. */
+export interface FocusSummaryRow {
+  targetType: FocusTargetType;
+  targetId: string | null;
+  minutes: number;
+  sessions: number;
+}
 
 export interface ShopItem {
   key: string;

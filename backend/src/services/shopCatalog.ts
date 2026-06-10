@@ -8,7 +8,7 @@
  *
  * Categories:
  *   token_skip | token_reroll | rr_credit | cosmetic | loot_crate | consumable
- *   | font | fx | persona
+ *   | font | fx | persona | timer
  *
  * Purchases record to the Purchase table + a WalletLedger spend entry; the
  * grant (tokens/credits/cosmetic/loot roll) is applied to PlayerProfile,
@@ -22,7 +22,8 @@
  *
  * Ownership keys in PlayerProfile.cosmetics: themes are BARE keys
  * ('synthwave'); the newer lines are PREFIXED ('font_orbitron', 'fx_rain',
- * 'persona_drill') — conveniently identical to their catalog item keys.
+ * 'persona_drill', 'timer_flip') — conveniently identical to their catalog
+ * item keys.
  */
 
 export interface ShopItem {
@@ -30,11 +31,12 @@ export interface ShopItem {
   name: string;
   description: string;
   category: 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable'
-    | 'font' | 'fx' | 'persona';
+    | 'font' | 'fx' | 'persona' | 'timer';
   priceEddies: number;
   /** Category-specific payload, e.g. { tokens: 1 }, { themeKey: 'synthwave' },
    *  { kind: 'shield' | 'booster' | 'budget' } for consumables, or
-   *  { fontKey } / { fxKey } / { personaKey } for the display/persona lines. */
+   *  { fontKey } / { fxKey } / { personaKey } / { timerKey } for the
+   *  display/persona/timer lines. */
   payload?: Record<string, unknown>;
 }
 
@@ -67,6 +69,9 @@ export const FONT_KEYS = ['orbitron', 'vt323', 'spacemono', 'sharetech'] as cons
 
 /** Ambient FX pack keys index.css ships a html[data-fx] block for. */
 export const FX_KEYS = ['rain', 'aurora', 'vhs', 'datastream', 'radar', 'crt'] as const;
+
+/** Focus-chamber timer style keys the FocusView clock supports. */
+export const TIMER_KEYS = ['flip', 'ring', 'pulse'] as const;
 
 export const SHOP_ITEMS: ShopItem[] = [
   // ---- Skip tokens (drop a quest, no penalty) ------------------------
@@ -365,6 +370,32 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'fx',
     priceEddies: 350,
     payload: { fxKey: 'crt' },
+  },
+
+  // ---- Focus-chamber timer styles (auto-equip on buy) -----------------
+  {
+    key: 'timer_flip',
+    name: 'Split-Flap Chrono',
+    description: 'Departure-board digits in chamfered panels. Every minute clacks over like a platform change.',
+    category: 'timer',
+    priceEddies: 400,
+    payload: { timerKey: 'flip' },
+  },
+  {
+    key: 'timer_ring',
+    name: 'Orbital Gauge',
+    description: 'The clock sits inside a slow accent ring that drains your countdown — or laps the minute on open runs.',
+    category: 'timer',
+    priceEddies: 450,
+    payload: { timerKey: 'ring' },
+  },
+  {
+    key: 'timer_pulse',
+    name: 'Biorhythm',
+    description: 'Digits that beat like a monitored heart. Deep work, vitals on screen.',
+    category: 'timer',
+    priceEddies: 400,
+    payload: { timerKey: 'pulse' },
   },
 
   // ---- Power consumables (real mechanics, server-enforced) -----------

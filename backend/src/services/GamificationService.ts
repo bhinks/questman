@@ -92,6 +92,7 @@ export interface PlayerSnapshot {
   equippedTheme: string | null;
   equippedFont: string | null;  // display-font pack (Night Market)
   equippedFx: string | null;    // ambient FX pack (Night Market)
+  equippedTimer: string | null; // focus-chamber timer style (Night Market)
   /** Daily capacity/battery (World Mechanics). Optional: only the read path
    *  (getSnapshot) computes it; awardXp leaves it undefined to avoid an extra
    *  per-award query — the HUD reads it from GET /api/player. */
@@ -206,6 +207,7 @@ export class GamificationService {
       equippedTheme: p.equippedTheme,
       equippedFont: p.equippedFont,
       equippedFx: p.equippedFx,
+      equippedTimer: p.equippedTimer,
       energy,
     };
   }
@@ -391,6 +393,7 @@ export class GamificationService {
         equippedTheme: before.equippedTheme,
         equippedFont: before.equippedFont,
         equippedFx: before.equippedFx,
+        equippedTimer: before.equippedTimer,
         leveledUp: nextLevel > previousLevel,
         previousLevel,
         eddieMultiplierApplied: earn && mult > 1 ? mult : undefined,

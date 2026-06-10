@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { Habit, Module } from '../lib/api';
+import { useFocusTotals, fmtFocusMin } from '../lib/useFocusTotals';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -24,6 +25,9 @@ export function RecurringList({ kind }: Props) {
     queryKey: ['habits', kind],
     queryFn: () => api.get<{ habits: Habit[] }>(`/api/habits?kind=${kind}`).then(r => r.habits),
   });
+  // Actual minutes jacked in against each row (focus-timer rollup; the
+  // summary stores the row's real kind, so query both and join on id).
+  const focusTotals = useFocusTotals(['habit', 'chore']);
 
   // For the "new habit" form we need the matching module id.
   const modulesQ = useQuery({
@@ -69,6 +73,7 @@ export function RecurringList({ kind }: Props) {
     editingId === h.id
       ? <HabitForm key={h.id} kind={kind} moduleId={h.moduleId} habit={h} onClose={() => setEditingId(null)} />
       : <Row key={h.id} habit={h}
+          focusMin={focusTotals.get(h.id) ?? 0}
           onCheck={() => check.mutate(h.id)}
           onUncheck={() => uncheck.mutate(h.id)}
           onEdit={() => setEditingId(h.id)}
@@ -151,8 +156,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function Row({
-  habit, onCheck, onUncheck, onEdit, onDelete,
-}: { habit: Habit; onCheck: () => void; onUncheck: () => void; onEdit: () => void; onDelete: () => void }) {
+  habit, focusMin, onCheck, onUncheck, onEdit, onDelete,
+}: { habit: Habit; focusMin: number; onCheck: () => void; onUncheck: () => void; onEdit: () => void; onDelete: () => void }) {
   const done = habit.isCompletedToday;
   return (
     <div
@@ -231,6 +236,22 @@ function Row({
           }}
         >
           <Icon name="clock" size={12} /> {habit.estMinutes}m
+        </div>
+      )}
+
+      {focusMin > 0 && (
+        <div
+          className="mono"
+          title={`${focusMin} minutes of logged focus time`}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: 'var(--teal)',
+            padding: '4px 8px',
+            background: 'color-mix(in srgb, var(--teal) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--teal) 30%, transparent)',
+          }}
+        >
+          <Icon name="zap" size={12} /> {fmtFocusMin(focusMin)}
         </div>
       )}
 

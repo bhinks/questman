@@ -10,6 +10,7 @@ import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { Workout, WorkoutPlan, WorkoutPlanResponse } from '../lib/api';
+import { useFocusTotals, fmtFocusMin } from '../lib/useFocusTotals';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -230,6 +231,8 @@ function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void 
     queryKey: ['workouts', 'plan'],
     queryFn: () => api.get<WorkoutPlanResponse>('/api/workouts/plan').then(r => r.plans),
   });
+  // Actual minutes jacked in against each plan slot (focus-timer rollup).
+  const focusTotals = useFocusTotals(['workout']);
 
   const [addingDay, setAddingDay] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -302,6 +305,7 @@ function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void 
                   <PlanSlot
                     key={plan.id}
                     plan={plan}
+                    focusMin={focusTotals.get(plan.id) ?? 0}
                     busy={remove.isPending}
                     onLog={() => onLogSlot(plan)}
                     onEdit={() => { setEditingId(plan.id); setAddingDay(null); }}
@@ -336,8 +340,8 @@ function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void 
 
 /** One planned slot card in a day column. */
 function PlanSlot({
-  plan, busy, onLog, onEdit, onDelete,
-}: { plan: WorkoutPlan; busy: boolean; onLog: () => void; onEdit: () => void; onDelete: () => void }) {
+  plan, focusMin, busy, onLog, onEdit, onDelete,
+}: { plan: WorkoutPlan; focusMin: number; busy: boolean; onLog: () => void; onEdit: () => void; onDelete: () => void }) {
   return (
     <div className="panel-inset" style={{ padding: 7, display: 'flex', flexDirection: 'column', gap: 5, opacity: plan.isActive ? 1 : 0.45 }}>
       <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'break-word' }}>{plan.title}</div>
@@ -348,6 +352,11 @@ function PlanSlot({
         {plan.targetMin != null && (
           <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <Icon name="clock" size={9} /> {plan.targetMin}m
+          </span>
+        )}
+        {focusMin > 0 && (
+          <span className="mono" title={`${focusMin} minutes of logged focus time`} style={{ fontSize: 9.5, color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <Icon name="zap" size={9} /> {fmtFocusMin(focusMin)}
           </span>
         )}
       </div>

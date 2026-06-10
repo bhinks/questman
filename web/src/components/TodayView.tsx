@@ -3,24 +3,24 @@
  *
  * Recreates proto-today.jsx bound to real data:
  *   - HUD strip: hex level badge + segmented XP bar + STREAK/EDDIES/CLEARED
- *   - PRIORITY CONTRACT: the planner's top-ranked in-plan pending quest,
- *     with the focus timer ("JACK IN" / "ABORT RUN") and COMPLETE
+ *   - PRIORITY CONTRACT: the planner's top-ranked in-plan pending quest.
+ *     JACK IN opens the distraction-free FOCUS CHAMBER (FocusView) seeded
+ *     with the contract — focus minutes persist there and flow back into
+ *     Quest.actualMinutes server-side.
  *   - CONTRACT LEDGER: remaining in-plan quests (counters get diamond pips
  *     + "+1" check-ins; one-shots get complete / skip / reroll) plus the
  *     day's cleared & skipped rows
  *   - Right rail: ENV.SCAN weather, POWER CELL energy (tap to override),
- *     SIDE JOBS (over-budget quests), SESSION LOG (today's XP ledger)
- *
- * All gameplay wiring (complete / +1 progress / token-gated skip + reroll /
- * focus minutes to /focus / energy override / socket refresh) is preserved
- * from the previous version — only the presentation changed.
+ *     SIDE JOBS (over-budget quests), SESSION LOG (today's XP ledger
+ *     interleaved with today's focus runs)
  */
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry, HandlerLatestResponse, HandlerPersona } from '../lib/api';
+import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry, FocusSession, HandlerLatestResponse, HandlerPersona } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
+import type { FocusSeed } from './FocusView';
 
 /** Module key → outline icon. NO emoji in this direction (meta.emoji unused). */
 const MODULE_ICONS: Record<string, string> = {
@@ -210,10 +210,8 @@ function Ticks({ focal, children }: { focal?: boolean; children: React.ReactNode
   );
 }
 
-export function TodayView() {
+export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => void }) {
   const qc = useQueryClient();
-  // The single quest the focus timer is running against (client-side count-up).
-  const [focus, setFocus] = useState<{ id: string; start: number } | null>(null);
 
   const playerQ = useQuery({
     queryKey: ['player'],
@@ -237,6 +235,12 @@ export function TodayView() {
   const ledgerQ = useQuery({
     queryKey: ['player', 'ledger', 'today'],
     queryFn: () => api.get<{ entries: LedgerEntry[] }>('/api/player/ledger?currency=xp&limit=60').then(r => r.entries),
+  });
+  // Today's focus runs, interleaved into the SESSION LOG (FocusView
+  // invalidates the ['focus'] prefix after every jack-out).
+  const focusQ = useQuery({
+    queryKey: ['focus', 'sessions', 'recent'],
+    queryFn: () => api.get<{ sessions: FocusSession[] }>('/api/focus/sessions?limit=40').then(r => r.sessions),
   });
 
   const invalidateAll = () => {
@@ -276,34 +280,10 @@ export function TodayView() {
     mutationFn: (id: string) => api.post(`/api/quests/${id}/reroll`),
     onSuccess: invalidateAll,
   });
-  const focusLog = useMutation({
-    mutationFn: ({ id, minutes }: { id: string; minutes: number }) =>
-      api.post(`/api/quests/${id}/focus`, { actualMinutes: minutes }),
-    onSuccess: invalidateAll,
-  });
   const setEnergy = useMutation({
     mutationFn: (tier: 'low' | 'med' | 'high') => api.post('/api/player/energy', { tier }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['player'] }),
   });
-
-  const jackOut = () => {
-    if (!focus) return;
-    const minutes = Math.max(1, Math.round((Date.now() - focus.start) / 60000));
-    focusLog.mutate({ id: focus.id, minutes });
-    setFocus(null);
-  };
-  const jackIn = (id: string) => {
-    // Switching timers: flush the running session's minutes before starting
-    // a new one, so they aren't silently discarded.
-    if (focus && focus.id !== id) jackOut();
-    setFocus({ id, start: Date.now() });
-  };
-  /** Complete a quest, flushing the focus timer first if it's running on it —
-   *  otherwise the session's actualMinutes would be silently lost. */
-  const completeWithFlush = (id: string) => {
-    if (focus?.id === id) jackOut();
-    completeQuest.mutate(id);
-  };
 
   if (playerQ.isLoading || todayQ.isLoading) {
     return <Splash>LOADING…</Splash>;
@@ -332,12 +312,20 @@ export function TodayView() {
   const sideJobs: PlanQuest[] = (plan?.quests ?? []).filter(q => !q.inPlan);
   const bestWindowQuest = pending.find(q => q.meta?.bestWindow) ?? null;
 
-  // SESSION LOG: today's XP grants, oldest → newest (terminal order).
-  const logEntries = (ledgerQ.data ?? []).filter(e => isToday(e.createdAt)).reverse();
+  // SESSION LOG: today's XP grants + focus runs, oldest → newest
+  // (terminal order), interleaved by timestamp.
+  type LogRow =
+    | { kind: 'xp'; key: string; t: number; entry: LedgerEntry }
+    | { kind: 'focus'; key: string; t: number; session: FocusSession };
+  const logRows: LogRow[] = [
+    ...(ledgerQ.data ?? []).filter(e => isToday(e.createdAt))
+      .map((e): LogRow => ({ kind: 'xp', key: `xp-${e.id}`, t: new Date(e.createdAt).getTime(), entry: e })),
+    ...(focusQ.data ?? []).filter(s => isToday(s.endedAt))
+      .map((s): LogRow => ({ kind: 'focus', key: `fs-${s.id}`, t: new Date(s.endedAt).getTime(), session: s })),
+  ].sort((a, b) => a.t - b.t);
   const xpDayTotal = today.xpEarned + today.xpAvailable;
   const bankedPct = Math.min(100, (today.xpEarned / Math.max(1, xpDayTotal)) * 100);
 
-  const running = focus != null && priority != null && focus.id === priority.id;
   const xpPct = Math.min(100, (player.xpIntoLevel / Math.max(1, player.xpForNextLevel)) * 100);
 
   const hudStats: Array<[string, string, string]> = [
@@ -405,7 +393,6 @@ export function TodayView() {
                     <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--cyan)' }}>▸▸ PRIORITY CONTRACT</span>
                     <span className="ncx-serial">CTR-{priority.id.slice(0, 6).toUpperCase()}</span>
                     <span style={{ flex: 1 }} />
-                    {running && <span className="ncx-stamp flat" style={{ color: 'var(--lime)' }}>RUNNING</span>}
                     {priority.mustDo && <span className="ncx-stamp flat" style={{ color: 'var(--red)' }}>MUST-DO</span>}
                     <span className={`ncx-stamp ${priority.difficulty}`}>{priority.difficulty}</span>
                   </div>
@@ -425,17 +412,17 @@ export function TodayView() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9, justifyContent: 'center' }}>
-                      {/* Keyed by run-state: remount instead of morphing so the
-                          primary↔plain transition can never freeze (handoff pitfall #1). */}
+                      {/* JACK IN → the distraction-free FOCUS CHAMBER, seeded
+                          with this contract (focus minutes persist there). */}
                       <button
-                        key={priority.id + (running ? '-run' : '-idle')}
+                        key={priority.id + '-jack'}
                         className="btn btn-primary"
                         style={{ padding: '12px 24px' }}
-                        onClick={() => (running ? jackOut() : jackIn(priority.id))}
+                        onClick={() => onJackIn({ type: 'quest', id: priority.id, label: priority.title })}
                       >
-                        <Icon name="zap" size={14} /> {running ? 'ABORT RUN' : 'JACK IN'}
+                        <Icon name="zap" size={14} /> JACK IN
                       </button>
-                      <button className="btn" onClick={() => completeWithFlush(priority.id)}>COMPLETE</button>
+                      <button className="btn" onClick={() => completeQuest.mutate(priority.id)}>COMPLETE</button>
                       {/* Burnout relief applies to the top contract too. */}
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                         <button
@@ -495,7 +482,7 @@ export function TodayView() {
                   index={i}
                   skipTokens={player.skipTokens}
                   rerollTokens={player.rerollTokens}
-                  onComplete={id => completeWithFlush(id)}
+                  onComplete={id => completeQuest.mutate(id)}
                   onProgress={id => progressQuest.mutate(id)}
                   onSkip={id => skipQuest.mutate(id)}
                   onReroll={id => rerollQuest.mutate(id)}
@@ -561,7 +548,7 @@ export function TodayView() {
                     className="btn btn-ghost"
                     style={{ padding: '3px 7px', fontSize: 10, flex: 'none' }}
                     title={q.targetCount > 1 ? `Check in (${q.currentCount}/${q.targetCount})` : 'Complete'}
-                    onClick={() => (q.targetCount > 1 ? progressQuest.mutate(q.id) : completeWithFlush(q.id))}
+                    onClick={() => (q.targetCount > 1 ? progressQuest.mutate(q.id) : completeQuest.mutate(q.id))}
                   >
                     {q.targetCount > 1 ? `+1 · ${q.currentCount}/${q.targetCount}` : <Icon name="check" size={11} />}
                   </button>
@@ -574,13 +561,19 @@ export function TodayView() {
                 SESSION LOG
               </div>
               <div className="ncx-term" style={{ maxHeight: 180, overflowY: 'auto' }}>
-                {logEntries.map(e => (
-                  <div key={e.id}>
-                    <span className="cy">{hhmm(e.createdAt)}</span>{' '}
-                    {e.amount > 0
-                      ? <span className="ok">✓ {humanizeReason(e.reason)}</span>
-                      : humanizeReason(e.reason)}
-                    {e.amount > 0 && <span> +{e.amount}xp</span>}
+                {logRows.map(r => r.kind === 'xp' ? (
+                  <div key={r.key}>
+                    <span className="cy">{hhmm(r.entry.createdAt)}</span>{' '}
+                    {r.entry.amount > 0
+                      ? <span className="ok">✓ {humanizeReason(r.entry.reason)}</span>
+                      : humanizeReason(r.entry.reason)}
+                    {r.entry.amount > 0 && <span> +{r.entry.amount}xp</span>}
+                  </div>
+                ) : (
+                  <div key={r.key}>
+                    <span className="cy">{hhmm(r.session.endedAt)}</span>{' '}
+                    <span style={{ color: 'var(--violet)' }}>⧗ focus {r.session.minutes}m</span>
+                    {' — '}{r.session.label.toLowerCase()}
                   </div>
                 ))}
                 <div>

@@ -40,6 +40,7 @@ import debriefRoutes from './routes/debrief';
 import budgetRoutes from './routes/budgets';
 import recurringRoutes from './routes/recurring';
 import settingsRoutes from './routes/settings';
+import focusRoutes from './routes/focus';
 
 const app = express();
 const server = createServer(app);
@@ -103,6 +104,7 @@ app.use('/api/debrief', authMiddleware, debriefRoutes);
 app.use('/api/budgets', authMiddleware, budgetRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/focus', authMiddleware, focusRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

@@ -67,6 +67,9 @@ model User {
   // Weekly workout plan (phase 8)
   workoutPlans         WorkoutPlan[]
 
+  // Focus timer (phase 9): persisted JACK IN sessions
+  focusSessions        FocusSession[]
+
   @@map("users")
 }
 
@@ -562,6 +565,35 @@ model WorkoutSession {
   @@map("workout_sessions")
 }
 
+// A finished focus-timer run (the JACK IN deep-work chamber). Persisted on
+// jack-out; the timer itself is client-side. Time accumulates against the
+// chosen target so views can show ACTUAL minutes spent per object.
+model FocusSession {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // What the time was spent on: "quest"|"project"|"habit"|"chore"|"workout"|"other".
+  // habit/chore both reference Habit rows (kind distinguishes); workout
+  // references a WorkoutPlan; targetId is null for "other". label is a
+  // display-title snapshot (freeform text for "other") so the log still
+  // reads after the target is deleted/expired.
+  targetType   String   @default("other")
+  targetId     String?
+  label        String
+
+  startedAt    DateTime
+  endedAt      DateTime
+  minutes      Int      // rounded wall-clock actual
+  limitMinutes Int?     // countdown limit chosen at start; null = open-ended count-up
+
+  createdAt    DateTime @default(now())
+
+  @@index([userId, startedAt])
+  @@index([userId, targetType, targetId])
+  @@map("focus_sessions")
+}
+
 model PlayerProfile {
   id            String   @id @default(cuid())
   userId        String   @unique
@@ -611,6 +643,7 @@ model PlayerProfile {
   // Night Market expansion: independently-equippable cosmetic slots.
   equippedFont  String?  // display-font pack key (null = stock Chakra Petch)
   equippedFx    String?  // ambient FX pack key (null = none)
+  equippedTimer String?  // focus-chamber timer style key (null = standard)
   // --- World mechanics (phase 5): energy / battery ---
   // A daily capacity tier derived from sleep (vitals sleepHours) with a
   // manual override. "low"|"med"|"high". energyOverrideOn pins the override

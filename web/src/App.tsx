@@ -33,6 +33,8 @@ import { BudgetsView } from './components/BudgetsView';
 import { BillsView } from './components/BillsView';
 import { TransactionsView } from './components/TransactionsView';
 import { CalibrationView } from './components/CalibrationView';
+import { FocusView } from './components/FocusView';
+import type { FocusSeed } from './components/FocusView';
 import { LevelUpOverlay } from './components/LevelUpOverlay';
 import type { SettingsResponse } from './lib/api';
 import { useAuth } from './context/AuthContext';
@@ -84,6 +86,16 @@ function HubApp() {
   const [activeTab, setActiveTab] = useState('today');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // FOCUS CHAMBER (JACK IN): when open, FocusView replaces the whole shell
+  // (distraction-free). A run left active in localStorage (reload mid-run)
+  // re-opens the chamber on mount; FocusView resumes the clock from it.
+  const [focusOpen, setFocusOpen] = useState(() => localStorage.getItem('qm-focus-active') != null);
+  const [focusSeed, setFocusSeed] = useState<FocusSeed | null>(null);
+  const openFocus = (seed: FocusSeed | null = null) => {
+    setFocusSeed(seed);
+    setFocusOpen(true);
+  };
 
   // Player snapshot (shared via react-query cache with TodayView/Shop/etc.).
   // We read it here only to apply the equipped cosmetic theme to the whole
@@ -330,7 +342,7 @@ function HubApp() {
     switch (activeTab) {
       // --- Life-hub tabs ---
       case 'today':
-        return <TodayView />;
+        return <TodayView onJackIn={openFocus} />;
 
       case 'habits':
         return <RecurringList kind="habit" />;
@@ -468,11 +480,22 @@ function HubApp() {
     }
   };
 
+  // Distraction-free deep work: the chamber replaces the entire shell.
+  if (focusOpen) {
+    return (
+      <FocusView
+        seed={focusSeed}
+        onExit={() => { setFocusOpen(false); setFocusSeed(null); }}
+      />
+    );
+  }
+
   return (
     <AppShell
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onUpload={handleUpload}
+      onJackIn={() => openFocus(null)}
     >
       {/* Hidden file input driven by the topbar upload button. */}
       <input
