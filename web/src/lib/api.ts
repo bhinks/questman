@@ -159,11 +159,18 @@ export interface PlayerSnapshot {
   streakShields: number;         // banked shields (each absorbs one missed day)
   boosterUntil: string | null;   // Overdrive expiry — 2× eddies while in the future
   budgetBoostOn: string | null;  // Time Dilation day (+2h planner budget)
-  cosmetics: string[];           // owned cosmetic keys (themes, fonts, FX, personas)
+  cosmetics: string[];           // owned cosmetic keys (themes, fonts, FX, personas, gear)
   equippedTheme: string | null;  // active cosmetic theme key
   equippedFont: string | null;   // active display-font pack key
-  equippedFx: string | null;     // active ambient FX pack key
-  equippedTimer: string | null;  // active focus-chamber timer style key
+  equippedFx: string | null;     // LEGACY single-equip FX pack (superseded by fxActive)
+  equippedTimer: string | null;  // active CHRONO session-timer style key
+  // Night Market v2 gear slots.
+  equippedShell: string | null;  // OS shell key ('tty'|'outrun'; null = Night City)
+  equippedTitle: string | null;  // vanity title key worn on the runner ID
+  equippedPet: string | null;    // data-pet key living in the nav deck
+  fxActive: string[];            // STACKABLE visual FX currently online
+  focusStims: number;            // banked FOCUS STIMs (effect TBD)
+  overclockChips: number;        // banked OVERCLOCK CHIPs (effect TBD)
   // World mechanics: daily energy/battery (only present on GET /api/player).
   energy?: {
     tier: 'low' | 'med' | 'high';
@@ -181,7 +188,7 @@ export interface PlayerSnapshot {
 
 export type ShopCategory =
   | 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable'
-  | 'font' | 'fx' | 'persona' | 'timer';
+  | 'font' | 'fx' | 'persona' | 'timer' | 'shell' | 'title' | 'pet';
 
 // ---- focus timer (JACK IN deep-work chamber) -------------------------
 
@@ -221,6 +228,8 @@ export interface ShopItem {
   description: string;
   category: ShopCategory;
   priceEddies: number;
+  /** Minimum player level to buy (server re-validates on /buy). */
+  levelReq?: number;
   payload?: Record<string, unknown>;
   /** Server-computed: cosmetic already owned (so the UI disables "buy"). */
   owned?: boolean;
@@ -692,7 +701,10 @@ export interface SettingsResponse { settings: AppSettings; }
 
 // ---- intelligence layer (phase 6): Handler, insights, weekly debrief -----
 
-export type HandlerPersona = 'rogue_ai' | 'fixer' | 'ripperdoc';
+export type HandlerPersona =
+  | 'rogue_ai' | 'fixer' | 'ripperdoc'                       // free trio
+  | 'hrbot' | 'drill' | 'zen' | 'noir' | 'motherboard' | 'patch' // Night Market v2
+  | 'showman';                                               // retired stock
 export type HandlerKind = 'daily_rundown' | 'weekly_debrief' | 'event';
 
 /** One line of Handler banter (the sardonic rogue-AI voice). */

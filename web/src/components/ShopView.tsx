@@ -1,54 +1,49 @@
 /**
- * ShopView — the NIGHT MARKET (Night City direction), the eddie sink.
+ * ShopView — the NIGHT MARKET v2 (design handoff: night market expansion).
  *
- * A fixed-price catalog of burnout-relief tokens, R&R credits, loot
- * crates, and cosmetic neon skins. Buying spends €$ (server-owned via
- * GamificationService); equipping a cosmetic swaps the app's data-theme
- * (the equipped key is read by App.tsx's useEffect that sets the html
- * dataset + fires the ~450ms theming pulse). All currency is
- * authoritative on the server — after every mutation we invalidate
- * ['player'] so the HUD + theme refresh.
+ * Eight category lines behind a chamfered pill rail (ALL shows every
+ * section stacked):
+ *   SKINS    — accent-palette remaps (single-equip; legacy owned themes
+ *              keep a card so they stay equippable)
+ *   SHELLS   — deep interface rewires (single-equip; fonts ride along
+ *              here — the section label covers them)
+ *   FX       — ambient overlays (STACKABLE — toggle on/off any time)
+ *   CHRONO   — session-timer styles (single-equip; v1 faces kept on sale)
+ *   HANDLERS — the comms voice (single-equip via the Handler config)
+ *   TITLES   — vanity titles on the runner ID (single-equip, removable)
+ *   PETS     — deck companions (single-equip, removable)
+ *   SUPPLY   — consumables (repeat purchase, stock counters)
+ *
+ * Card states (Polish-Pass contract — glow only on true actions):
+ *   equipped → .focal border + LIVE stamp + quiet "▸ RUNNING NOW" line
+ *              (variants: BOOTED NOW / ON THE CLOCK / ON COMMS); titles
+ *              and pets get a REMOVE button instead (they can be unworn)
+ *   fx online→ focal border + lime ONLINE stamp + plain DISABLE button
+ *   owned    → OWNED stamp (faint) + plain EQUIP button
+ *   locked   → disabled "🔒 LVL n · €$price" button (server re-validates)
+ *   buyable  → "€$price · UNLOCK" (amber price); opacity .45 + disabled
+ *              when unaffordable
  *
  * Handoff behaviors preserved here:
- *  - buying a skin AUTO-EQUIPS it;
+ *  - every purchase AUTO-EQUIPS server-side (FX auto-activate);
  *  - conditional buttons are KEYED by state (never `transition: all`),
  *    so React remounts instead of morphing (verified stuck-transition bug);
- *  - loot-crate rolls surface through the existing inline feedback line.
+ *  - all currency is server-owned — after every mutation we invalidate
+ *    ['player'] so the HUD + theme refresh.
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
-import type { ShopItem, ShopResponse, ShopCategory, BuyResponse, PlayerSnapshot, PersonaResponse } from '../lib/api';
+import type { ShopItem, ShopResponse, BuyResponse, PlayerSnapshot, PersonaResponse } from '../lib/api';
 import { Icon } from './Icon';
+import { useAuth } from '../context/AuthContext';
+import { SKIN_META, SHELL_META, PERSONA_META, TITLE_META, PET_META, chronoKey } from '../lib/market';
+import { FxPreview } from './FxOverlays';
+import { SessionTimerPreview } from './SessionTimer';
 
-/**
- * Skin preview palettes [accent, secondary, tertiary]. Literal hexes are
- * CORRECT here (exception to the accent-var rule): each swatch previews the
- * skin's own colors, not the live accent. Keys match the catalog payload
- * themeKeys / index.css [data-theme] blocks.
- */
-const SKIN_PALETTES: Record<string, [string, string, string]> = {
-  default:     ['#1ce2ff', '#9d6bff', '#ff2e9a'],
-  synthwave:   ['#ff3d8b', '#b06bff', '#ff9de0'],
-  matrix:      ['#43ff8e', '#8bff43', '#2ff5a6'],
-  vaporwave:   ['#67e8ff', '#c9a6ff', '#ff9ed6'],
-  gold:        ['#ffc24b', '#ffe08a', '#ffb347'],
-  bloodmoon:   ['#ff4d6d', '#ff6b6b', '#ff7a99'],
-  arctic:      ['#8fd8ff', '#a6c8ff', '#c9e6ff'],
-  toxic:       ['#b4ff39', '#d8ff4d', '#6dff6d'],
-  sakura:      ['#ff9ecf', '#d8a6ff', '#ffd1e8'],
-  ronin:       ['#ff6a3d', '#ff4d6d', '#ffb03d'],
-  ultraviolet: ['#b14dff', '#7a4dff', '#ff4dd8'],
-  edgerunner:  ['#fcf300', '#ffdd00', '#00f0ff'],
-  arasaka:     ['#ff0040', '#ff4d8b', '#ff6d00'],
-  militech:    ['#52b788', '#74c69d', '#95d5b2'],
-  netrunner:   ['#3d7bff', '#7a5cff', '#00d4ff'],
-  ghost:       ['#f2f5ff', '#aab4d0', '#c9d1e8'],
-};
-
-/** Literal font stacks for the Display Mods previews. Literal families are
- *  CORRECT here (same exception as SKIN_PALETTES): each card previews its
- *  own face regardless of the currently equipped --font-display. */
+/** Literal font stacks for the display-font previews. Literal families are
+ *  CORRECT here (same exception as the skin palettes): each card previews
+ *  its own face regardless of the currently equipped --font-display. */
 const FONT_FAMILIES: Record<string, string> = {
   orbitron:  "'Orbitron', 'Chakra Petch', sans-serif",
   vt323:     "'VT323', 'Chakra Petch', monospace",
@@ -56,69 +51,54 @@ const FONT_FAMILIES: Record<string, string> = {
   sharetech: "'Share Tech Mono', 'Chakra Petch', monospace",
 };
 
-/** FX preview backgrounds keyed by fxKey — punchier alphas than the live
- *  index.css overlays so each effect reads at thumbnail size. */
-const FX_PREVIEWS: Record<string, string> = {
-  rain:       'repeating-linear-gradient(100deg, transparent 0px, transparent 7px, rgba(var(--accent-rgb),0.35) 7px, rgba(var(--accent-rgb),0.35) 8px)',
-  aurora:     'radial-gradient(80px 40px at 25% 30%, rgba(var(--accent-rgb),0.45), transparent 70%), radial-gradient(90px 50px at 75% 70%, rgba(157,107,255,0.4), transparent 70%)',
-  vhs:        'repeating-linear-gradient(0deg, transparent 0px, transparent 12px, rgba(var(--accent-rgb),0.30) 12px, rgba(var(--accent-rgb),0.30) 15px, rgba(255,255,255,0.14) 15px, rgba(255,255,255,0.14) 16px)',
-  datastream: 'repeating-linear-gradient(90deg, transparent 0px, transparent 12px, rgba(var(--accent-rgb),0.35) 12px, rgba(var(--accent-rgb),0.35) 13px)',
-  radar:      'conic-gradient(from 300deg at 50% 60%, rgba(var(--accent-rgb),0.5) 0deg, rgba(var(--accent-rgb),0.12) 45deg, transparent 90deg)',
-  crt:        'linear-gradient(180deg, transparent 30%, rgba(var(--accent-rgb),0.45) 50%, transparent 70%), repeating-linear-gradient(0deg, rgba(255,255,255,0.07) 0 1px, transparent 1px 3px)',
-};
-
-const CONSUMABLE_ORDER: ShopCategory[] = ['token_skip', 'token_reroll', 'rr_credit', 'consumable', 'loot_crate'];
-
-/** Outline icon per consumable category (NO emoji anywhere). */
-const CONSUMABLE_ICON: Record<string, string> = {
-  token_skip:   'chevR',
-  token_reroll: 'repeat',
-  rr_credit:    'play',
-  loot_crate:   'bag',
-};
-/** Per-item icon overrides for the power consumables. */
-const ITEM_ICON: Record<string, string> = {
-  shield_1:        'shield',
-  booster_1:       'zap',
+/** Outline icon per supply SKU (NO emoji outside .ncx-chip containers). */
+const SUPPLY_ICON: Record<string, string> = {
+  reroll_1: 'repeat',
+  skip_1: 'chevR',
+  focus_1: 'target',
+  overclock_1: 'clock',
+  shield_1: 'shield',
+  booster_1: 'zap',
+  rr_1: 'play',
   time_dilation_1: 'clock',
+  crate_standard: 'bag',
+  crate_prime: 'bag',
 };
 
-/** Owned ×n counts we can read off the player snapshot. */
-const OWNED_COUNT: Partial<Record<ShopCategory, (p: PlayerSnapshot) => number>> = {
-  token_skip:   p => p.skipTokens,
-  token_reroll: p => p.rerollTokens,
-  rr_credit:    p => p.rrCredits,
+/** Owned ×n stock counter per supply SKU, read off the player snapshot. */
+const SUPPLY_COUNT: Record<string, (p: PlayerSnapshot) => number> = {
+  skip_1: p => p.skipTokens,
+  reroll_1: p => p.rerollTokens,
+  rr_1: p => p.rrCredits,
+  shield_1: p => p.streakShields,
+  focus_1: p => p.focusStims,
+  overclock_1: p => p.overclockChips,
 };
 
-/** Owned/active status per power-consumable item key. */
-function consumableStatus(itemKey: string, p: PlayerSnapshot): { count: number; active: string | null } {
-  if (itemKey === 'shield_1') return { count: p.streakShields, active: null };
+/** Active-effect label for the timed supplies. */
+function supplyActiveLabel(itemKey: string, p: PlayerSnapshot): string | null {
   if (itemKey === 'booster_1') {
     const until = p.boosterUntil ? new Date(p.boosterUntil) : null;
     if (until && until > new Date()) {
       const hrs = Math.max(1, Math.round((until.getTime() - Date.now()) / 3_600_000));
-      return { count: 0, active: `ACTIVE · ${hrs}H LEFT` };
+      return `ACTIVE · ${hrs}H LEFT`;
     }
-    return { count: 0, active: null };
   }
   if (itemKey === 'time_dilation_1') {
     const on = p.budgetBoostOn ? new Date(p.budgetBoostOn) : null;
     const now = new Date();
-    const today = on && on.getFullYear() === now.getFullYear() && on.getMonth() === now.getMonth() && on.getDate() === now.getDate();
-    return { count: 0, active: today ? 'ACTIVE TODAY' : null };
+    if (on && on.getFullYear() === now.getFullYear() && on.getMonth() === now.getMonth() && on.getDate() === now.getDate()) {
+      return 'ACTIVE TODAY';
+    }
   }
-  return { count: 0, active: null };
+  return null;
 }
 
-/** View-model for one Neon Skin card (catalog cosmetics + built-in default). */
-interface SkinVM {
-  key: string;                      // catalog itemKey, or 'theme-default'
-  name: string;
-  themeKey: string | null;          // null = stock QUESTMAN OS palette
-  price: number | null;             // null = free/built-in
-  owned: boolean;
-  palette: [string, string, string];
-}
+/** Display order of the SUPPLY grid (handoff six first, kept stock after). */
+const SUPPLY_ORDER = [
+  'reroll_1', 'skip_1', 'focus_1', 'overclock_1', 'shield_1', 'booster_1',
+  'rr_1', 'time_dilation_1', 'crate_standard', 'crate_prime',
+];
 
 /** Fallback feedback line for loot-crate rolls when the server sent no message. */
 function grantedLine(granted?: Record<string, unknown>): string | null {
@@ -127,15 +107,26 @@ function grantedLine(granted?: Record<string, unknown>): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+const MKT_CATS: Array<[string, string]> = [
+  ['all', 'ALL'], ['skins', 'SKINS'], ['shells', 'SHELLS'], ['fx', 'FX'], ['chrono', 'CHRONO'],
+  ['handlers', 'HANDLERS'], ['titles', 'TITLES'], ['pets', 'PETS'], ['supply', 'SUPPLY'],
+];
+
+type Feedback = { key: string; message: string; ok: boolean } | null;
+
 export function ShopView() {
   const qc = useQueryClient();
-  const [feedback, setFeedback] = useState<{ key: string; message: string; ok: boolean } | null>(null);
+  const { user } = useAuth();
+  const [cat, setCat] = useState('all');
+  const [feedback, setFeedback] = useState<Feedback>(null);
+  const show = (k: string) => cat === 'all' || cat === k;
+  const handle = (user?.name || user?.email?.split('@')[0] || 'RUNNER').toUpperCase();
 
   const shopQ = useQuery({
     queryKey: ['shop'],
     queryFn: () => api.get<ShopResponse>('/api/shop'),
   });
-  // Current Handler persona — the EQUIPPED stamp for the persona cards.
+  // Current Handler persona — drives the LIVE stamp on the handler cards.
   const personaQ = useQuery({
     queryKey: ['handler', 'persona'],
     queryFn: () => api.get<PersonaResponse>('/api/handler/persona'),
@@ -151,19 +142,17 @@ export function ShopView() {
     qc.invalidateQueries({ queryKey: ['handler', 'latest'] });
   };
 
+  // One equip endpoint covers every slot; explicit null clears (titles/pets).
   const equip = useMutation({
-    mutationFn: (themeKey: string | null) => api.post<{ player: PlayerSnapshot }>('/api/shop/equip', { themeKey }),
-    onSuccess: refreshPlayer,
-  });
-
-  // Display-mod slots: { fontKey } / { fxKey } / { timerKey }; explicit null
-  // clears a slot.
-  const equipMod = useMutation({
-    mutationFn: (body: { fontKey?: string | null; fxKey?: string | null; timerKey?: string | null }) =>
+    mutationFn: (body: Record<string, string | null>) =>
       api.post<{ player: PlayerSnapshot }>('/api/shop/equip', body),
     onSuccess: refreshPlayer,
   });
-
+  // VISUAL FX are stackable — membership flips, no slot.
+  const fxToggle = useMutation({
+    mutationFn: (fxKey: string) => api.post<{ player: PlayerSnapshot }>('/api/shop/fx-toggle', { fxKey }),
+    onSuccess: refreshPlayer,
+  });
   // Owned Handler voices equip through the Handler config endpoint.
   const equipPersona = useMutation({
     mutationFn: (personaKey: string) => api.put('/api/handler/persona', { persona: personaKey }),
@@ -179,8 +168,8 @@ export function ShopView() {
         message: res.message ?? grantedLine(res.granted) ?? 'Purchased',
         ok: true,
       });
-      // Skins/fonts/FX auto-equip SERVER-SIDE on buy (polish pass §5);
-      // refreshPlayer above re-snapshots the equipped theme for App.tsx.
+      // Everything auto-equips SERVER-SIDE on buy (handoff contract);
+      // refreshPlayer above re-snapshots theme/shell/gear for App.tsx.
       // Personas also auto-equip server-side — refresh the Handler config.
       if (res.purchase.category === 'persona') refreshPersona();
     },
@@ -195,60 +184,56 @@ export function ShopView() {
 
   const { items, player } = shopQ.data;
   const pendingKey = buy.isPending ? buy.variables : null;
+  const busy = buy.isPending || equip.isPending || fxToggle.isPending || equipPersona.isPending;
+  const fb = (key: string) => (feedback?.key === key ? feedback : null);
+  const doBuy = (key: string) => { setFeedback(null); buy.mutate(key); };
 
-  // Stock QUESTMAN OS palette is always owned + free; equipped when no theme key is set.
+  const byCat = (c: ShopItem['category']) => items.filter(i => i.category === c);
+
+  // ---- SKINS view-model: stock default + the full catalog ladder ----
+  const skinItems = byCat('cosmetic');
+  type SkinVM = {
+    key: string; themeKey: string | null; name: string;
+    colors: [string, string, string]; price: number | null;
+    levelReq?: number; owned: boolean;
+  };
   const skins: SkinVM[] = [
-    { key: 'theme-default', name: 'QUESTMAN OS', themeKey: null, price: null, owned: true, palette: SKIN_PALETTES.default },
-    ...items.filter(i => i.category === 'cosmetic').map((i): SkinVM => {
-      const tk = typeof i.payload?.themeKey === 'string' ? (i.payload.themeKey as string) : i.key;
+    { key: 'theme-default', themeKey: null, name: SKIN_META.default.name, colors: SKIN_META.default.colors, price: null, owned: true },
+    ...skinItems.map((i): SkinVM => {
+      const tk = String(i.payload?.themeKey ?? i.key);
+      const meta = SKIN_META[tk];
       return {
-        key: i.key,
-        name: i.name,
-        themeKey: tk,
-        price: i.priceEddies,
-        owned: i.owned === true,
-        palette: SKIN_PALETTES[tk] ?? SKIN_PALETTES.default,
+        key: i.key, themeKey: tk,
+        name: meta?.name ?? i.name.toUpperCase(),
+        colors: meta?.colors ?? SKIN_META.default.colors,
+        price: i.priceEddies, levelReq: i.levelReq, owned: i.owned === true,
       };
     }),
   ];
+  const skinEquipped = (s: SkinVM) => (player.equippedTheme ?? null) === s.themeKey;
 
-  const consumables = CONSUMABLE_ORDER.flatMap(cat => items.filter(i => i.category === cat));
-  const personas = items.filter(i => i.category === 'persona');
-  const mods = [...items.filter(i => i.category === 'font'), ...items.filter(i => i.category === 'fx')];
-  const timers = items.filter(i => i.category === 'timer');
+  // ---- SHELLS + fonts ----
+  const shellItems = byCat('shell');
+  const fontItems = byCat('font');
+  const equippedShell = player.equippedShell ?? 'nightcity';
+
+  // ---- FX / CHRONO / HANDLERS / TITLES / PETS / SUPPLY ----
+  const fxItems = byCat('fx');
+  const fxActive = new Set(player.fxActive);
+  const timerItems = byCat('timer');
+  const equippedChrono = chronoKey(player.equippedTimer);
+  const personaItems = byCat('persona');
   const currentPersona = personaQ.data?.persona ?? null;
+  const titleItems = byCat('title');
+  const petItems = byCat('pet');
+  const supplyItems = SUPPLY_ORDER
+    .map(key => items.find(i => i.key === key))
+    .filter((i): i is ShopItem => i != null);
 
-  /** Render a display-mod card (font / fx / timer) with slot-aware wiring. */
-  const renderMod = (item: ShopItem) => {
-    const slot: ModSlot = item.category === 'font' ? 'font' : item.category === 'fx' ? 'fx' : 'timer';
-    const payloadKey = `${slot}Key`;
-    const modKey = typeof item.payload?.[payloadKey] === 'string' ? (item.payload[payloadKey] as string) : item.key;
-    const equippedNow =
-      slot === 'font' ? player.equippedFont === modKey :
-      slot === 'fx' ? player.equippedFx === modKey :
-      player.equippedTimer === modKey;
-    const body = (v: string | null) =>
-      slot === 'font' ? { fontKey: v } : slot === 'fx' ? { fxKey: v } : { timerKey: v };
-    return (
-      <ModCard
-        key={item.key}
-        item={item}
-        slot={slot}
-        modKey={modKey}
-        equipped={equippedNow}
-        owned={item.owned === true}
-        affordable={player.eddies >= item.priceEddies}
-        busy={pendingKey === item.key || equipMod.isPending}
-        feedback={feedback?.key === item.key ? feedback : null}
-        onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
-        onEquip={() => equipMod.mutate(body(modKey))}
-        onUnequip={() => equipMod.mutate(body(null))}
-      />
-    );
-  };
+  const ownCount = (list: ShopItem[]) => list.filter(i => i.owned === true).length;
 
   return (
-    <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ---- header: chroma title + focal balance panel ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div>
@@ -256,7 +241,7 @@ export function ShopView() {
             NIGHT MARKET
           </div>
           <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 4 }}>
-            COSMETICS · CONSUMABLES · NO REFUNDS
+            COSMETICS · FIRMWARE · COMPANIONS · NO REFUNDS
           </div>
         </div>
         <span style={{ flex: 1 }} />
@@ -270,224 +255,498 @@ export function ShopView() {
         </Ticks>
       </div>
 
-      {/* ---- neon skins ---- */}
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-        NEON SKINS — FULL ACCENT REMAP · EQUIP TO PREVIEW LIVE
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
-        {skins.map(skin => (
-          <SkinCard
-            key={skin.key}
-            skin={skin}
-            equipped={player.equippedTheme === skin.themeKey}
-            affordable={skin.price === null || player.eddies >= skin.price}
-            busy={pendingKey === skin.key || equip.isPending}
-            feedback={feedback?.key === skin.key ? feedback : null}
-            onBuy={() => { setFeedback(null); buy.mutate(skin.key); }}
-            onEquip={() => equip.mutate(skin.themeKey)}
-          />
+      {/* ---- category rail (keyed by active state — remount, don't morph) ---- */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {MKT_CATS.map(([k, label]) => (
+          <button
+            key={k + '-' + (cat === k)}
+            className={'btn' + (cat === k ? ' btn-primary' : '')}
+            style={{ padding: '5px 13px', fontSize: 10 }}
+            onClick={() => setCat(k)}
+          >
+            {label}
+          </button>
         ))}
       </div>
 
-      {/* ---- handler personas ---- */}
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
-        HANDLER PERSONAS — NEW VOICES FOR THE EAR-PIECE · AUTO-EQUIP ON BUY
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
-        {personas.map(item => {
-          const personaKey = typeof item.payload?.personaKey === 'string' ? (item.payload.personaKey as string) : item.key;
+      {/* ---- NEON SKINS ---- */}
+      <MktSection
+        show={show('skins')}
+        label="NEON SKINS — FULL ACCENT REMAP · EQUIP TO PREVIEW LIVE"
+        serial={`${skins.filter(s => s.owned).length}/${skins.length} OWNED`}
+      >
+        {skins.map(s => {
+          const equipped = skinEquipped(s);
           return (
-            <PersonaCard
+            <MktCard key={s.key} equipped={equipped}>
+              <SkinPreview colors={s.colors} />
+              <NameRow name={s.name} equipped={equipped} owned={s.owned} />
+              <ActionSlot
+                equipped={equipped} owned={s.owned}
+                price={s.price} levelReq={s.levelReq} level={player.level}
+                eddies={player.eddies} busy={busy}
+                onBuy={() => doBuy(s.key)}
+                onEquip={() => equip.mutate({ themeKey: s.themeKey })}
+              />
+              {fb(s.key) && <FeedbackLine feedback={fb(s.key)!} />}
+            </MktCard>
+          );
+        })}
+      </MktSection>
+
+      {/* ---- OS SHELLS ---- */}
+      <MktSection
+        show={show('shells')}
+        label="OS SHELLS — FULL INTERFACE REWIRE · FONTS · GEOMETRY · BACKDROP"
+        serial={`${1 + ownCount(shellItems)}/${1 + shellItems.length} OWNED`}
+      >
+        {/* Factory firmware — always owned, equipping it clears the slot. */}
+        <MktCard equipped={equippedShell === 'nightcity'}>
+          <ShellPreview k="nightcity" />
+          <NameRow name={SHELL_META.nightcity.name} equipped={equippedShell === 'nightcity'} owned />
+          <DescLine text={SHELL_META.nightcity.desc} />
+          <ActionSlot
+            equipped={equippedShell === 'nightcity'} owned liveText="BOOTED NOW"
+            price={null} eddies={player.eddies} level={player.level} busy={busy}
+            onEquip={() => equip.mutate({ shellKey: 'nightcity' })}
+          />
+        </MktCard>
+        {shellItems.map(item => {
+          const shellKey = String(item.payload?.shellKey ?? '');
+          const equipped = equippedShell === shellKey;
+          return (
+            <MktCard key={item.key} equipped={equipped}>
+              <ShellPreview k={shellKey} />
+              <NameRow name={SHELL_META[shellKey]?.name ?? item.name.toUpperCase()} equipped={equipped} owned={item.owned === true} />
+              <DescLine text={item.description} />
+              <ActionSlot
+                equipped={equipped} owned={item.owned === true} liveText="BOOTED NOW"
+                price={item.priceEddies} levelReq={item.levelReq} level={player.level}
+                eddies={player.eddies} busy={busy}
+                onBuy={() => doBuy(item.key)}
+                onEquip={() => equip.mutate({ shellKey })}
+              />
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </MktCard>
+          );
+        })}
+      </MktSection>
+
+      {/* ---- display fonts (ride along under the SHELLS pill) ---- */}
+      <MktSection
+        show={show('shells')}
+        label="DISPLAY FONTS — HEADER TYPEFACE · AUTO-EQUIP ON BUY"
+        serial={`${ownCount(fontItems)}/${fontItems.length} OWNED`}
+      >
+        {fontItems.map(item => {
+          const fontKey = String(item.payload?.fontKey ?? '');
+          const equipped = player.equippedFont === fontKey;
+          return (
+            <MktCard key={item.key} equipped={equipped}>
+              <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
+                <span style={{ fontFamily: FONT_FAMILIES[fontKey] ?? 'var(--font-display)', fontSize: fontKey === 'vt323' ? 22 : 16, letterSpacing: '0.06em', color: 'var(--cyan)' }}>
+                  {item.name.toUpperCase()}
+                </span>
+              </div>
+              <NameRow name={item.name} equipped={equipped} owned={item.owned === true} />
+              <DescLine text={item.description} />
+              <ActionSlot
+                equipped={equipped} owned={item.owned === true}
+                onRemove={equipped ? () => equip.mutate({ fontKey: null }) : undefined}
+                price={item.priceEddies} levelReq={item.levelReq} level={player.level}
+                eddies={player.eddies} busy={busy}
+                onBuy={() => doBuy(item.key)}
+                onEquip={() => equip.mutate({ fontKey })}
+              />
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </MktCard>
+          );
+        })}
+      </MktSection>
+
+      {/* ---- VISUAL FX (stackable) ---- */}
+      <MktSection
+        show={show('fx')}
+        label="VISUAL FX — AMBIENT OVERLAYS · STACKABLE · TOGGLE ANY TIME"
+        serial={`${player.fxActive.length} ONLINE`}
+      >
+        {fxItems.map(item => {
+          const fxKey = String(item.payload?.fxKey ?? '');
+          const active = fxActive.has(fxKey);
+          const isOwned = item.owned === true;
+          return (
+            <MktCard key={item.key} equipped={active}>
+              <FxPreview k={fxKey} />
+              <NameRow name={item.name} active={active} owned={isOwned} />
+              <DescLine text={item.description} />
+              {isOwned ? (
+                <button
+                  key={item.key + '-' + (active ? 'off' : 'on')}
+                  className="btn" style={{ fontSize: 11, padding: 8 }}
+                  disabled={busy}
+                  onClick={() => fxToggle.mutate(fxKey)}
+                >
+                  {active ? 'DISABLE' : 'ENABLE'}
+                </button>
+              ) : (
+                <ActionSlot
+                  equipped={false} owned={false}
+                  price={item.priceEddies} levelReq={item.levelReq} level={player.level}
+                  eddies={player.eddies} busy={busy}
+                  onBuy={() => doBuy(item.key)}
+                />
+              )}
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </MktCard>
+          );
+        })}
+      </MktSection>
+
+      {/* ---- CHRONO ---- */}
+      <MktSection
+        show={show('chrono')}
+        label="CHRONO — SESSION TIMER STYLES · SHOWN WHILE JACKED IN"
+        serial={`${1 + ownCount(timerItems)}/${1 + timerItems.length} OWNED`}
+      >
+        {/* STANDARD ISSUE — the free built-in; equipping clears the slot. */}
+        <MktCard equipped={equippedChrono === 'standard'}>
+          <SessionTimerPreview k="standard" />
+          <NameRow name="STANDARD ISSUE" equipped={equippedChrono === 'standard'} owned />
+          <DescLine text="Clean mono countdown with a progress rail." />
+          <ActionSlot
+            equipped={equippedChrono === 'standard'} owned liveText="ON THE CLOCK"
+            price={null} eddies={player.eddies} level={player.level} busy={busy}
+            onEquip={() => equip.mutate({ timerKey: 'standard' })}
+          />
+        </MktCard>
+        {timerItems.map(item => {
+          const timerKey = String(item.payload?.timerKey ?? '');
+          const equipped = equippedChrono === timerKey;
+          const isLegacyFace = ['flip', 'ring', 'pulse'].includes(timerKey);
+          return (
+            <MktCard key={item.key} equipped={equipped}>
+              {isLegacyFace
+                ? <LegacyFacePreview k={timerKey} />
+                : <SessionTimerPreview k={timerKey} />}
+              <NameRow name={item.name} equipped={equipped} owned={item.owned === true} />
+              <DescLine text={item.description} />
+              <ActionSlot
+                equipped={equipped} owned={item.owned === true} liveText="ON THE CLOCK"
+                price={item.priceEddies} levelReq={item.levelReq} level={player.level}
+                eddies={player.eddies} busy={busy}
+                onBuy={() => doBuy(item.key)}
+                onEquip={() => equip.mutate({ timerKey })}
+              />
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </MktCard>
+          );
+        })}
+      </MktSection>
+
+      {/* ---- HANDLERS ---- */}
+      <MktSection
+        show={show('handlers')}
+        label="HANDLERS — THE VOICE ON YOUR COMMS · TICKER + LEVEL-UPS"
+        serial={`${1 + ownCount(personaItems)}/${1 + personaItems.length} OWNED`}
+      >
+        {/* V1KTOR — the free default voice. */}
+        <HandlerCard
+          personaKey="fixer" price={null}
+          equipped={currentPersona === 'fixer'} owned
+          streak={player.currentStreak} level={player.level} eddies={player.eddies} busy={busy}
+          onEquip={() => equipPersona.mutate('fixer')}
+        />
+        {personaItems.map(item => {
+          const personaKey = String(item.payload?.personaKey ?? '');
+          return (
+            <HandlerCard
               key={item.key}
-              item={item}
-              equipped={currentPersona === personaKey}
-              owned={item.owned === true}
-              affordable={player.eddies >= item.priceEddies}
-              busy={pendingKey === item.key || equipPersona.isPending}
-              feedback={feedback?.key === item.key ? feedback : null}
-              onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
+              personaKey={personaKey} price={item.priceEddies} levelReq={item.levelReq}
+              equipped={currentPersona === personaKey} owned={item.owned === true}
+              streak={player.currentStreak} level={player.level} eddies={player.eddies} busy={busy}
+              onBuy={() => doBuy(item.key)}
               onEquip={() => equipPersona.mutate(personaKey)}
+              feedback={fb(item.key)}
             />
           );
         })}
-      </div>
+      </MktSection>
 
-      {/* ---- display mods: fonts + ambient fx ---- */}
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
-        DISPLAY MODS — HEADER FONTS &amp; AMBIENT FX · AUTO-EQUIP ON BUY
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
-        {mods.map(renderMod)}
-      </div>
-
-      {/* ---- timer styles: focus-chamber clock faces ---- */}
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
-        TIMER STYLES — FOCUS CHAMBER CLOCK FACES · AUTO-EQUIP ON BUY
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
-        {timers.map(renderMod)}
-      </div>
-
-      {/* ---- consumables ---- */}
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
-        CONSUMABLES
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
-        {consumables.map(item => {
-          const status = item.category === 'consumable' ? consumableStatus(item.key, player) : null;
+      {/* ---- TITLES ---- */}
+      <MktSection
+        show={show('titles')}
+        label="TITLES — WORN ON YOUR RUNNER ID"
+        serial={`${ownCount(titleItems)}/${titleItems.length} OWNED`}
+      >
+        {titleItems.map(item => {
+          const titleKey = String(item.payload?.titleKey ?? '');
+          const name = TITLE_META[titleKey]?.name ?? item.name.toUpperCase();
+          const equipped = player.equippedTitle === titleKey;
           return (
-            <ConsumableCard
-              key={item.key}
-              item={item}
-              ownedCount={status ? status.count : (OWNED_COUNT[item.category]?.(player) ?? 0)}
-              activeLabel={status?.active ?? null}
-              affordable={player.eddies >= item.priceEddies}
-              busy={pendingKey === item.key || equip.isPending}
-              feedback={feedback?.key === item.key ? feedback : null}
-              onBuy={() => { setFeedback(null); buy.mutate(item.key); }}
-            />
+            <MktCard key={item.key} equipped={equipped}>
+              <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px' }}>
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.14em', whiteSpace: 'nowrap' }}>
+                  {handle} <span style={{ color: equipped ? 'var(--cyan)' : 'var(--text-dim)' }}>// {name}</span>
+                </span>
+              </div>
+              <NameRow name={name} equipped={equipped} owned={item.owned === true} />
+              <DescLine text={item.description} />
+              <ActionSlot
+                equipped={equipped} owned={item.owned === true}
+                onRemove={equipped ? () => equip.mutate({ titleKey: null }) : undefined}
+                price={item.priceEddies} levelReq={item.levelReq} level={player.level}
+                eddies={player.eddies} busy={busy}
+                onBuy={() => doBuy(item.key)}
+                onEquip={() => equip.mutate({ titleKey })}
+              />
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </MktCard>
           );
         })}
-      </div>
+      </MktSection>
+
+      {/* ---- DATA PETS ---- */}
+      <MktSection
+        show={show('pets')}
+        label="DATA PETS — LIVE IN YOUR DECK · DO NOTHING · BELOVED"
+        serial={`${ownCount(petItems)}/${petItems.length} ADOPTED`}
+      >
+        {petItems.map(item => {
+          const petKey = String(item.payload?.petKey ?? '');
+          const pet = PET_META[petKey];
+          if (!pet) return null;
+          const equipped = player.equippedPet === petKey;
+          return (
+            <MktCard key={item.key} equipped={equipped}>
+              <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px' }}>
+                <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 38, height: 38, fontSize: 19 }}>
+                  {pet.emoji}
+                </div>
+                <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', lineHeight: 1.6, minWidth: 0 }}>
+                  <div style={{ color: 'var(--text-dim)', letterSpacing: '0.16em' }}>{pet.species}</div>
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pet.status[0]}</div>
+                </div>
+              </div>
+              <NameRow name={pet.name} equipped={equipped} owned={item.owned === true} />
+              <ActionSlot
+                equipped={equipped} owned={item.owned === true}
+                onRemove={equipped ? () => equip.mutate({ petKey: null }) : undefined}
+                price={item.priceEddies} levelReq={item.levelReq} level={player.level}
+                eddies={player.eddies} busy={busy}
+                onBuy={() => doBuy(item.key)}
+                onEquip={() => equip.mutate({ petKey })}
+              />
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </MktCard>
+          );
+        })}
+      </MktSection>
+
+      {/* ---- SUPPLIES ---- */}
+      <MktSection
+        show={show('supply')}
+        label="SUPPLIES — CONSUMABLES · STOCK UP"
+        serial="REPEAT PURCHASE OK"
+      >
+        {supplyItems.map(item => {
+          const count = SUPPLY_COUNT[item.key]?.(player) ?? 0;
+          const active = supplyActiveLabel(item.key, player);
+          const affordable = player.eddies >= item.priceEddies;
+          return (
+            <div key={item.key} className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="ncx-chip" style={{ width: 34, height: 34, color: 'var(--cyan)' }}>
+                  <Icon name={SUPPLY_ICON[item.key] ?? 'bag'} size={15} />
+                </div>
+                <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
+                {active ? (
+                  <span className="ncx-stamp flat" style={{ marginLeft: 'auto', color: 'var(--lime)', fontSize: 9.5 }}>{active}</span>
+                ) : count > 0 ? (
+                  <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)' }}>×{count}</span>
+                ) : null}
+              </div>
+              <DescLine text={item.description} />
+              <button
+                className="btn"
+                style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
+                disabled={!affordable || pendingKey === item.key}
+                onClick={() => doBuy(item.key)}
+                title={affordable ? undefined : 'Not enough eddies'}
+              >
+                <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· BUY
+              </button>
+              {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
+            </div>
+          );
+        })}
+      </MktSection>
     </div>
   );
 }
 
-/* ---------- neon skin card ---------- */
+/* ---------- shared card chrome ---------- */
 
-function SkinCard({ skin, equipped, affordable, busy, feedback, onBuy, onEquip }: {
-  skin: SkinVM;
-  equipped: boolean;
-  affordable: boolean;
-  busy: boolean;
-  feedback: { message: string; ok: boolean } | null;
-  onBuy: () => void;
-  onEquip: () => void;
+function MktSection({ label, serial, show, children }: {
+  label: string; serial: string; show: boolean; children: React.ReactNode;
 }) {
-  const c = skin.palette;
+  if (!show) return null;
   return (
-    <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* mini-HUD preview in the skin's OWN colors */}
-      <div className="panel-inset" style={{ height: 70, padding: 10, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(120px 60px at 20% 0%, ${c[0]}22, transparent)` }} />
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{
-            width: 14, height: 14, flex: 'none',
-            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
-            background: c[0], boxShadow: `0 0 8px ${c[0]}`,
-          }} />
-          <div style={{ flex: 1, height: 5, background: '#0a0b14', boxShadow: 'inset 0 0 0 1px rgba(150,168,224,0.12)' }}>
-            <div style={{ width: '62%', height: '100%', background: c[0], boxShadow: `0 0 8px ${c[0]}aa` }} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {c.map((col, i) => (
-            <span key={i} style={{ flex: 1, height: 4, background: col, opacity: 0.85, boxShadow: `0 0 6px ${col}66` }} />
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{skin.name}</span>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{label}</span>
         <span style={{ flex: 1 }} />
-        {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>LIVE</span>}
-        {!equipped && skin.owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
+        <span className="ncx-serial">{serial}</span>
       </div>
+      <div className="mkt-grid">{children}</div>
+    </>
+  );
+}
 
-      {/* keyed by state — see file header. Equipped = nothing to press
-          (polish pass §2a): the hud border + LIVE stamp already say it. */}
-      {equipped ? (
-        <div key={skin.key + '-eq'} className="mono" style={{
-          fontSize: 10, letterSpacing: '0.2em', color: 'var(--text-faint)',
-          textAlign: 'center', padding: '9px 0',
-          boxShadow: 'inset 0 0 0 1px var(--line)',
-        }}>▸ RUNNING NOW</div>
-      ) : skin.owned ? (
-        <button key={skin.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
-          EQUIP
-        </button>
-      ) : (
-        <button
-          key={skin.key + '-buy'}
-          className="btn"
-          style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
-          disabled={!affordable || busy}
-          onClick={onBuy}
-          title={affordable ? undefined : 'Not enough eddies'}
-        >
-          <span style={{ color: 'var(--amber)' }}>€${(skin.price ?? 0).toLocaleString()}</span>· UNLOCK
-        </button>
-      )}
-
-      {feedback && <FeedbackLine feedback={feedback} />}
+function MktCard({ equipped, children }: { equipped: boolean; children: React.ReactNode }) {
+  return (
+    <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11 }}>
+      {children}
     </div>
   );
 }
 
-/* ---------- handler persona card ---------- */
+function NameRow({ name, equipped, owned, active }: {
+  name: string; equipped?: boolean; owned?: boolean; active?: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+      <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.13em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+      <span style={{ flex: 1 }} />
+      {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>LIVE</span>}
+      {active && <span className="ncx-stamp flat" style={{ color: 'var(--lime)' }}>ONLINE</span>}
+      {!equipped && !active && owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
+    </div>
+  );
+}
 
-function PersonaCard({ item, equipped, owned, affordable, busy, feedback, onBuy, onEquip }: {
-  item: ShopItem;
+function DescLine({ text }: { text: string }) {
+  return <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{text}</div>;
+}
+
+/**
+ * The buy / equip / live action slot shared by every single-equip line.
+ * Buttons are KEYED by state (remount, don't morph — see file header).
+ */
+function ActionSlot({ equipped, owned, liveText, onRemove, price, levelReq, level, eddies, busy, onBuy, onEquip }: {
   equipped: boolean;
   owned: boolean;
-  affordable: boolean;
+  liveText?: string;
+  /** Present on removable lines (titles/pets; fonts clear to stock). */
+  onRemove?: () => void;
+  price: number | null;          // null = free/built-in (never a buy state)
+  levelReq?: number;
+  level: number;
+  eddies: number;
   busy: boolean;
-  feedback: { message: string; ok: boolean } | null;
-  onBuy: () => void;
-  onEquip: () => void;
+  onBuy?: () => void;
+  onEquip?: () => void;
 }) {
+  if (equipped) {
+    return onRemove ? (
+      <button key="rm" className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onRemove}>
+        REMOVE
+      </button>
+    ) : (
+      /* Equipped = nothing to press (Polish-Pass §2a): the focal border +
+         LIVE stamp already say it — this line is NOT a button. */
+      <div key="live" className="mkt-live">▸ {liveText ?? 'RUNNING NOW'}</div>
+    );
+  }
+  if (owned) {
+    return (
+      <button key="eq" className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
+        EQUIP
+      </button>
+    );
+  }
+  if (levelReq && level < levelReq) {
+    return (
+      <button key="lock" className="btn" style={{ fontSize: 11, padding: 8 }} disabled>
+        <Icon name="lock" size={11} /> LVL {levelReq} · €${(price ?? 0).toLocaleString()}
+      </button>
+    );
+  }
+  const affordable = price == null || eddies >= price;
   return (
-    <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div className="ncx-chip" style={{ width: 34, height: 34, color: equipped ? 'var(--cyan)' : 'var(--violet)' }}>
-          <Icon name="bell" size={15} />
+    <button
+      key="buy"
+      className="btn"
+      style={{ fontSize: 11, padding: 8, opacity: affordable ? 1 : 0.45 }}
+      disabled={!affordable || busy}
+      onClick={onBuy}
+      title={affordable ? undefined : 'Not enough eddies'}
+    >
+      <span style={{ color: 'var(--amber)' }}>€${(price ?? 0).toLocaleString()}</span>· UNLOCK
+    </button>
+  );
+}
+
+/* ---------- previews ---------- */
+
+/** Mini-HUD in the skin's OWN colors: hex chip, progress bar, 3 strips. */
+function SkinPreview({ colors }: { colors: [string, string, string] }) {
+  return (
+    <div className="panel-inset mkt-prev" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(120px 60px at 20% 0%, ${colors[0]}22, transparent)` }} />
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{
+          width: 14, height: 14, flex: 'none',
+          clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+          background: colors[0], boxShadow: `0 0 8px ${colors[0]}`,
+        }} />
+        <div style={{ flex: 1, height: 5, background: '#0a0b14', boxShadow: 'inset 0 0 0 1px rgba(150,168,224,0.12)' }}>
+          <div style={{ width: '62%', height: '100%', background: colors[0], boxShadow: `0 0 8px ${colors[0]}aa` }} />
         </div>
-        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
-        <span style={{ flex: 1 }} />
-        {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>EQUIPPED</span>}
-        {!equipped && owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
       </div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{item.description}</div>
-
-      {/* keyed by state — see file header. Equipped = nothing to press
-          (polish pass §2a): the hud border + EQUIPPED stamp already say it. */}
-      {equipped ? (
-        <div key={item.key + '-eq'} className="mono" style={{
-          fontSize: 10, letterSpacing: '0.2em', color: 'var(--text-faint)',
-          textAlign: 'center', padding: '9px 0',
-          boxShadow: 'inset 0 0 0 1px var(--line)',
-        }}>▸ RUNNING NOW</div>
-      ) : owned ? (
-        <button key={item.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
-          EQUIP
-        </button>
-      ) : (
-        <button
-          key={item.key + '-buy'}
-          className="btn"
-          style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
-          disabled={!affordable || busy}
-          onClick={onBuy}
-          title={affordable ? undefined : 'Not enough eddies'}
-        >
-          <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· UNLOCK
-        </button>
-      )}
-
-      {feedback && <FeedbackLine feedback={feedback} />}
+      <div style={{ display: 'flex', gap: 4 }}>
+        {colors.map((c, i) => (
+          <span key={i} style={{ flex: 1, height: 4, background: c, opacity: 0.85, boxShadow: `0 0 6px ${c}66` }} />
+        ))}
+      </div>
     </div>
   );
 }
 
-/* ---------- display mod card (font / ambient fx / timer style) ---------- */
-
-type ModSlot = 'font' | 'fx' | 'timer';
-
-/** Mini clock mocks for the timer-style cards — card-scale approximations
- *  of the real FocusView faces (the live faces live in index.css). */
-function TimerPreview({ timerKey }: { timerKey: string }) {
-  if (timerKey === 'flip') {
+function ShellPreview({ k }: { k: string }) {
+  if (k === 'tty') {
     return (
+      <div className="mkt-shellprev-tty">
+        <div>&gt; mount /vault/local <span style={{ color: '#3fff76' }}>[OK]</span></div>
+        <div>&gt; render --chrome=none</div>
+        <div>&gt; phosphor locked<span className="cursor-blink">_</span></div>
+      </div>
+    );
+  }
+  if (k === 'outrun') {
+    return (
+      <div className="mkt-shellprev-outrun">
+        <span className="sun" />
+        <span className="grid" />
+      </div>
+    );
+  }
+  return ( /* night city — factory firmware */
+    <div className="panel-inset mkt-prev" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 7, justifyContent: 'center' }}>
+      <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700 }}>NIGHT CITY</div>
+      <div className="ncx-bar slim" style={{ width: '70%' }}>
+        <i style={{ width: '62%', background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))' }} />
+        <span className="seg-mask" />
+      </div>
+    </div>
+  );
+}
+
+/** Card-scale mocks for the v1 clock faces (flip / ring / pulse), kept on
+ *  sale alongside the v2 CHRONO styles (their live faces are chamber-only). */
+function LegacyFacePreview({ k }: { k: string }) {
+  let inner: React.ReactNode;
+  if (k === 'flip') {
+    inner = (
       <div className="mono" style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
         {['2', '5', ':', '0', '0'].map((ch, i) => ch === ':' ? (
           <span key={i} style={{ color: 'var(--text-faint)', fontSize: 18, fontWeight: 700 }}>:</span>
@@ -501,10 +760,9 @@ function TimerPreview({ timerKey }: { timerKey: string }) {
         ))}
       </div>
     );
-  }
-  if (timerKey === 'ring') {
+  } else if (k === 'ring') {
     const C = 2 * Math.PI * 44;
-    return (
+    inner = (
       <div style={{ position: 'relative', width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <svg viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0 }} aria-hidden>
           <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(var(--accent-rgb),0.18)" strokeWidth="6" />
@@ -514,123 +772,70 @@ function TimerPreview({ timerKey }: { timerKey: string }) {
         <span className="mono" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--cyan)' }}>25:00</span>
       </div>
     );
+  } else {
+    // pulse — reuses the live face's heartbeat keyframes (index.css)
+    inner = (
+      <span className="mono qm-preview-pulse" style={{ fontSize: 21, fontWeight: 700, color: 'var(--cyan)' }}>
+        25:00
+      </span>
+    );
   }
-  // pulse — reuses the live face's heartbeat keyframes (index.css)
   return (
-    <span className="mono qm-preview-pulse" style={{ fontSize: 21, fontWeight: 700, color: 'var(--cyan)' }}>
-      25:00
-    </span>
+    <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {inner}
+    </div>
   );
 }
 
-function ModCard({ item, slot, modKey, equipped, owned, affordable, busy, feedback, onBuy, onEquip, onUnequip }: {
-  item: ShopItem;
-  slot: ModSlot;
-  modKey: string;
+/* ---------- handler card (terminal-quote preview + tag stamp) ---------- */
+
+function HandlerCard({ personaKey, price, levelReq, equipped, owned, streak, level, eddies, busy, onBuy, onEquip, feedback }: {
+  personaKey: string;
+  price: number | null;
+  levelReq?: number;
   equipped: boolean;
   owned: boolean;
-  affordable: boolean;
+  streak: number;
+  level: number;
+  eddies: number;
   busy: boolean;
-  feedback: { message: string; ok: boolean } | null;
-  onBuy: () => void;
+  onBuy?: () => void;
   onEquip: () => void;
-  onUnequip: () => void;
+  feedback?: Feedback;
 }) {
+  const meta = PERSONA_META[personaKey];
+  if (!meta) return null;
+  const [line] = meta.lines({ streak });
   return (
-    <div className={'panel' + (equipped ? ' hud' : '')} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* preview: font cards render their own name IN the face; fx cards a
-          swatch; timer cards a mini clock mock */}
-      <div className="panel-inset" style={{ height: 54, padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-        {slot === 'font' ? (
-          <span style={{ fontFamily: FONT_FAMILIES[modKey] ?? 'var(--font-display)', fontSize: modKey === 'vt323' ? 22 : 16, letterSpacing: '0.06em', color: 'var(--cyan)' }}>
-            {item.name.toUpperCase()}
-          </span>
-        ) : slot === 'timer' ? (
-          <TimerPreview timerKey={modKey} />
-        ) : (
-          <div style={{ position: 'absolute', inset: 0, background: FX_PREVIEWS[modKey] ?? FX_PREVIEWS.aurora }} />
-        )}
+    <MktCard equipped={equipped}>
+      <div className="panel-inset" style={{ minHeight: 70, padding: '10px 12px' }}>
+        <div className="ncx-term" style={{ fontSize: 10.5, lineHeight: 1.6 }}>
+          <span className="cy">{meta.name}&gt;</span> {line}
+        </div>
       </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.13em', whiteSpace: 'nowrap' }}>{meta.name}</span>
+        <span className="ncx-stamp flat" style={{ color: 'var(--violet)', fontSize: 8 }}>{meta.tag}</span>
         <span style={{ flex: 1 }} />
-        {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>EQUIPPED</span>}
+        {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>LIVE</span>}
         {!equipped && owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
       </div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{item.description}</div>
-
-      {/* keyed by state — see file header */}
-      {equipped ? (
-        <button key={item.key + '-uneq'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onUnequip}>
-          UNEQUIP
-        </button>
-      ) : owned ? (
-        <button key={item.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
-          EQUIP
-        </button>
-      ) : (
-        <button
-          key={item.key + '-buy'}
-          className="btn"
-          style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
-          disabled={!affordable || busy}
-          onClick={onBuy}
-          title={affordable ? undefined : 'Not enough eddies'}
-        >
-          <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· UNLOCK
-        </button>
-      )}
-
+      <DescLine text={meta.desc} />
+      <ActionSlot
+        equipped={equipped} owned={owned} liveText="ON COMMS"
+        price={price} levelReq={levelReq} level={level}
+        eddies={eddies} busy={busy}
+        onBuy={onBuy} onEquip={onEquip}
+      />
       {feedback && <FeedbackLine feedback={feedback} />}
-    </div>
-  );
-}
-
-/* ---------- consumable card ---------- */
-
-function ConsumableCard({ item, ownedCount, activeLabel, affordable, busy, feedback, onBuy }: {
-  item: ShopItem;
-  ownedCount: number;
-  activeLabel?: string | null;
-  affordable: boolean;
-  busy: boolean;
-  feedback: { message: string; ok: boolean } | null;
-  onBuy: () => void;
-}) {
-  return (
-    <div className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div className="ncx-chip" style={{ width: 34, height: 34, color: 'var(--cyan)' }}>
-          <Icon name={ITEM_ICON[item.key] ?? CONSUMABLE_ICON[item.category] ?? 'bag'} size={15} />
-        </div>
-        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
-        {activeLabel ? (
-          <span className="ncx-stamp flat" style={{ marginLeft: 'auto', color: 'var(--lime)', fontSize: 9.5 }}>{activeLabel}</span>
-        ) : ownedCount > 0 ? (
-          <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)' }}>×{ownedCount}</span>
-        ) : null}
-      </div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{item.description}</div>
-      <button
-        className="btn"
-        style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
-        disabled={!affordable || busy}
-        onClick={onBuy}
-        title={affordable ? undefined : 'Not enough eddies'}
-      >
-        <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· BUY
-      </button>
-
-      {feedback && <FeedbackLine feedback={feedback} />}
-    </div>
+    </MktCard>
   );
 }
 
 /* ---------- shared bits ---------- */
 
 /** Inline purchase feedback — loot crates reveal what dropped here. */
-function FeedbackLine({ feedback }: { feedback: { message: string; ok: boolean } }) {
+function FeedbackLine({ feedback }: { feedback: NonNullable<Feedback> }) {
   return (
     <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.08em', color: feedback.ok ? 'var(--lime)' : 'var(--red)' }}>
       {feedback.ok ? '▸ ' : '✕ '}{feedback.message}

@@ -1,9 +1,10 @@
 /**
- * The Shop route — the primary eddie sink.
+ * The Shop route — the NIGHT MARKET v2, the primary eddie sink.
  *
- *   GET  /        → catalog (cosmetics flagged owned) + player snapshot.
- *   POST /buy      → spend eddies + grant the item, atomically in one tx.
- *   POST /equip    → set/clear the active cosmetic theme.
+ *   GET  /          → catalog (ownership flagged) + player snapshot.
+ *   POST /buy       → spend eddies + grant the item, atomically in one tx.
+ *   POST /equip     → set/clear an equip slot (theme/font/timer/shell/title/pet).
+ *   POST /fx-toggle → flip one owned VISUAL FX overlay on/off (stackable).
  *
  * Conventions mirror routes/media.ts:
  *   - userId-scoped (req.user!.id), router is auth-mounted.
@@ -11,8 +12,10 @@
  *     GamificationService.awardXp (reason 'shop_purchase', touchStreak:false
  *     so a spend never ticks the daily streak; that reason is also excluded
  *     from the overclock multiplier so spends pass through raw).
- *   - PlayerProfile.cosmetics is a JSON-string array of owned theme keys,
- *     parsed/stringified by hand (SQLite has no JSON column).
+ *   - PlayerProfile.cosmetics / .fxActive are JSON-string arrays, parsed/
+ *     stringified by hand (SQLite has no JSON column).
+ *   - Level gates (`levelReq`) are re-validated here against the XP ledger —
+ *     the client's level display is cosmetic, the ledger is the truth.
  */
 import express from 'express';
 import { z } from 'zod';
@@ -20,7 +23,13 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
-import { SHOP_ITEMS, ShopItem, LootDrop, COSMETIC_THEME_KEYS, FONT_KEYS, FX_KEYS, TIMER_KEYS } from '../services/shopCatalog';
+import {
+  SHOP_ITEMS, ShopItem, LootDrop,
+  COSMETIC_THEME_KEYS, FONT_KEYS, FX_KEYS, TIMER_KEYS,
+  SHELL_KEYS, TITLE_KEYS, PET_KEYS,
+  LEGACY_FX_ALIAS,
+} from '../services/shopCatalog';
+import { levelFromXp } from '../utils/leveling';
 import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
@@ -28,8 +37,8 @@ const router = express.Router();
 let _game: GamificationService | null = null;
 const game = () => (_game ??= new GamificationService(prisma));
 
-/** Parse PlayerProfile.cosmetics (JSON-string array) defensively. */
-function parseCosmetics(raw: string | null | undefined): string[] {
+/** Parse a JSON-string array column (cosmetics / fxActive) defensively. */
+function parseKeys(raw: string | null | undefined): string[] {
   if (!raw) return [];
   try {
     const v = JSON.parse(raw);
@@ -43,6 +52,23 @@ function parseCosmetics(raw: string | null | undefined): string[] {
 async function eddieBalance(userId: string, tx: { walletLedger: typeof prisma.walletLedger }): Promise<number> {
   const agg = await tx.walletLedger.aggregate({ where: { userId }, _sum: { amount: true } });
   return agg._sum.amount ?? 0;
+}
+
+/** Player level from the XP ledger (authoritative) — for levelReq gates. */
+async function playerLevel(userId: string, tx: { xpLedger: typeof prisma.xpLedger }): Promise<number> {
+  const agg = await tx.xpLedger.aggregate({ where: { userId }, _sum: { amount: true } });
+  return levelFromXp(agg._sum.amount ?? 0);
+}
+
+/** Does `owned` unlock VISUAL FX `fxKey`? ('fx_<key>' or a legacy pack alias.) */
+function ownsFx(owned: string[], fxKey: string): boolean {
+  if (owned.includes(`fx_${fxKey}`)) return true;
+  return Object.entries(LEGACY_FX_ALIAS).some(([legacy, v2]) => v2 === fxKey && owned.includes(`fx_${legacy}`));
+}
+
+/** Does `owned` unlock CHRONO style `timerKey`? (Ownership key 'timer_<key>'.) */
+function ownsTimer(owned: string[], timerKey: string): boolean {
+  return owned.includes(`timer_${timerKey}`);
 }
 
 /** Weighted random pick from a loot table. */
@@ -67,23 +93,29 @@ function rollLoot(table: LootDrop[], ownedCosmetics: string[]): LootDrop | null 
 
 // --- catalog ------------------------------------------------------------
 
-/** GET / → { items, player }. Cosmetics already owned carry owned:true. */
+/** GET / → { items, player }. Ownership flagged per category's key scheme. */
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
   const player = await game().getSnapshot(userId);
-  const owned = new Set(player.cosmetics);
+  const owned = player.cosmetics;
+  const ownedSet = new Set(owned);
 
   const items: ShopItem[] = SHOP_ITEMS.map(item => {
-    if (item.category === 'cosmetic') {
-      const themeKey = item.payload?.themeKey as string | undefined;
-      return { ...item, owned: themeKey ? owned.has(themeKey) : false };
+    switch (item.category) {
+      case 'cosmetic': {
+        const themeKey = item.payload?.themeKey as string | undefined;
+        return { ...item, owned: themeKey ? ownedSet.has(themeKey) : false };
+      }
+      case 'fx':
+        return { ...item, owned: ownsFx(owned, item.payload?.fxKey as string) };
+      case 'timer':
+        return { ...item, owned: ownsTimer(owned, item.payload?.timerKey as string) };
+      // The prefixed lines own exactly their catalog item key.
+      case 'font': case 'persona': case 'shell': case 'title': case 'pet':
+        return { ...item, owned: ownedSet.has(item.key) };
+      default:
+        return { ...item };
     }
-    // font/fx/persona/timer ownership keys are prefixed and equal the item
-    // key ('font_orbitron', 'fx_rain', 'persona_drill', 'timer_flip').
-    if (item.category === 'font' || item.category === 'fx' || item.category === 'persona' || item.category === 'timer') {
-      return { ...item, owned: owned.has(item.key) };
-    }
-    return { ...item };
   });
 
   res.json({ items, player });
@@ -97,10 +129,10 @@ const buySchema = z.object({ itemKey: z.string().min(1).max(100) });
  * POST /buy { itemKey }
  *
  * Spend eddies and apply the grant atomically. Everything — the balance
- * check, the spend ledger entry, the profile grant, and the receipt — runs
- * inside one prisma.$transaction so a crash can never charge without
- * granting (or vice-versa). The player snapshot is re-read AFTER commit so
- * token/cosmetic counts and the new balance are fresh.
+ * check, the level gate, the spend ledger entry, the profile grant, and the
+ * receipt — runs inside one prisma.$transaction so a crash can never charge
+ * without granting (or vice-versa). The player snapshot is re-read AFTER
+ * commit so token/cosmetic counts and the new balance are fresh.
  */
 router.post('/buy', asyncHandler(async (req: AuthRequest, res) => {
   const { itemKey } = buySchema.parse(req.body);
@@ -114,18 +146,30 @@ router.post('/buy', asyncHandler(async (req: AuthRequest, res) => {
     const balance = await eddieBalance(userId, tx);
     if (balance < item.priceEddies) throw new AppError('Not enough eddies', 400);
 
+    // 2) Level gate (ledger is authoritative; the UI lock is cosmetic).
+    if (item.levelReq) {
+      const level = await playerLevel(userId, tx);
+      if (level < item.levelReq) throw new AppError(`Locked until level ${item.levelReq}`, 400);
+    }
+
     // Read the current profile (owned cosmetics, for the owned-guard + loot).
     await game().ensurePlayer(userId, tx);
     const profile = await tx.playerProfile.findUniqueOrThrow({ where: { userId } });
-    const owned = parseCosmetics(profile.cosmetics);
+    const owned = parseKeys(profile.cosmetics);
 
-    // 2) Cosmetic owned-guard — refuse to charge for a re-buy.
+    // 3) Owned-guards — refuse to charge for a re-buy of a single-buy item.
     if (item.category === 'cosmetic') {
       const themeKey = item.payload?.themeKey as string | undefined;
       if (themeKey && owned.includes(themeKey)) throw new AppError('Already owned', 400);
     }
+    if (item.category === 'fx' && ownsFx(owned, item.payload?.fxKey as string)) {
+      throw new AppError('Already owned', 400);
+    }
+    if (item.category === 'timer' && ownsTimer(owned, item.payload?.timerKey as string)) {
+      throw new AppError('Already owned', 400);
+    }
 
-    // 3) Spend through the economy (raw — 'shop_purchase' is excluded from
+    // 4) Spend through the economy (raw — 'shop_purchase' is excluded from
     //    the overclock multiplier; touchStreak:false so a spend isn't activity).
     await game().awardXp(userId, {
       amount: 0,
@@ -138,12 +182,13 @@ router.post('/buy', asyncHandler(async (req: AuthRequest, res) => {
       meta: { itemKey: item.key },
     }, tx);
 
-    // 4) Apply the grant by updating PlayerProfile in the same tx. A guard
+    // 5) Apply the grant by updating PlayerProfile in the same tx. A guard
     //    throw here (shield rack full / overdrive already running / dilation
-    //    already active) rolls the whole tx back, so the spend never lands.
+    //    already active / already owned) rolls the whole tx back, so the
+    //    spend never lands.
     const granted = await applyGrant(tx, userId, item, owned, profile);
 
-    // 5) Record the receipt.
+    // 6) Record the receipt.
     const purchase = await tx.purchase.create({
       data: {
         userId,
@@ -168,13 +213,16 @@ router.post('/buy', asyncHandler(async (req: AuthRequest, res) => {
  * Apply a purchased item's grant to the player profile inside `tx`.
  * Returns the human-facing `message` plus a structured `grant` describing
  * exactly what dropped (used for the receipt + the BuyResponse.granted).
+ *
+ * Auto-equip on buy is the handoff contract for every gear line; FX
+ * auto-ACTIVATE instead (they're stackable, not a slot).
  */
 async function applyGrant(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   userId: string,
   item: ShopItem,
   owned: string[],
-  profile: { streakShields: number; boosterUntil: Date | null; budgetBoostOn: Date | null },
+  profile: { streakShields: number; boosterUntil: Date | null; budgetBoostOn: Date | null; fxActive: string | null },
 ): Promise<{ grant: Record<string, unknown>; message: string }> {
   switch (item.category) {
     case 'consumable': {
@@ -202,6 +250,16 @@ async function applyGrant(
         await tx.playerProfile.update({ where: { userId }, data: { budgetBoostOn: today } });
         return { grant: { budgetBoostMin: 120 }, message: '+2h planner budget for today' };
       }
+      // Night Market v2 supplies — stock counters only (effects are
+      // explicitly out of scope in the design handoff; backend work TBD).
+      if (kind === 'focus') {
+        await tx.playerProfile.update({ where: { userId }, data: { focusStims: { increment: 1 } } });
+        return { grant: { focusStims: 1 }, message: '+1 Focus Stim banked' };
+      }
+      if (kind === 'overclock') {
+        await tx.playerProfile.update({ where: { userId }, data: { overclockChips: { increment: 1 } } });
+        return { grant: { overclockChips: 1 }, message: '+1 Overclock Chip banked' };
+      }
       throw new AppError('Unknown consumable', 400);
     }
     case 'token_skip': {
@@ -220,7 +278,7 @@ async function applyGrant(
       return { grant: { rrCredits: n }, message: `+${n} R&R credit${n === 1 ? '' : 's'}` };
     }
     case 'cosmetic': {
-      // Auto-equips server-side, like fonts/FX/personas (polish pass §5) —
+      // Auto-equips server-side, like all gear lines (polish pass §5) —
       // kills the client's buy→equip chained mutation and its cache race.
       const themeKey = item.payload?.themeKey as string;
       const next = [...owned, themeKey];
@@ -228,7 +286,34 @@ async function applyGrant(
         where: { userId },
         data: { cosmetics: JSON.stringify(next), equippedTheme: themeKey },
       });
-      return { grant: { themeKey }, message: `Theme unlocked + equipped: ${item.name}` };
+      return { grant: { themeKey }, message: `Skin unlocked + equipped: ${item.name}` };
+    }
+    case 'shell': {
+      const shellKey = item.payload?.shellKey as string;
+      if (owned.includes(item.key)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, item.key]), equippedShell: shellKey },
+      });
+      return { grant: { shellKey }, message: `OS shell unlocked + booted: ${item.name}` };
+    }
+    case 'title': {
+      const titleKey = item.payload?.titleKey as string;
+      if (owned.includes(item.key)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, item.key]), equippedTitle: titleKey },
+      });
+      return { grant: { titleKey }, message: `Title unlocked + worn: ${item.name}` };
+    }
+    case 'pet': {
+      const petKey = item.payload?.petKey as string;
+      if (owned.includes(item.key)) throw new AppError('Already owned', 400);
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify([...owned, item.key]), equippedPet: petKey },
+      });
+      return { grant: { petKey }, message: `${item.name} adopted — now living in your deck` };
     }
     case 'persona': {
       // Owned key is 'persona_<key>' (== the catalog item key). Auto-equips.
@@ -245,7 +330,7 @@ async function applyGrant(
         update: { handlerPersona: personaKey },
         create: { userId, handlerPersona: personaKey },
       });
-      return { grant: { personaKey }, message: `Handler persona unlocked + equipped: ${item.name}` };
+      return { grant: { personaKey }, message: `Handler unlocked + on comms: ${item.name}` };
     }
     case 'font': {
       // Owned key is 'font_<key>' (== the catalog item key). Auto-equips.
@@ -259,26 +344,29 @@ async function applyGrant(
       return { grant: { fontKey }, message: `Display font unlocked + equipped: ${item.name}` };
     }
     case 'fx': {
-      // Owned key is 'fx_<key>' (== the catalog item key). Auto-equips.
+      // Owned key is 'fx_<key>'. STACKABLE: buying auto-ACTIVATES the layer
+      // (appends to fxActive) rather than filling a slot.
       const fxKey = item.payload?.fxKey as string;
       const ownKey = `fx_${fxKey}`;
-      if (owned.includes(ownKey)) throw new AppError('Already owned', 400);
+      const active = parseKeys(profile.fxActive);
       await tx.playerProfile.update({
         where: { userId },
-        data: { cosmetics: JSON.stringify([...owned, ownKey]), equippedFx: fxKey },
+        data: {
+          cosmetics: JSON.stringify([...owned, ownKey]),
+          fxActive: JSON.stringify(active.includes(fxKey) ? active : [...active, fxKey]),
+        },
       });
-      return { grant: { fxKey }, message: `Ambient FX unlocked + equipped: ${item.name}` };
+      return { grant: { fxKey }, message: `Visual FX unlocked + online: ${item.name}` };
     }
     case 'timer': {
       // Owned key is 'timer_<key>' (== the catalog item key). Auto-equips.
       const timerKey = item.payload?.timerKey as string;
       const ownKey = `timer_${timerKey}`;
-      if (owned.includes(ownKey)) throw new AppError('Already owned', 400);
       await tx.playerProfile.update({
         where: { userId },
         data: { cosmetics: JSON.stringify([...owned, ownKey]), equippedTimer: timerKey },
       });
-      return { grant: { timerKey }, message: `Timer style unlocked + equipped: ${item.name}` };
+      return { grant: { timerKey }, message: `Chrono style unlocked + on the clock: ${item.name}` };
     }
     case 'loot_crate': {
       const table = (item.payload?.table as LootDrop[] | undefined) ?? [];
@@ -321,7 +409,7 @@ async function applyGrant(
           const themeKey = pool[Math.floor(Math.random() * pool.length)];
           const next = [...owned, themeKey];
           await tx.playerProfile.update({ where: { userId }, data: { cosmetics: JSON.stringify(next) } });
-          return { grant: { kind: 'cosmetic', themeKey }, message: `Unlocked theme: ${themeKey}` };
+          return { grant: { kind: 'cosmetic', themeKey }, message: `Unlocked skin: ${themeKey}` };
         }
       }
     }
@@ -335,33 +423,36 @@ async function applyGrant(
 const equipSchema = z.object({
   themeKey: z.string().max(100).nullable().optional(),
   fontKey: z.string().max(100).nullable().optional(),
-  fxKey: z.string().max(100).nullable().optional(),
   timerKey: z.string().max(100).nullable().optional(),
+  shellKey: z.string().max(100).nullable().optional(),
+  titleKey: z.string().max(100).nullable().optional(),
+  petKey: z.string().max(100).nullable().optional(),
 });
 
 /**
- * POST /equip { themeKey? | fontKey? | fxKey? | timerKey? }
+ * POST /equip { themeKey? | fontKey? | timerKey? | shellKey? | titleKey? | petKey? }
  *
- * Set/clear an equipped cosmetic slot. Omitted keys are left untouched;
- * an explicit `null` clears the slot. For the theme slot, 'default' also
- * clears (back to the stock neon palette). Any non-null key must be a real,
- * owned cosmetic, else 400 'Not owned'.
+ * Set/clear an equipped gear slot. Omitted keys are left untouched; an
+ * explicit `null` clears the slot. 'default' also clears the theme slot
+ * (stock neon palette) and 'nightcity' the shell slot (factory firmware).
+ * Any non-null key must be a real, owned item, else 400 'Not owned'.
+ * (VISUAL FX are stackable, not a slot — see POST /fx-toggle.)
  */
 router.post('/equip', asyncHandler(async (req: AuthRequest, res) => {
-  const { themeKey, fontKey, fxKey, timerKey } = equipSchema.parse(req.body);
+  const { themeKey, fontKey, timerKey, shellKey, titleKey, petKey } = equipSchema.parse(req.body);
   const userId = req.user!.id;
 
   await game().ensurePlayer(userId);
 
   // One profile read covers every ownership check this request needs.
-  const wantsTheme = themeKey != null && themeKey !== 'default';
-  let ownedKeys: string[] = [];
-  if (wantsTheme || fontKey != null || fxKey != null || timerKey != null) {
-    const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
-    ownedKeys = parseCosmetics(profile.cosmetics);
-  }
+  const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
+  const ownedKeys = parseKeys(profile.cosmetics);
 
-  const data: { equippedTheme?: string | null; equippedFont?: string | null; equippedFx?: string | null; equippedTimer?: string | null } = {};
+  const data: {
+    equippedTheme?: string | null; equippedFont?: string | null;
+    equippedTimer?: string | null; equippedShell?: string | null;
+    equippedTitle?: string | null; equippedPet?: string | null;
+  } = {};
 
   if (themeKey !== undefined) {
     const isClear = themeKey == null || themeKey === 'default';
@@ -383,25 +474,84 @@ router.post('/equip', asyncHandler(async (req: AuthRequest, res) => {
     data.equippedFont = fontKey ?? null;
   }
 
-  if (fxKey !== undefined) {
-    if (fxKey != null) {
-      if (!(FX_KEYS as readonly string[]).includes(fxKey)) throw new AppError('Not owned', 400);
-      if (!ownedKeys.includes(`fx_${fxKey}`)) throw new AppError('Not owned', 400);
+  if (timerKey !== undefined) {
+    // 'standard' (the free built-in) clears back to the default style.
+    const isClear = timerKey == null || timerKey === 'standard';
+    if (!isClear) {
+      if (!(TIMER_KEYS as readonly string[]).includes(timerKey)) throw new AppError('Not owned', 400);
+      if (!ownsTimer(ownedKeys, timerKey)) throw new AppError('Not owned', 400);
     }
-    data.equippedFx = fxKey ?? null;
+    data.equippedTimer = isClear ? null : timerKey;
   }
 
-  if (timerKey !== undefined) {
-    if (timerKey != null) {
-      if (!(TIMER_KEYS as readonly string[]).includes(timerKey)) throw new AppError('Not owned', 400);
-      if (!ownedKeys.includes(`timer_${timerKey}`)) throw new AppError('Not owned', 400);
+  if (shellKey !== undefined) {
+    // 'nightcity' (factory firmware) clears back to the default shell.
+    const isClear = shellKey == null || shellKey === 'nightcity';
+    if (!isClear) {
+      if (!(SHELL_KEYS as readonly string[]).includes(shellKey)) throw new AppError('Not owned', 400);
+      if (!ownedKeys.includes(`shell_${shellKey}`)) throw new AppError('Not owned', 400);
     }
-    data.equippedTimer = timerKey ?? null;
+    data.equippedShell = isClear ? null : shellKey;
+  }
+
+  if (titleKey !== undefined) {
+    if (titleKey != null) {
+      if (!(TITLE_KEYS as readonly string[]).includes(titleKey)) throw new AppError('Not owned', 400);
+      if (!ownedKeys.includes(`title_${titleKey}`)) throw new AppError('Not owned', 400);
+    }
+    data.equippedTitle = titleKey ?? null;
+  }
+
+  if (petKey !== undefined) {
+    if (petKey != null) {
+      if (!(PET_KEYS as readonly string[]).includes(petKey)) throw new AppError('Not owned', 400);
+      if (!ownedKeys.includes(`pet_${petKey}`)) throw new AppError('Not owned', 400);
+    }
+    data.equippedPet = petKey ?? null;
   }
 
   if (Object.keys(data).length === 0) throw new AppError('Nothing to equip', 400);
 
   await prisma.playerProfile.update({ where: { userId }, data });
+
+  const player = await game().getSnapshot(userId);
+  res.json({ player });
+}));
+
+// --- visual fx toggle -----------------------------------------------------
+
+const fxToggleSchema = z.object({
+  fxKey: z.string().min(1).max(100),
+  /** Explicit target state; omitted = flip current membership. */
+  active: z.boolean().optional(),
+});
+
+/**
+ * POST /fx-toggle { fxKey, active? }
+ *
+ * VISUAL FX are stackable: fxActive holds any subset of the owned overlay
+ * keys. This flips (or explicitly sets) one key's membership.
+ */
+router.post('/fx-toggle', asyncHandler(async (req: AuthRequest, res) => {
+  const { fxKey, active } = fxToggleSchema.parse(req.body);
+  const userId = req.user!.id;
+
+  if (!(FX_KEYS as readonly string[]).includes(fxKey)) throw new AppError('Not owned', 400);
+
+  await game().ensurePlayer(userId);
+  const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
+  if (!ownsFx(parseKeys(profile.cosmetics), fxKey)) throw new AppError('Not owned', 400);
+
+  const current = parseKeys(profile.fxActive);
+  const on = active ?? !current.includes(fxKey);
+  const next = on
+    ? (current.includes(fxKey) ? current : [...current, fxKey])
+    : current.filter(k => k !== fxKey);
+
+  await prisma.playerProfile.update({
+    where: { userId },
+    data: { fxActive: JSON.stringify(next) },
+  });
 
   const player = await game().getSnapshot(userId);
   res.json({ player });

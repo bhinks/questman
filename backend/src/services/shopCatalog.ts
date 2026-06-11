@@ -1,29 +1,35 @@
 /**
- * The Shop catalog — the primary EDDIE SINK.
+ * The Shop catalog — the NIGHT MARKET v2 (design handoff: night market
+ * expansion), the primary EDDIE SINK.
  *
- * Fixed-price catalog of eddie sinks. Quests pay ~10-25 eddies each, so
- * prices are tuned so that a single burnout-relief token costs roughly a
- * couple of full days of questing, a cosmetic theme is a multi-week goal,
- * and loot crates are a gamble for the eddie-rich.
+ * Economy intent (handoff): the catalog totals ≈ €$37,000 against a payout
+ * of round(xp/2) eddies per cleared contract (utils/economy.ts), so players
+ * can't max out quickly. Several items are level-gated via `levelReq` —
+ * re-validated server-side in routes/shop.ts.
  *
  * Categories:
  *   token_skip | token_reroll | rr_credit | cosmetic | loot_crate | consumable
- *   | font | fx | persona | timer
+ *   | font | fx | persona | timer | shell | title | pet
  *
  * Purchases record to the Purchase table + a WalletLedger spend entry; the
- * grant (tokens/credits/cosmetic/loot roll) is applied to PlayerProfile,
- * all inside one transaction (see routes/shop.ts). The server owns ALL
- * currency — nothing here mints eddies, it only describes prices/payloads.
+ * grant is applied to PlayerProfile, all inside one transaction (see
+ * routes/shop.ts). The server owns ALL currency — nothing here mints
+ * eddies, it only describes prices/payloads.
  *
- * Cosmetic themeKeys are FIXED to the set index.css already supports:
- *   synthwave | matrix | vaporwave | gold | bloodmoon | arctic
- *   | toxic | sakura | ronin | ultraviolet
- *   | edgerunner | arasaka | militech | netrunner | ghost
+ * Equip models (handoff contract):
+ *   - skins/shells/timers/personas: single-equip, AUTO-EQUIP on buy
+ *   - titles/pets: single-equip, removable (equip null), auto-equip on buy
+ *   - fx: STACKABLE — buying auto-ACTIVATES; toggle any subset on/off
+ *   - supplies: stock counters, repeat purchase OK
  *
  * Ownership keys in PlayerProfile.cosmetics: themes are BARE keys
- * ('synthwave'); the newer lines are PREFIXED ('font_orbitron', 'fx_rain',
- * 'persona_drill', 'timer_flip') — conveniently identical to their catalog
- * item keys.
+ * ('synthwave'); everything else is PREFIXED ('font_orbitron', 'fx_rain',
+ * 'persona_drill', 'timer_fuse', 'shell_tty', 'title_eotm', 'pet_byte') —
+ * conveniently identical to their catalog item keys.
+ *
+ * Legacy lines (pre-v2): the 8 v1 themes are back on sale (repriced into
+ *  the v2 curve); old single-equip FX packs alias onto the nearest v2
+ *  overlay if owned (LEGACY_FX_ALIAS); v1 clock faces stayed on sale.
  */
 
 export interface ShopItem {
@@ -31,12 +37,14 @@ export interface ShopItem {
   name: string;
   description: string;
   category: 'token_skip' | 'token_reroll' | 'rr_credit' | 'cosmetic' | 'loot_crate' | 'consumable'
-    | 'font' | 'fx' | 'persona' | 'timer';
+    | 'font' | 'fx' | 'persona' | 'timer' | 'shell' | 'title' | 'pet';
   priceEddies: number;
+  /** Minimum player level to buy (re-validated server-side). */
+  levelReq?: number;
   /** Category-specific payload, e.g. { tokens: 1 }, { themeKey: 'synthwave' },
-   *  { kind: 'shield' | 'booster' | 'budget' } for consumables, or
-   *  { fontKey } / { fxKey } / { personaKey } / { timerKey } for the
-   *  display/persona/timer lines. */
+   *  { kind: 'shield' | 'booster' | 'budget' | 'focus' | 'overclock' } for
+   *  consumables, or { fontKey } / { fxKey } / { personaKey } / { timerKey }
+   *  / { shellKey } / { titleKey } / { petKey } for the gear lines. */
   payload?: Record<string, unknown>;
 }
 
@@ -57,238 +65,476 @@ export interface LootDrop {
   themePool?: string[];
 }
 
-/** The fixed cosmetic theme keys index.css ships a [data-theme] for. */
-export const COSMETIC_THEME_KEYS = [
-  'synthwave', 'matrix', 'vaporwave', 'gold', 'bloodmoon', 'arctic',
-  'toxic', 'sakura', 'ronin', 'ultraviolet',
-  'edgerunner', 'arasaka', 'militech', 'netrunner', 'ghost',
+/** NEON SKINS on sale at the v2 market (index.css ships each [data-theme]).
+ *  The 11 handoff skins keep their designed prices; the 8 pre-v2 themes are
+ *  back on the rack (Brent loved the color options) repriced into the v2
+ *  curve (~2× their v1 prices, original relative order preserved) so they
+ *  don't undercut the redesigned economy. */
+export const NIGHT_MARKET_THEME_KEYS = [
+  'matrix', 'arctic', 'toxic', 'vaporwave', 'abyssal', 'militech', 'netrunner',
+  'ember', 'sakura', 'ronin', 'synthwave', 'ultraviolet', 'edgerunner',
+  'acid', 'arasaka', 'bloodmoon', 'ghost', 'ghostwire', 'gold',
 ] as const;
+
+/** Every theme key /equip accepts. */
+export const COSMETIC_THEME_KEYS = NIGHT_MARKET_THEME_KEYS;
 
 /** Display-font pack keys index.css ships a html[data-font] block for. */
 export const FONT_KEYS = ['orbitron', 'vt323', 'spacemono', 'sharetech'] as const;
 
-/** Ambient FX pack keys index.css ships a html[data-fx] block for. */
-export const FX_KEYS = ['rain', 'aurora', 'vhs', 'datastream', 'radar', 'crt'] as const;
+/** VISUAL FX keys (stackable overlay layers — components in the web app). */
+export const FX_KEYS = ['cursor', 'dust', 'rain', 'vhs', 'datarain', 'glitch'] as const;
 
-/** Focus-chamber timer style keys the FocusView clock supports. */
-export const TIMER_KEYS = ['flip', 'ring', 'pulse'] as const;
+/** Owned legacy single-equip FX packs unlock the nearest v2 overlay. */
+export const LEGACY_FX_ALIAS: Record<string, (typeof FX_KEYS)[number]> = {
+  aurora: 'dust',        // ambient drifting light → rising motes
+  datastream: 'datarain',// code columns → falling glyph columns
+  radar: 'cursor',       // sweeping contact → pointer wake
+  crt: 'vhs',            // retrace line → tracking band
+};
+
+/** CHRONO session-timer styles (STANDARD ISSUE is the free built-in).
+ *  The v1 clock faces (flip/ring/pulse) stay on sale alongside the v2
+ *  handoff styles — nothing wrong with them, so they're kept, not replaced. */
+export const TIMER_KEYS = ['fuse', 'flatline', 'orbital', 'detonator', 'flip', 'ring', 'pulse'] as const;
+
+/** OS shell keys (NIGHT CITY is the free built-in default = null). */
+export const SHELL_KEYS = ['tty', 'outrun'] as const;
+
+/** Vanity title keys worn on the runner ID. */
+export const TITLE_KEYS = ['eotm', 'netrunner', 'chromesaint', 'debtslayer', 'streaklord', 'voiddancer'] as const;
+
+/** Data-pet keys living in the nav deck. */
+export const PET_KEYS = ['byte', 'nibble', 'koi', 'null'] as const;
 
 export const SHOP_ITEMS: ShopItem[] = [
-  // ---- Skip tokens (drop a quest, no penalty) ------------------------
-  {
-    key: 'skip_1',
-    name: 'Skip Token',
-    description: 'Drop one quest from the day with zero penalty. For when life gets in the way.',
-    category: 'token_skip',
-    priceEddies: 40,
-    payload: { tokens: 1 },
-  },
-  {
-    key: 'skip_3',
-    name: 'Skip Token ×3',
-    description: 'Three skips, bundled at a discount. Stock up before a busy week.',
-    category: 'token_skip',
-    priceEddies: 100,
-    payload: { tokens: 3 },
-  },
-
-  // ---- Reroll tokens (swap a quest for another) ----------------------
-  {
-    key: 'reroll_1',
-    name: 'Reroll Token',
-    description: 'Swap one quest for a fresh draw. Hate today’s assignment? Reroll it.',
-    category: 'token_reroll',
-    priceEddies: 50,
-    payload: { tokens: 1 },
-  },
-  {
-    key: 'reroll_3',
-    name: 'Reroll Token ×3',
-    description: 'Three rerolls at a discount. Curate your day to taste.',
-    category: 'token_reroll',
-    priceEddies: 130,
-    payload: { tokens: 3 },
-  },
-
-  // ---- R&R credits (activate a backlog media item) -------------------
-  {
-    key: 'rr_1',
-    name: 'R&R Credit',
-    description: 'Buy guilt-free downtime: spend it to pull a backlog item onto the active shelf.',
-    category: 'rr_credit',
-    priceEddies: 60,
-    payload: { credits: 1 },
-  },
-  {
-    key: 'rr_3',
-    name: 'R&R Credit ×3',
-    description: 'Three downtime credits. A weekend’s worth of earned leisure, banked.',
-    category: 'rr_credit',
-    priceEddies: 150,
-    payload: { credits: 3 },
-  },
-
-  // ---- Cosmetic neon themes (one per theme, priced by rarity) --------
-  {
-    key: 'theme_synthwave',
-    name: 'Theme: Synthwave',
-    description: 'Hot-pink sunset neon. The classic outrun palette for the HUD.',
-    category: 'cosmetic',
-    priceEddies: 300,
-    payload: { themeKey: 'synthwave' },
-  },
+  // ---- NEON SKINS — accent remap, auto-equip on buy. One ascending
+  // price ladder: handoff skins at their designed prices, the returning
+  // pre-v2 themes interleaved at ~2× their v1 prices. ------------------
   {
     key: 'theme_matrix',
-    name: 'Theme: Matrix',
+    name: 'Matrix',
     description: 'Cascading green code-rain. Wake up — you’re in the construct now.',
     category: 'cosmetic',
-    priceEddies: 350,
+    priceEddies: 800,
     payload: { themeKey: 'matrix' },
   },
   {
-    key: 'theme_vaporwave',
-    name: 'Theme: Vaporwave',
-    description: 'Soft cyan-and-rose aesthetic. A e s t h e t i c. Easy on the eyes.',
-    category: 'cosmetic',
-    priceEddies: 350,
-    payload: { themeKey: 'vaporwave' },
-  },
-  {
     key: 'theme_arctic',
-    name: 'Theme: Arctic',
+    name: 'Arctic',
     description: 'Cool glacial blues. A calm, frosted interface for clear-headed days.',
     category: 'cosmetic',
-    priceEddies: 450,
+    priceEddies: 900,
     payload: { themeKey: 'arctic' },
   },
   {
-    key: 'theme_gold',
-    name: 'Theme: Gold',
-    description: 'Molten amber luxury. A high-roller palette — flaunt your eddies.',
-    category: 'cosmetic',
-    priceEddies: 550,
-    payload: { themeKey: 'gold' },
-  },
-  {
-    key: 'theme_bloodmoon',
-    name: 'Theme: Bloodmoon',
-    description: 'Crimson danger-red. The rarest skin — for those who run hot.',
-    category: 'cosmetic',
-    priceEddies: 600,
-    payload: { themeKey: 'bloodmoon' },
-  },
-
-  // ---- Cosmetic themes, second wave (slightly premium) ----------------
-  {
     key: 'theme_toxic',
-    name: 'Theme: Toxic',
+    name: 'Toxic',
     description: 'Acid green-yellow biohazard glow. Looks like it voids warranties.',
     category: 'cosmetic',
-    priceEddies: 450,
+    priceEddies: 900,
     payload: { themeKey: 'toxic' },
   },
   {
-    key: 'theme_sakura',
-    name: 'Theme: Sakura',
-    description: 'Soft blossom pink over chrome. Neon petals on black rain.',
+    key: 'theme_vaporwave',
+    name: 'Vaporwave',
+    description: 'Soft cyan-and-rose aesthetic. A e s t h e t i c. Easy on the eyes.',
     category: 'cosmetic',
-    priceEddies: 500,
-    payload: { themeKey: 'sakura' },
+    priceEddies: 1000,
+    payload: { themeKey: 'vaporwave' },
   },
   {
-    key: 'theme_ronin',
-    name: 'Theme: Ronin',
-    description: 'Burnt ember orange. A masterless blade running on spite and caffeine.',
+    key: 'theme_abyssal',
+    name: 'Abyssal',
+    description: 'Deep-sea teal over blacklight blue. The net floor, where the light barely reaches.',
     category: 'cosmetic',
-    priceEddies: 550,
-    payload: { themeKey: 'ronin' },
-  },
-  {
-    key: 'theme_ultraviolet',
-    name: 'Theme: Ultraviolet',
-    description: 'Electric purple past the visible spectrum. Blacklight for the HUD.',
-    category: 'cosmetic',
-    priceEddies: 650,
-    payload: { themeKey: 'ultraviolet' },
-  },
-
-  // ---- Cosmetic themes, third wave (corpo/runner editions) ------------
-  {
-    key: 'theme_edgerunner',
-    name: 'Theme: Edgerunner',
-    description: 'Construct-yellow with a cyan pop. The street-samurai HUD, straight off the box art.',
-    category: 'cosmetic',
-    priceEddies: 600,
-    payload: { themeKey: 'edgerunner' },
-  },
-  {
-    key: 'theme_arasaka',
-    name: 'Theme: Arasaka',
-    description: 'Cold corporate crimson. Compliance red on tower black — security is always watching.',
-    category: 'cosmetic',
-    priceEddies: 650,
-    payload: { themeKey: 'arasaka' },
+    priceEddies: 1000,
+    payload: { themeKey: 'abyssal' },
   },
   {
     key: 'theme_militech',
-    name: 'Theme: Militech',
+    name: 'Militech',
     description: 'Mil-spec tactical green. Muted, disciplined HUD tones for runners who plan the op.',
     category: 'cosmetic',
-    priceEddies: 500,
+    priceEddies: 1000,
     payload: { themeKey: 'militech' },
   },
   {
     key: 'theme_netrunner',
-    name: 'Theme: Netrunner',
+    name: 'Netrunner',
     description: 'Deep-dive electric blue. ICE-cold interface tones from the far side of the blackwall.',
     category: 'cosmetic',
-    priceEddies: 500,
+    priceEddies: 1000,
     payload: { themeKey: 'netrunner' },
   },
   {
+    key: 'theme_ember',
+    name: 'Ember District',
+    description: 'Furnace orange with a red undertow. The block that never stopped burning.',
+    category: 'cosmetic',
+    priceEddies: 1100,
+    payload: { themeKey: 'ember' },
+  },
+  {
+    key: 'theme_sakura',
+    name: 'Sakura',
+    description: 'Soft blossom pink over chrome. Neon petals on black rain.',
+    category: 'cosmetic',
+    priceEddies: 1100,
+    payload: { themeKey: 'sakura' },
+  },
+  {
+    key: 'theme_ronin',
+    name: 'Ronin',
+    description: 'Burnt ember orange. A masterless blade running on spite and caffeine.',
+    category: 'cosmetic',
+    priceEddies: 1100,
+    payload: { themeKey: 'ronin' },
+  },
+  {
+    key: 'theme_synthwave',
+    name: 'Synthwave Sunset',
+    description: 'Hot-pink sunset neon. The classic outrun palette for the HUD.',
+    category: 'cosmetic',
+    priceEddies: 1200,
+    payload: { themeKey: 'synthwave' },
+  },
+  {
+    key: 'theme_ultraviolet',
+    name: 'Ultraviolet',
+    description: 'Electric purple past the visible spectrum. Blacklight for the HUD.',
+    category: 'cosmetic',
+    priceEddies: 1300,
+    payload: { themeKey: 'ultraviolet' },
+  },
+  {
+    key: 'theme_edgerunner',
+    name: 'Edgerunner',
+    description: 'Construct-yellow with a cyan pop. The street-samurai HUD, straight off the box art.',
+    category: 'cosmetic',
+    priceEddies: 1300,
+    payload: { themeKey: 'edgerunner' },
+  },
+  {
+    key: 'theme_acid',
+    name: 'Acid Rain',
+    description: 'Caustic chartreuse fallout. Don’t look up without eye protection.',
+    category: 'cosmetic',
+    priceEddies: 1400,
+    levelReq: 16,
+    payload: { themeKey: 'acid' },
+  },
+  {
+    key: 'theme_arasaka',
+    name: 'Arasaka',
+    description: 'Cold corporate crimson. Compliance red on tower black — security is always watching.',
+    category: 'cosmetic',
+    priceEddies: 1400,
+    payload: { themeKey: 'arasaka' },
+  },
+  {
+    key: 'theme_bloodmoon',
+    name: 'Blood Moon',
+    description: 'Crimson danger-red. For those who run hot.',
+    category: 'cosmetic',
+    priceEddies: 1500,
+    payload: { themeKey: 'bloodmoon' },
+  },
+  {
     key: 'theme_ghost',
-    name: 'Theme: Ghost',
+    name: 'Ghost',
     description: 'Monochrome white phosphor. A war-room mainframe HUD — shall we play a game?',
     category: 'cosmetic',
-    priceEddies: 700,
+    priceEddies: 1600,
     payload: { themeKey: 'ghost' },
   },
+  {
+    key: 'theme_ghostwire',
+    name: 'Ghostwire',
+    description: 'Pale signal-white over static. The HUD as an apparition.',
+    category: 'cosmetic',
+    priceEddies: 2200,
+    levelReq: 20,
+    payload: { themeKey: 'ghostwire' },
+  },
+  {
+    key: 'theme_gold',
+    name: 'Gold Chrome',
+    description: 'Molten amber luxury. A high-roller palette — flaunt your eddies.',
+    category: 'cosmetic',
+    priceEddies: 2500,
+    payload: { themeKey: 'gold' },
+  },
 
-  // ---- Handler personas (new AI voice styles; auto-equip on buy) ------
+  // ---- OS SHELLS — deep interface rewires (handoff copy verbatim) -----
+  {
+    key: 'shell_tty',
+    name: 'Bare Metal',
+    description: 'Strip everything. Phosphor mono, square corners, zero glow. Palette locked.',
+    category: 'shell',
+    priceEddies: 3200,
+    payload: { shellKey: 'tty' },
+  },
+  {
+    key: 'shell_outrun',
+    name: 'Outrun',
+    description: 'Sunset on the horizon, grid rolling at 120 mph. Palette locked.',
+    category: 'shell',
+    priceEddies: 3800,
+    payload: { shellKey: 'outrun' },
+  },
+
+  // ---- VISUAL FX — stackable overlays (handoff copy verbatim) ---------
+  {
+    key: 'fx_cursor',
+    name: 'Ghost Cursor',
+    description: 'Your pointer leaves a decaying neon wake.',
+    category: 'fx',
+    priceEddies: 350,
+    payload: { fxKey: 'cursor' },
+  },
+  {
+    key: 'fx_dust',
+    name: 'Holo Dust',
+    description: 'Drifting motes of light rise through the frame.',
+    category: 'fx',
+    priceEddies: 450,
+    payload: { fxKey: 'dust' },
+  },
+  {
+    key: 'fx_rain',
+    name: 'Neon Downpour',
+    description: 'It is always raining somewhere in Night City.',
+    category: 'fx',
+    priceEddies: 500,
+    payload: { fxKey: 'rain' },
+  },
+  {
+    key: 'fx_vhs',
+    name: 'VHS Tracking',
+    description: 'A tracking band crawls the screen every few seconds.',
+    category: 'fx',
+    priceEddies: 650,
+    payload: { fxKey: 'vhs' },
+  },
+  {
+    key: 'fx_datarain',
+    name: 'Data Rain',
+    description: 'Glyph columns fall behind your panels. You are in it.',
+    category: 'fx',
+    priceEddies: 800,
+    payload: { fxKey: 'datarain' },
+  },
+  {
+    key: 'fx_glitch',
+    name: 'Glitch Protocol',
+    description: 'Every cleared contract detonates a chromatic burst.',
+    category: 'fx',
+    priceEddies: 900,
+    payload: { fxKey: 'glitch' },
+  },
+
+  // ---- CHRONO — session-timer styles (handoff copy verbatim) ----------
+  {
+    key: 'timer_fuse',
+    name: 'Short Fuse',
+    description: 'A burning line, sparking at the tip. No pressure.',
+    category: 'timer',
+    priceEddies: 550,
+    payload: { timerKey: 'fuse' },
+  },
+  {
+    key: 'timer_flatline',
+    name: 'Flatline Monitor',
+    description: 'An EKG trace keeps pace with your session.',
+    category: 'timer',
+    priceEddies: 700,
+    payload: { timerKey: 'flatline' },
+  },
+  {
+    key: 'timer_orbital',
+    name: 'Orbital',
+    description: 'One satellite, one orbit, one contract.',
+    category: 'timer',
+    priceEddies: 750,
+    payload: { timerKey: 'orbital' },
+  },
+  {
+    key: 'timer_detonator',
+    name: 'Detonator',
+    description: 'Red seven-seg countdown. Blinks under a minute.',
+    category: 'timer',
+    priceEddies: 850,
+    payload: { timerKey: 'detonator' },
+  },
+  // v1 clock faces — kept on sale alongside the v2 lineup.
+  {
+    key: 'timer_flip',
+    name: 'Split-Flap Chrono',
+    description: 'Departure-board digits in chamfered panels. Every minute clacks over like a platform change.',
+    category: 'timer',
+    priceEddies: 400,
+    payload: { timerKey: 'flip' },
+  },
+  {
+    key: 'timer_ring',
+    name: 'Orbital Gauge',
+    description: 'The clock sits inside a slow accent ring that drains your countdown — or laps the minute on open runs.',
+    category: 'timer',
+    priceEddies: 450,
+    payload: { timerKey: 'ring' },
+  },
+  {
+    key: 'timer_pulse',
+    name: 'Biorhythm',
+    description: 'Digits that beat like a monitored heart. Deep work, vitals on screen.',
+    category: 'timer',
+    priceEddies: 400,
+    payload: { timerKey: 'pulse' },
+  },
+
+  // ---- HANDLERS — comms voices (handoff copy verbatim; V1KTOR free) ---
+  // Keys reuse the pre-v2 persona keys where a voice already existed
+  // (drill → SGT. CHROME, zen → KOAN-9, noir → RAYMOND) so prior owners
+  // keep their unlock.
+  {
+    key: 'persona_hrbot',
+    name: 'HR-BOT 3000',
+    description: 'Synergy. Alignment. Circling back. Forever.',
+    category: 'persona',
+    priceEddies: 600,
+    payload: { personaKey: 'hrbot', tag: 'CORPORATE' },
+  },
   {
     key: 'persona_drill',
-    name: 'Drill Sergeant',
-    description: 'A relentless PT instructor in your ear. Barked orders, zero sympathy, secretly proud.',
+    name: 'SGT. CHROME',
+    description: 'Volume permanently at maximum. Believes in you, loudly.',
     category: 'persona',
-    priceEddies: 350,
-    payload: { personaKey: 'drill' },
+    priceEddies: 750,
+    payload: { personaKey: 'drill', tag: 'DRILL UNIT' },
   },
   {
     key: 'persona_zen',
-    name: 'Zen Monk',
-    description: 'A serene minimalist. Koans, stillness, and the quiet insistence that the work is the way.',
+    name: 'KOAN-9',
+    description: 'A monastery that achieved sentience. Speaks in riddles.',
     category: 'persona',
-    priceEddies: 350,
-    payload: { personaKey: 'zen' },
+    priceEddies: 750,
+    payload: { personaKey: 'zen', tag: 'ZEN PROCESS' },
   },
   {
     key: 'persona_noir',
-    name: 'Noir Detective',
-    description: 'Hardboiled first-person narration. Your to-do list, retold in rain-slicked metaphors.',
+    name: 'RAYMOND',
+    description: 'Hardboiled. Narrates your chores like a rainy stakeout.',
     category: 'persona',
-    priceEddies: 400,
-    payload: { personaKey: 'noir' },
+    priceEddies: 800,
+    payload: { personaKey: 'noir', tag: 'NOIR PI' },
   },
   {
-    key: 'persona_showman',
-    name: 'The Showman',
-    description: 'A glam media-star hype-man. Every quest is a broadcast and you are the headline act.',
+    key: 'persona_motherboard',
+    name: 'MOTHERBOARD',
+    description: 'Warm, proud, mildly disappointed when you skip stretches.',
     category: 'persona',
-    priceEddies: 400,
-    payload: { personaKey: 'showman' },
+    priceEddies: 900,
+    payload: { personaKey: 'motherboard', tag: 'MATERNAL' },
+  },
+  {
+    key: 'persona_patch',
+    name: 'PATCH v0.12',
+    description: 'Twelve years old. Better at this than you. Knows it.',
+    category: 'persona',
+    priceEddies: 900,
+    payload: { personaKey: 'patch', tag: 'SCRIPT KIDDIE' },
   },
 
-  // ---- Display fonts (auto-equip on buy; toggle via /equip) -----------
+  // ---- TITLES — worn on the runner ID (handoff copy verbatim) ---------
+  {
+    key: 'title_eotm',
+    name: 'Employee of the Month',
+    description: 'Of which month, no one will say.',
+    category: 'title',
+    priceEddies: 66,
+    payload: { titleKey: 'eotm' },
+  },
+  {
+    key: 'title_netrunner',
+    name: 'Netrunner',
+    description: 'Standard-issue flex. A classic.',
+    category: 'title',
+    priceEddies: 400,
+    payload: { titleKey: 'netrunner' },
+  },
+  {
+    key: 'title_chromesaint',
+    name: 'Chrome Saint',
+    description: 'For the tastefully augmented.',
+    category: 'title',
+    priceEddies: 800,
+    payload: { titleKey: 'chromesaint' },
+  },
+  {
+    key: 'title_debtslayer',
+    name: 'Debt Slayer',
+    description: 'Earned in the red. Worn in the black.',
+    category: 'title',
+    priceEddies: 1000,
+    payload: { titleKey: 'debtslayer' },
+  },
+  {
+    key: 'title_streaklord',
+    name: 'Streaklord',
+    description: 'The chain speaks for itself.',
+    category: 'title',
+    priceEddies: 1200,
+    levelReq: 16,
+    payload: { titleKey: 'streaklord' },
+  },
+  {
+    key: 'title_voiddancer',
+    name: 'Void Dancer',
+    description: 'Nobody knows what it means. That is the point.',
+    category: 'title',
+    priceEddies: 1800,
+    levelReq: 20,
+    payload: { titleKey: 'voiddancer' },
+  },
+
+  // ---- DATA PETS — live in the deck, do nothing, beloved --------------
+  {
+    key: 'pet_byte',
+    name: 'BYTE',
+    description: 'A net pigeon. Delivers packets. Some of them are crumbs.',
+    category: 'pet',
+    priceEddies: 1200,
+    payload: { petKey: 'byte' },
+  },
+  {
+    key: 'pet_nibble',
+    name: 'NIBBLE',
+    description: 'A cyber-rat. Finds eddies in the vents. Keeps them.',
+    category: 'pet',
+    priceEddies: 1500,
+    payload: { petKey: 'nibble' },
+  },
+  {
+    key: 'pet_koi',
+    name: 'K0I',
+    description: 'A stream fish. Swims the data stream, circles the cache.',
+    category: 'pet',
+    priceEddies: 1800,
+    levelReq: 18,
+    payload: { petKey: 'koi' },
+  },
+  {
+    key: 'pet_null',
+    name: 'NULL',
+    description: 'A glitch cat. Stares at nothing. Possibly something.',
+    category: 'pet',
+    priceEddies: 2200,
+    levelReq: 16,
+    payload: { petKey: 'null' },
+  },
+
+  // ---- Display fonts (kept from v1; shown under the SHELLS section) ---
   {
     key: 'font_orbitron',
     name: 'Orbitron Display',
@@ -322,91 +568,50 @@ export const SHOP_ITEMS: ShopItem[] = [
     payload: { fontKey: 'sharetech' },
   },
 
-  // ---- Ambient FX (auto-equip on buy; toggle via /equip) --------------
+  // ---- SUPPLIES — consumables, repeat purchase OK (handoff prices) ----
   {
-    key: 'fx_rain',
-    name: 'Neon Drizzle',
-    description: 'Subtle animated rain streaks over the whole HUD. Night City weather, indoors.',
-    category: 'fx',
-    priceEddies: 300,
-    payload: { fxKey: 'rain' },
+    key: 'reroll_1',
+    name: 'Reroll Token',
+    description: 'Swap a contract for a fresh pull.',
+    category: 'token_reroll',
+    priceEddies: 100,
+    payload: { tokens: 1 },
   },
   {
-    key: 'fx_aurora',
-    name: 'Aurora Shift',
-    description: 'Slow drifting accent-tinted light fields. Re-tints itself to match your skin.',
-    category: 'fx',
-    priceEddies: 300,
-    payload: { fxKey: 'aurora' },
+    key: 'skip_1',
+    name: 'Skip Token',
+    description: 'Skip a contract, keep the streak.',
+    category: 'token_skip',
+    priceEddies: 150,
+    payload: { tokens: 1 },
   },
   {
-    key: 'fx_vhs',
-    name: 'VHS Tracking',
-    description: 'Drifting interference bands with a tape-deck wobble. Your life, recorded over a rental.',
-    category: 'fx',
-    priceEddies: 300,
-    payload: { fxKey: 'vhs' },
+    key: 'focus_1',
+    name: 'Focus Stim',
+    description: 'Next jack-in session pays +50% XP.',
+    category: 'consumable',
+    priceEddies: 250,
+    payload: { kind: 'focus' },
   },
   {
-    key: 'fx_datastream',
-    name: 'Data Stream',
-    description: 'Thin code columns sliding across the HUD. Corpo net traffic, always passing through.',
-    category: 'fx',
-    priceEddies: 300,
-    payload: { fxKey: 'datastream' },
-  },
-  {
-    key: 'fx_radar',
-    name: 'Tac-Sweep',
-    description: 'A slow tactical radar wedge sweeping the whole display. Contacts unconfirmed.',
-    category: 'fx',
+    key: 'overclock_1',
+    name: 'Overclock Chip',
+    description: 'Unlocks a fourth side-job slot tomorrow.',
+    category: 'consumable',
     priceEddies: 350,
-    payload: { fxKey: 'radar' },
+    payload: { kind: 'overclock' },
   },
-  {
-    key: 'fx_crt',
-    name: 'CRT Retrace',
-    description: 'A phosphor refresh line crawling down the tube over a faint scanline wash.',
-    category: 'fx',
-    priceEddies: 350,
-    payload: { fxKey: 'crt' },
-  },
-
-  // ---- Focus-chamber timer styles (auto-equip on buy) -----------------
-  {
-    key: 'timer_flip',
-    name: 'Split-Flap Chrono',
-    description: 'Departure-board digits in chamfered panels. Every minute clacks over like a platform change.',
-    category: 'timer',
-    priceEddies: 400,
-    payload: { timerKey: 'flip' },
-  },
-  {
-    key: 'timer_ring',
-    name: 'Orbital Gauge',
-    description: 'The clock sits inside a slow accent ring that drains your countdown — or laps the minute on open runs.',
-    category: 'timer',
-    priceEddies: 450,
-    payload: { timerKey: 'ring' },
-  },
-  {
-    key: 'timer_pulse',
-    name: 'Biorhythm',
-    description: 'Digits that beat like a monitored heart. Deep work, vitals on screen.',
-    category: 'timer',
-    priceEddies: 400,
-    payload: { timerKey: 'pulse' },
-  },
-
-  // ---- Power consumables (real mechanics, server-enforced) -----------
   {
     key: 'shield_1',
     name: 'Streak Shield',
-    description: 'One missed day forgiven — auto-fires at the roll-over and preserves your overclock chain. Max 3 banked.',
+    description: 'One missed day forgiven. Auto-fires. Max 3 banked.',
     category: 'consumable',
     priceEddies: 400,
     payload: { kind: 'shield' },
   },
+  // NOTE: the handoff lists this SKU as "XP BOOSTER — 2× XP for 24 hours",
+  // but the live mechanic is 2× EDDIES (XP stays honest — Brent's standing
+  // rule, see GamificationService). Name/copy kept truthful to the mechanic.
   {
     key: 'booster_1',
     name: 'Overdrive Chip',
@@ -414,6 +619,14 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'consumable',
     priceEddies: 600,
     payload: { kind: 'booster' },
+  },
+  {
+    key: 'rr_1',
+    name: 'R&R Credit',
+    description: 'Buy guilt-free downtime: spend it to pull a backlog item onto the active shelf.',
+    category: 'rr_credit',
+    priceEddies: 60,
+    payload: { credits: 1 },
   },
   {
     key: 'time_dilation_1',
@@ -424,7 +637,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     payload: { kind: 'budget' },
   },
 
-  // ---- Loot crates (weighted random reward) --------------------------
+  // ---- Loot crates (weighted random reward; kept from v1) -------------
   {
     key: 'crate_standard',
     name: 'Standard Crate',
@@ -444,7 +657,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   {
     key: 'crate_prime',
     name: 'Prime Crate',
-    description: 'High-roller crate: better odds, bigger token hauls, and a shot at a random cosmetic theme.',
+    description: 'High-roller crate: better odds, bigger token hauls, and a shot at a random neon skin.',
     category: 'loot_crate',
     priceEddies: 400,
     payload: {
@@ -453,7 +666,7 @@ export const SHOP_ITEMS: ShopItem[] = [
         { kind: 'skip',     weight: 22, label: '+3 Skip Tokens', amount: 3 },
         { kind: 'reroll',   weight: 22, label: '+3 Reroll Tokens', amount: 3 },
         { kind: 'rr',       weight: 20, label: '+2 R&R Credits', amount: 2 },
-        { kind: 'cosmetic', weight: 16, label: 'A random neon theme', themePool: [...COSMETIC_THEME_KEYS] },
+        { kind: 'cosmetic', weight: 16, label: 'A random neon skin', themePool: [...NIGHT_MARKET_THEME_KEYS] },
       ] satisfies LootDrop[],
     },
   },

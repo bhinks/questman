@@ -18,14 +18,26 @@
  * straight back into the chamber with the clock still right.
  *
  * The clock face honors the equipped Night Market timer style
- * (PlayerSnapshot.equippedTimer → data-timer attr; 'ring' additionally
- * draws an SVG progress ring that drains the countdown or laps the minute).
+ * (PlayerSnapshot.equippedTimer → data-timer attr). The v1 faces
+ * (flip/ring/pulse) restyle the digits; the v2 CHRONO styles
+ * (standard/fuse/flatline/orbital/detonator) additionally render their
+ * furniture (progress rail / fuse bar / EKG / EST label) as a compact
+ * row under the clock (SessionTimer), and 'ring'/'orbital' draw an SVG
+ * ring that drains the countdown or laps the minute.
+ *
+ * OVERTIME (Night Market v2 handoff): a countdown no longer auto-logs at
+ * zero — past the limit the clock flips to red `+MM:SS` and keeps counting
+ * ("BOOM. KEEP WORKING"). Jack-out logs the full raw minutes.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
 import type { FocusTargetOption, FocusTargetType, FocusSession, PlayerSnapshot } from '../lib/api';
 import { Icon } from './Icon';
+import { SessionTimer, type ChronoStyle } from './SessionTimer';
+
+/** v2 CHRONO styles that render a furniture row under the chamber clock. */
+const CHRONO_STYLES: ReadonlySet<string> = new Set(['standard', 'fuse', 'flatline', 'orbital', 'detonator'] satisfies ChronoStyle[]);
 
 /** What the launcher (topbar / priority contract) seeds the chamber with. */
 export interface FocusSeed {
@@ -119,7 +131,8 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
     queryFn: () => api.get<{ targets: FocusTargetOption[] }>('/api/focus/targets').then(r => r.targets),
   });
   const targets = targetsQ.data ?? [];
-  const timerKey = playerQ.data?.equippedTimer ?? 'default';
+  // null slot = STANDARD ISSUE (the free CHRONO built-in, v2 default face).
+  const timerKey = playerQ.data?.equippedTimer ?? 'standard';
 
   const logSession = useMutation({
     mutationFn: (body: {
@@ -152,17 +165,22 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
     ? (limitSec != null ? limitSec - elapsedSec : elapsedSec)
     : (limitSec ?? 0);
 
+  // OVERTIME (v2 handoff): past the limit the clock counts UP in red
+  // (+MM:SS) instead of auto-logging — keep working, jack out yourself.
+  const overtime = phase === 'running' && limitSec != null && elapsedSec >= limitSec;
+
   // Ring progress: countdown drains 1 → 0; open runs lap once per minute.
   const ringFrac = phase !== 'running'
     ? 1
     : limitSec != null
       ? Math.max(0, 1 - elapsedSec / limitSec)
       : (elapsedSec % 60) / 60;
+  // Orbital satellite/arc tracks PROGRESS (elapsed), not remainder.
+  const orbitFrac = limitSec != null ? Math.min(1, 1 - ringFrac) : (elapsedSec % 60) / 60;
 
-  const jackOut = (capToLimit: boolean) => {
+  const jackOut = () => {
     if (!run || logSession.isPending) return;
-    const raw = Math.max(1, Math.round((Date.now() - run.startedAt) / 60_000));
-    const minutes = Math.min(1440, capToLimit && run.limitMin != null ? Math.min(run.limitMin, raw) : raw);
+    const minutes = Math.min(1440, Math.max(1, Math.round((Date.now() - run.startedAt) / 60_000)));
     setError(null);
     logSession.mutate({
       targetType: run.targetType,
@@ -173,13 +191,6 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
       limitMinutes: run.limitMin,
     });
   };
-
-  // Countdown hit zero → auto jack-out at exactly the limit.
-  const expired = phase === 'running' && limitSec != null && elapsedSec >= limitSec;
-  useEffect(() => {
-    if (expired) jackOut(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expired]);
 
   const jackIn = () => {
     let targetType: FocusTargetType = 'other';
@@ -204,14 +215,27 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
   };
 
   // ---- clock face -------------------------------------------------------
-  const clockStr = fmtClock(clockSec);
+  const clockStr = overtime
+    ? '+' + fmtClock(elapsedSec - (limitSec ?? 0))
+    : fmtClock(clockSec);
+  // DETONATOR blinks under a minute (and in overtime) — design contract.
+  const detonatorHot = timerKey === 'detonator' && phase === 'running'
+    && (overtime || (limitSec != null && limitSec - elapsedSec < 60));
   const clock = (
-    <div className={'qm-clock' + (phase === 'running' ? ' running' : '')} data-timer={timerKey}>
+    <div
+      className={'qm-clock'
+        + (phase === 'running' ? ' running' : '')
+        + (overtime ? ' overtime' : '')
+        + (detonatorHot ? ' tmr-blink' : '')}
+      data-timer={timerKey}
+    >
+      {timerKey === 'detonator' && <span className="qm-sep">⟦</span>}
       {clockStr.split('').map((ch, i) => (
         ch === ':'
           ? <span key={i} className="qm-sep">:</span>
           : <span key={i} className="qm-digit">{ch}</span>
       ))}
+      {timerKey === 'detonator' && <span className="qm-sep">⟧</span>}
     </div>
   );
 
@@ -230,7 +254,37 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
       </svg>
       {clock}
     </div>
+  ) : timerKey === 'orbital' ? (
+    /* ORBITAL — progress arc + a satellite dot riding the rim (v2). */
+    <div className="qm-ring-wrap">
+      <svg viewBox="0 0 100 100" aria-hidden>
+        <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(var(--accent-rgb),0.14)" strokeWidth="1.5" />
+        <circle
+          cx="50" cy="50" r="46" fill="none"
+          stroke={overtime ? 'var(--red)' : 'var(--cyan)'} strokeWidth="2" strokeLinecap="round"
+          strokeDasharray={`${Math.max(0.001, orbitFrac) * C} ${C}`}
+          transform="rotate(-90 50 50)"
+          style={{ filter: 'drop-shadow(0 0 6px rgba(var(--accent-rgb),0.7))', transition: 'stroke-dasharray .4s linear' }}
+        />
+        <circle
+          cx={50 + 46 * Math.cos(orbitFrac * 2 * Math.PI - Math.PI / 2)}
+          cy={50 + 46 * Math.sin(orbitFrac * 2 * Math.PI - Math.PI / 2)}
+          r="2.6" fill={overtime ? 'var(--red)' : 'var(--cyan)'}
+          style={{ filter: 'drop-shadow(0 0 5px rgba(var(--accent-rgb),0.9))' }}
+        />
+      </svg>
+      {clock}
+    </div>
   ) : clock;
+
+  // CHRONO furniture row (v2): the style's rail/fuse/EKG/EST readout under
+  // the clock while a LIMITED run is live (open runs have no est to burn).
+  const chronoRail = phase === 'running' && run && run.limitMin != null
+    && CHRONO_STYLES.has(timerKey) && timerKey !== 'orbital' ? (
+      <div style={{ width: 'min(560px, 86vw)' }}>
+        <SessionTimer styleKey={timerKey} start={run.startedAt} estMin={run.limitMin} hideDigits />
+      </div>
+    ) : null;
 
   // Group the picker options by type once per fetch.
   const grouped = useMemo(() => TYPE_GROUPS
@@ -340,8 +394,9 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
           </div>
         )}
 
-        {/* ---- the clock ---- */}
+        {/* ---- the clock (+ the equipped CHRONO style's furniture row) ---- */}
         {face}
+        {chronoRail}
 
         {/* ---- under-clock: status + controls ---- */}
         {phase === 'setup' && (
@@ -369,7 +424,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
                 className="btn btn-primary"
                 style={{ padding: '13px 34px', fontSize: 13 }}
                 disabled={logSession.isPending}
-                onClick={() => jackOut(false)}
+                onClick={jackOut}
               >
                 <Icon name="zap" size={15} /> {logSession.isPending ? 'LOGGING…' : 'JACK OUT'}
               </button>

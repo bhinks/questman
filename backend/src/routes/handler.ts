@@ -34,15 +34,20 @@ function parseCosmetics(raw: string | null | undefined): string[] {
 }
 
 /** Persona display copy. Free trio first; paid voices are Night Market goods
- *  (price comes from the shop catalog so it lives in exactly one place). */
+ *  (price comes from the shop catalog so it lives in exactly one place).
+ *  Labels follow the Night Market v2 handoff identities; 'showman' is
+ *  retired from sale but stays listed for prior owners. */
 const PERSONA_OPTIONS: { key: Persona; label: string; blurb: string; free: boolean }[] = [
   { key: 'rogue_ai', label: 'Rogue AI', blurb: 'Sardonic, dry, quietly amused. The default.', free: true },
-  { key: 'fixer', label: 'Fixer', blurb: 'Gruff, all-business, hands you the gig.', free: true },
+  { key: 'fixer', label: 'V1KTOR — Fixer', blurb: 'Terse. Professional. Gets you paid.', free: true },
   { key: 'ripperdoc', label: 'Ripperdoc', blurb: 'Upbeat, clinical, optimizes your day.', free: true },
-  { key: 'drill', label: 'Drill Sergeant', blurb: 'Barked orders, zero sympathy, secretly proud.', free: false },
-  { key: 'zen', label: 'Zen Monk', blurb: 'Koans and stillness. The work is the way.', free: false },
-  { key: 'noir', label: 'Noir Detective', blurb: 'Hardboiled voice-over, rain-slicked metaphors.', free: false },
-  { key: 'showman', label: 'The Showman', blurb: 'Prime-time hype-man. You are the headline act.', free: false },
+  { key: 'hrbot', label: 'HR-BOT 3000 — Corporate', blurb: 'Synergy. Alignment. Circling back. Forever.', free: false },
+  { key: 'drill', label: 'SGT. CHROME — Drill Unit', blurb: 'Volume permanently at maximum. Believes in you, loudly.', free: false },
+  { key: 'zen', label: 'KOAN-9 — Zen Process', blurb: 'A monastery that achieved sentience. Speaks in riddles.', free: false },
+  { key: 'noir', label: 'RAYMOND — Noir PI', blurb: 'Hardboiled. Narrates your chores like a rainy stakeout.', free: false },
+  { key: 'motherboard', label: 'MOTHERBOARD — Maternal', blurb: 'Warm, proud, mildly disappointed when you skip stretches.', free: false },
+  { key: 'patch', label: 'PATCH v0.12 — Script Kiddie', blurb: 'Twelve years old. Better at this than you. Knows it.', free: false },
+  { key: 'showman', label: 'The Showman', blurb: 'Prime-time hype-man. Retired stock — yours if you bought it.', free: false },
 ];
 
 /** Catalog price for a paid persona ('persona_<key>'), if listed. */
@@ -126,7 +131,9 @@ router.get('/persona', asyncHandler(async (req: AuthRequest, res) => {
       ...o,
       owned: o.free || ownedKeys.includes(`persona_${o.key}`),
       ...(o.free ? {} : { priceEddies: personaPrice(o.key) }),
-    })),
+    }))
+      // Retired stock (off-catalog, e.g. The Showman) only shows for owners.
+      .filter(o => o.free || o.owned || o.priceEddies !== undefined),
   });
 }));
 

@@ -25,6 +25,8 @@ import type {
 } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
+import { FxLayer, useGlitchBurst } from './FxOverlays';
+import { PET_META, TITLE_META, type PetMeta } from '../lib/market';
 
 interface AppShellProps {
   activeTab: string;
@@ -89,6 +91,37 @@ function Clock() {
   );
 }
 
+/**
+ * PetWidget — the equipped data pet, living above the runner ID card
+ * (Night Market v2 handoff). 32px emoji chip with a 2.6s bob (NULL also
+ * flickers ~1 frame every 7s), name // SPECIES, and a rotating status
+ * line (7s interval) ending in a blinking cursor. Emoji are allowed ONLY
+ * inside gradient .ncx-chip containers (brand rule).
+ */
+function PetWidget({ pet }: { pet: PetMeta }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI(x => x + 1), 7000);
+    return () => clearInterval(id);
+  }, []);
+  const status = pet.status[i % pet.status.length];
+  return (
+    <div className="pet-card">
+      <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 32, height: 32, fontSize: 16 }}>
+        {pet.emoji}
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em' }}>
+          {pet.name} <span style={{ color: 'var(--text-ghost)' }}>// {pet.species}</span>
+        </div>
+        <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {status}<span className="cursor-blink" style={{ color: 'var(--cyan)' }}>_</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn }: AppShellProps) {
   const qc = useQueryClient();
   const { user, logout } = useAuth();
@@ -136,8 +169,15 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
   const activeIce = (iceQ.data ?? []).filter(a => a.isActive).length;
   const topBoss = (bossQ.data ?? []).find(b => b.status === 'active');
 
+  // Night Market v2 gear on the shell: equipped title (runner ID), data pet
+  // (deck companion), stackable visual FX (+ the GLITCH PROTOCOL burst).
+  const equippedTitle = p?.equippedTitle ? TITLE_META[p.equippedTitle] ?? null : null;
+  const equippedPet = p?.equippedPet ? PET_META[p.equippedPet] ?? null : null;
+  const fxActive = p?.fxActive ?? [];
+  const burst = useGlitchBurst(fxActive);
+
   return (
-    <div className="app-shell">
+    <div className={'app-shell' + (burst ? ' fx-burst' : '')}>
       <div className="ncx-shell">
         {/* ---- DECK ---- */}
         <aside className="ncx-deck">
@@ -167,13 +207,15 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
               </div>
             ))}
           </nav>
-          {/* Runner ID card */}
+          {/* Data pet — the deck companion lives just above the ID card. */}
+          {equippedPet && <PetWidget pet={equippedPet} />}
+          {/* Runner ID card — an equipped vanity title replaces RUNNER-01. */}
           <div className="ncx-id">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>{p?.level ?? '—'}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {handle} <span style={{ color: 'var(--text-ghost)' }}>// RUNNER-01</span>
+                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {handle} <span style={{ color: equippedTitle ? 'var(--cyan)' : 'var(--text-ghost)' }}>// {equippedTitle ? equippedTitle.name : 'RUNNER-01'}</span>
                 </div>
                 <div className="ncx-bar slim" style={{ marginTop: 6 }}>
                   <i style={{ width: `${xpPct}%`, background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))' }} />
@@ -278,8 +320,13 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
         <span>SKIPS ×{p?.skipTokens ?? 0}</span>
         <span>REROLL ×{p?.rerollTokens ?? 0}</span>
         {(p?.streakShields ?? 0) > 0 && <span style={{ color: 'var(--teal)' }}>SHIELD ×{p!.streakShields}</span>}
+        {fxActive.length > 0 && <span>FX ×{fxActive.length}</span>}
         <span className="ncx-serial">QTM//{String(streak).padStart(3, '0')}.076</span>
       </footer>
+
+      {/* Night Market v2 visual FX — stackable ambient overlays (z-30,
+          pointer-events none) + the GLITCH PROTOCOL burst veil. */}
+      <FxLayer fxActive={fxActive} />
 
       {/* MORE sheet — glass overlay exposing the FULL deck on mobile
           (polish pass §3a). Reuses NAV_GROUPS verbatim so the sheet can

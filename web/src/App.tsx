@@ -104,21 +104,28 @@ function HubApp() {
     queryFn: () => api.get<PlayerResponse>('/api/player').then(r => r.player),
   });
   const equippedTheme = playerQuery.data?.equippedTheme ?? null;
+  // OS shell (Night Market v2): a deep interface rewire applied as
+  // <html data-shell>. Shells LOCK the palette (index.css puts their var
+  // blocks after every [data-theme]), so the equipped skin is ignored
+  // while a non-default shell is booted — per the design handoff.
+  const equippedShell = playerQuery.data?.equippedShell ?? null;
   const energyTier = playerQuery.data?.energy?.tier ?? null;
   const themeInitRef = useRef(false);
   useEffect(() => {
     const el = document.documentElement;
     if (equippedTheme) el.dataset.theme = equippedTheme;
     else delete el.dataset.theme;
-    // Theme-equip pulse (design handoff): a ~450ms global color transition so
-    // the reskin sweeps rather than snaps. Skipped on the initial mount.
+    if (equippedShell) el.dataset.shell = equippedShell;
+    else delete el.dataset.shell;
+    // Theme/shell-equip pulse (design handoff): a ~450ms global color
+    // transition so the reskin sweeps rather than snaps. Skipped on mount.
     if (themeInitRef.current) {
       el.classList.add('theming');
       const t = setTimeout(() => el.classList.remove('theming'), 450);
       return () => { clearTimeout(t); el.classList.remove('theming'); };
     }
     themeInitRef.current = true;
-  }, [equippedTheme]);
+  }, [equippedTheme, equippedShell]);
   useEffect(() => {
     const el = document.documentElement;
     // World mechanics: a low battery visibly dims the UI (index.css).
@@ -126,17 +133,18 @@ function HubApp() {
     else delete el.dataset.energy;
   }, [energyTier]);
 
-  // Night Market cosmetic slots: display-font + ambient FX packs apply as
-  // data attributes (index.css ships a [data-font]/[data-fx] block per pack).
+  // Night Market display-font pack applies as a data attribute (index.css
+  // ships a [data-font] block per pack). Visual FX are no longer a data-fx
+  // attribute: the v2 system is STACKABLE component overlays rendered by
+  // AppShell (FxOverlays.tsx) from PlayerSnapshot.fxActive.
   const equippedFont = playerQuery.data?.equippedFont ?? null;
-  const equippedFx = playerQuery.data?.equippedFx ?? null;
   useEffect(() => {
     const el = document.documentElement;
     if (equippedFont) el.dataset.font = equippedFont;
     else delete el.dataset.font;
-    if (equippedFx) el.dataset.fx = equippedFx;
-    else delete el.dataset.fx;
-  }, [equippedFont, equippedFx]);
+    // One-time cleanup: drop any stale data-fx left by the legacy system.
+    delete el.dataset.fx;
+  }, [equippedFont]);
 
   // Night City display calibration: apply the per-user CRT knobs as CSS vars
   // on the root. CRT % fans out to the scanline/sweep alphas (handoff formula).

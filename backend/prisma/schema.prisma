@@ -666,8 +666,19 @@ model PlayerProfile {
   equippedTheme String?
   // Night Market expansion: independently-equippable cosmetic slots.
   equippedFont  String?  // display-font pack key (null = stock Chakra Petch)
-  equippedFx    String?  // ambient FX pack key (null = none)
-  equippedTimer String?  // focus-chamber timer style key (null = standard)
+  equippedFx    String?  // LEGACY single-equip FX pack key (superseded by fxActive)
+  equippedTimer String?  // session-timer (CHRONO) style key (null = standard)
+  // --- Night Market v2 gear slots (design handoff: night market expansion) ---
+  equippedShell String?  // OS shell key ('tty'|'outrun'; null = Night City default)
+  equippedTitle String?  // vanity title key worn on the runner ID (null = none)
+  equippedPet   String?  // data-pet key living in the nav deck (null = none)
+  // Visual FX are STACKABLE (unlike the old single-equip packs): JSON array
+  // of active fx keys — any subset of the owned 'fx_*' cosmetics.
+  fxActive      String?
+  // Night Market v2 supplies — stock counters only for now (the gameplay
+  // effects are explicitly out of scope in the design handoff).
+  focusStims     Int     @default(0) // FOCUS STIM: next session +50% XP (effect TBD)
+  overclockChips Int     @default(0) // OVERCLOCK CHIP: 4th side-job slot (effect TBD)
   // --- World mechanics (phase 5): energy / battery ---
   // A daily capacity tier derived from sleep (vitals sleepHours) with a
   // manual override. "low"|"med"|"high". energyOverrideOn pins the override

@@ -795,17 +795,18 @@ html.theming, html.theming * { transition: background .35s, box-shadow .35s, col
   --glow-cyan:   0 0 0.5px rgba(255,106,61,.85), 0 0 12px rgba(255,106,61,.40);
 }
 
-/* Ultraviolet — electric purple, past the visible spectrum */
+/* Ultraviolet — electric purple, past the visible spectrum
+   (hexes nudged to the Night Market v2 handoff palette) */
 [data-theme="ultraviolet"] {
-  --cyan:        #b14dff;
+  --cyan:        #b44dff;
   --cyan-deep:   #7e22cc;
   --magenta:     #ff4dd8;
-  --violet:      #7a4dff;
+  --violet:      #7a5cff;
   --teal:        #c98aff;
   --brand:       var(--cyan);
-  --accent-rgb:  177, 77, 255;
-  --line-bright: rgba(177, 77, 255, 0.32);
-  --glow-cyan:   0 0 0.5px rgba(177,77,255,.85), 0 0 12px rgba(177,77,255,.40);
+  --accent-rgb:  180, 77, 255;
+  --line-bright: rgba(180, 77, 255, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(180,77,255,.85), 0 0 12px rgba(180,77,255,.40);
 }
 
 /* ============================================================
@@ -880,6 +881,65 @@ html.theming, html.theming * { transition: background .35s, box-shadow .35s, col
 }
 
 /* ============================================================
+   Cosmetic themes — NIGHT MARKET v2 (design handoff: night market
+   expansion). Same contract: accent remap only, surfaces/text
+   constant, --lime/--amber/--red stay semantic, accent alphas
+   ALWAYS built via rgba(var(--accent-rgb), α).
+   ============================================================ */
+
+/* Abyssal — deep-sea teal over blacklight blue */
+[data-theme="abyssal"] {
+  --cyan:        #2ff5d6;
+  --cyan-deep:   #17a98f;
+  --magenta:     #27c4ff;
+  --violet:      #1fb39b;
+  --teal:        #2ff5d6;
+  --brand:       var(--cyan);
+  --accent-rgb:  47, 245, 214;
+  --line-bright: rgba(47, 245, 214, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(47,245,214,.85), 0 0 12px rgba(47,245,214,.40);
+}
+
+/* Ember District — furnace orange with a red undertow */
+[data-theme="ember"] {
+  --cyan:        #ff8a3c;
+  --cyan-deep:   #c45c14;
+  --magenta:     #ff3d5e;
+  --violet:      #ffb36b;
+  --teal:        #ffaa6b;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 138, 60;
+  --line-bright: rgba(255, 138, 60, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,138,60,.85), 0 0 12px rgba(255,138,60,.40);
+}
+
+/* Acid Rain — caustic chartreuse fallout (LVL 16) */
+[data-theme="acid"] {
+  --cyan:        #d8ff2e;
+  --cyan-deep:   #9cbf12;
+  --magenta:     #7dff5e;
+  --violet:      #eaff7a;
+  --teal:        #aaff4d;
+  --brand:       var(--cyan);
+  --accent-rgb:  216, 255, 46;
+  --line-bright: rgba(216, 255, 46, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(216,255,46,.85), 0 0 12px rgba(216,255,46,.40);
+}
+
+/* Ghostwire — pale signal-white over static (LVL 20) */
+[data-theme="ghostwire"] {
+  --cyan:        #e8ecff;
+  --cyan-deep:   #a6aecf;
+  --magenta:     #aab4d0;
+  --violet:      #c9d1e8;
+  --teal:        #d6dcf5;
+  --brand:       var(--cyan);
+  --accent-rgb:  232, 236, 255;
+  --line-bright: rgba(232, 236, 255, 0.28);
+  --glow-cyan:   0 0 0.5px rgba(232,236,255,.8), 0 0 12px rgba(232,236,255,.30);
+}
+
+/* ============================================================
    Display font packs (Shop "Display Mods"). Applied via
    <html data-font="KEY"> from PlayerSnapshot.equippedFont — only
    --font-display swaps; UI/mono faces stay constant.
@@ -906,198 +966,179 @@ html[data-font="sharetech"] {
 html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
 
 /* ============================================================
-   Ambient FX packs (Shop "Display Mods"). Applied via
-   <html data-fx="KEY"> from PlayerSnapshot.equippedFx. A single
-   fixed pseudo-element overlay: pointer-events none, z-index 2
-   (above the body frame layers, far below modals), texture alphas
-   kept ≤ 0.06 so content always reads through. Motion is gated
-   behind prefers-reduced-motion: no-preference.
+   NIGHT MARKET v2 — VISUAL FX overlays, CHRONO session timers,
+   data pets, shop grid. Ported from the design handoff's
+   market.css; namespaces kept verbatim (.fx-*, .tmr-*, .pet-*,
+   .mkt-*) for design parity. FX layers are React components
+   (FxOverlays.tsx) driven by PlayerSnapshot.fxActive — stackable,
+   unlike the retired single-equip html[data-fx] packs.
    ============================================================ */
 
-/* Neon Drizzle — thin near-vertical streaks drifting down */
-html[data-fx="rain"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0.5;
-  background:
-    repeating-linear-gradient(
-      100deg,
-      transparent 0px,
-      transparent 22px,
-      rgba(var(--accent-rgb), 0.05) 22px,
-      rgba(var(--accent-rgb), 0.05) 23px
-    ),
-    repeating-linear-gradient(
-      100deg,
-      transparent 0px,
-      transparent 30px,
-      rgba(190, 210, 255, 0.04) 30px,
-      rgba(190, 210, 255, 0.04) 31px
-    );
+/* ---- overlay layers ---- */
+.fxo {
+  position: fixed; inset: 0; pointer-events: none; overflow: hidden;
+  z-index: 30; /* above content, far below modals (1000+) */
 }
+.fxo.prev { position: absolute; z-index: 1; }
 
-/* Aurora Shift — slow drifting accent-tinted light fields (re-tints
-   with the equipped theme via --accent-rgb) */
-html[data-fx="aurora"]::after {
-  content: "";
-  position: fixed;
-  inset: -20%;
-  pointer-events: none;
-  z-index: 2;
-  background:
-    radial-gradient(620px 420px at 18% 22%, rgba(var(--accent-rgb), 0.05), transparent 70%),
-    radial-gradient(720px 480px at 78% 28%, rgba(157, 107, 255, 0.04), transparent 70%),
-    radial-gradient(660px 520px at 55% 82%, rgba(var(--accent-rgb), 0.04), transparent 70%);
+/* ---- NEON DOWNPOUR ---- */
+.fx-drop {
+  position: absolute; width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(var(--accent-rgb), 0.55));
 }
-
-/* VHS Tracking — wide interference bands drifting down with a tape wobble.
-   Band period 160px; the X nudge at the animation midpoint is the wobble. */
-html[data-fx="vhs"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px,
-      transparent 89px,
-      rgba(var(--accent-rgb), 0.05) 89px,
-      rgba(var(--accent-rgb), 0.05) 92px,
-      rgba(255, 255, 255, 0.03) 92px,
-      rgba(255, 255, 255, 0.03) 94px,
-      transparent 94px,
-      transparent 160px
-    ),
-    repeating-linear-gradient(90deg, rgba(190, 210, 255, 0.02) 0 1px, transparent 1px 6px);
-}
-
-/* Data Stream — thin vertical code columns sliding sideways (corpo net
-   traffic). Column period 74px. */
-html[data-fx="datastream"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0px,
-      transparent 58px,
-      rgba(var(--accent-rgb), 0.05) 58px,
-      rgba(var(--accent-rgb), 0.05) 59px,
-      transparent 59px,
-      transparent 73px,
-      rgba(190, 210, 255, 0.03) 73px,
-      rgba(190, 210, 255, 0.03) 74px
-    );
-}
-
-/* Tac-Sweep — a rotating radar wedge centered on the viewport. The element
-   is an oversized square so the rotation never exposes a corner; without
-   motion it degrades to a faint static wedge. */
-html[data-fx="radar"]::after {
-  content: "";
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  width: 160vmax;
-  height: 160vmax;
-  margin: -80vmax 0 0 -80vmax;
-  pointer-events: none;
-  z-index: 2;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    rgba(var(--accent-rgb), 0.055) 0deg,
-    rgba(var(--accent-rgb), 0.018) 26deg,
-    transparent 60deg,
-    transparent 360deg
-  );
-}
-
-/* CRT Retrace — a phosphor refresh line crawling down the tube over a faint
-   scanline wash. The line lives in a 300%-tall gradient; animating its
-   background-position 100%→0% sends it top-to-bottom. */
-html[data-fx="crt"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 47%,
-      rgba(var(--accent-rgb), 0.06) 50%,
-      transparent 53%,
-      transparent 100%
-    ),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px);
-  background-size: 100% 300%, 100% 100%;
-  background-position: 0 100%, 0 0;
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  html[data-fx="rain"]::after {
-    animation: qm-fx-rain 9s linear infinite;
-  }
-  /* Layer periods 23px/31px at 100deg → vertical tiling ≈ 89px/120px;
-     8 and 6 loops land both layers back on phase together. */
-  @keyframes qm-fx-rain {
-    from { background-position: 0 0, 0 0; }
-    to   { background-position: 0 712px, 0 720px; }
-  }
+  .fx-drop { animation: fx-drop-fall var(--dur, 1.1s) linear infinite; }
+}
+@keyframes fx-drop-fall { to { transform: translateY(var(--fall, 115vh)); } }
 
-  html[data-fx="aurora"]::after {
-    animation: qm-fx-aurora 26s ease-in-out infinite alternate;
-  }
-  @keyframes qm-fx-aurora {
-    from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
-    to   { transform: translate3d(1.5%, 1%, 0) scale(1.05); }
-  }
+/* ---- DATA RAIN ---- */
+.fx-mtxcol {
+  position: absolute; white-space: pre; text-align: center;
+  font-family: var(--font-mono); line-height: 1.35;
+  color: rgba(var(--accent-rgb), 0.4);
+  text-shadow: 0 0 7px rgba(var(--accent-rgb), 0.45);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-mtxcol { animation: fx-mtx-fall var(--dur, 9s) linear infinite; }
+}
+@keyframes fx-mtx-fall { to { transform: translateY(var(--fall, 140vh)); } }
 
-  html[data-fx="vhs"]::after {
-    animation: qm-fx-vhs 11s linear infinite;
-  }
-  /* One 160px band period per loop; the 2px X excursion at 50% is the
-     tape-tracking wobble (returns to 0 so the loop is seamless). */
-  @keyframes qm-fx-vhs {
-    0%   { background-position: 0 0, 0 0; }
-    50%  { background-position: 2px 80px, 0 0; }
-    100% { background-position: 0 160px, 0 0; }
-  }
+/* ---- HOLO DUST ---- */
+.fx-mote {
+  position: absolute; bottom: -8px; border-radius: 50%; opacity: 0;
+  background: rgba(var(--accent-rgb), 0.85);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.8);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-mote { animation: fx-mote-rise var(--dur, 12s) linear infinite; }
+}
+@keyframes fx-mote-rise {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  12%  { opacity: var(--o, 0.5); }
+  88%  { opacity: var(--o, 0.5); }
+  100% { transform: translate(var(--sway, 18px), var(--rise, -105vh)); opacity: 0; }
+}
 
-  html[data-fx="datastream"]::after {
-    animation: qm-fx-datastream 18s linear infinite;
-  }
-  /* Two 74px column periods per loop. */
-  @keyframes qm-fx-datastream {
-    from { background-position: 0 0; }
-    to   { background-position: 148px 0; }
-  }
+/* ---- VHS TRACKING ---- */
+.fx-vhsband {
+  position: absolute; left: 0; right: 0; top: -16%; height: 12%; opacity: 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(var(--accent-rgb), 0.06) 50%,
+    rgba(255, 255, 255, 0.035) 70%,
+    transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-vhsband { animation: fx-vhs-pass var(--dur, 7s) linear infinite; }
+}
+@keyframes fx-vhs-pass {
+  0%   { top: -16%; opacity: 0; }
+  3%   { opacity: 1; }
+  17%  { top: 106%; opacity: 1; }
+  18%  { opacity: 0; }
+  100% { top: 106%; opacity: 0; }
+}
 
-  html[data-fx="radar"]::after {
-    animation: qm-fx-radar 14s linear infinite;
-  }
-  @keyframes qm-fx-radar {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-  }
+/* ---- GHOST CURSOR ---- */
+.fx-ghostdot {
+  position: fixed; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  pointer-events: none; z-index: 80;
+  background: rgba(var(--accent-rgb), 0.85);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  box-shadow: 0 0 9px rgba(var(--accent-rgb), 0.7);
+  animation: fx-ghostfade 0.7s ease-out forwards;
+}
+@keyframes fx-ghostfade { to { opacity: 0; transform: scale(0.15); } }
 
-  html[data-fx="crt"]::after {
-    animation: qm-fx-crt 8s linear infinite;
-  }
-  /* 100%→0% with a 300%-tall image moves the bright line downscreen. */
-  @keyframes qm-fx-crt {
-    from { background-position: 0 100%, 0 0; }
-    to   { background-position: 0 0%, 0 0; }
-  }
+/* ---- GLITCH PROTOCOL (burst on contract clear) ----
+   'fx-burst' lands on .app-shell for ~520ms; the veil is a screen-blend
+   flash, the jolt shakes the inner .ncx-shell. */
+.fx-burst-veil { position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0; mix-blend-mode: screen;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.09), transparent 30%, transparent 70%, rgba(255, 46, 154, 0.09));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-burst .ncx-shell { animation: fx-burst-jolt 0.45s steps(2) 1; }
+  .fx-burst .fx-burst-veil { animation: fx-burst-veil 0.45s steps(3) 1; }
+}
+@keyframes fx-burst-jolt {
+  0%   { transform: none; }
+  20%  { transform: translate(-3px, 1px) skewX(-0.7deg); }
+  45%  { transform: translate(3px, -2px) skewX(0.5deg); }
+  70%  { transform: translate(-1px, 1px); }
+  100% { transform: none; }
+}
+@keyframes fx-burst-veil { from { opacity: 1; } to { opacity: 0; } }
+
+/* glitch shop preview — jitters on a loop */
+@media (prefers-reduced-motion: no-preference) {
+  .fx-glitchprev { animation: fx-prev-glitch 2.6s steps(2) infinite; }
+}
+@keyframes fx-prev-glitch {
+  0%, 7%, 100% { transform: none; opacity: 1; }
+  2% { transform: translate(-2px, 1px) skewX(-3deg); opacity: 0.75; }
+  5% { transform: translate(2px, -1px); }
+}
+
+/* ---- CHRONO session timers (compact row — shop previews + chamber rail) ---- */
+.tmr {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 16px;
+}
+.tmr.prev { height: 100%; border: none; }
+.tmr-digits {
+  font-family: var(--font-mono); font-weight: 600;
+  font-feature-settings: "tnum" 1, "zero" 1; letter-spacing: 0.02em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tmr-blink { animation: tmr-blink 1s steps(1) infinite; }
+}
+@keyframes tmr-blink { 50% { opacity: 0.22; } }
+
+.tmr-ekg .base { stroke: rgba(150, 168, 224, 0.18); }
+.tmr-ekg .trace { stroke-dasharray: 60 460; }
+@media (prefers-reduced-motion: no-preference) {
+  .tmr-ekg .trace { animation: tmr-ekg-run 2.4s linear infinite; }
+}
+@keyframes tmr-ekg-run { from { stroke-dashoffset: 520; } to { stroke-dashoffset: 0; } }
+
+.tmr-fusetip {
+  position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%; background: var(--amber);
+  box-shadow: 0 0 10px 2px rgba(255, 194, 75, 0.8);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tmr-fusetip { animation: tmr-spark 0.4s steps(2) infinite; }
+}
+@keyframes tmr-spark { 50% { box-shadow: 0 0 14px 4px rgba(255, 194, 75, 0.9); transform: scale(1.25); } }
+
+/* ---- data pets (deck companion above the runner ID) ---- */
+.pet-card {
+  margin: 10px 12px 0; padding: 9px 12px; position: relative;
+  display: flex; gap: 10px; align-items: center;
+  background: #070811; border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pet-chip { animation: pet-bob 2.6s ease-in-out infinite; }
+  .pet-flicker { animation: pet-bob 2.6s ease-in-out infinite, pet-flicker 7s steps(1) infinite; }
+}
+@keyframes pet-bob { 50% { transform: translateY(-2.5px); } }
+@keyframes pet-flicker { 0%, 91%, 94%, 100% { opacity: 1; } 92%, 93% { opacity: 0.15; } }
+
+/* ---- shop bits ---- */
+.mkt-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 14px;
+}
+.mkt-live {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+  color: var(--text-faint); text-align: center; padding: 9px 0;
+  box-shadow: inset 0 0 0 1px var(--line); text-transform: uppercase;
+}
+.mkt-prev {
+  position: relative; overflow: hidden; height: 70px;
 }
 
 /* ============================================================
@@ -1198,3 +1239,219 @@ html[data-fx="crt"]::after {
   24% { text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45); transform: scale(1.004); }
   36% { text-shadow: 0 0 30px rgba(var(--accent-rgb), 0.8), 0 0 80px rgba(var(--accent-rgb), 0.35); transform: scale(1.018); }
 }
+
+/* ---- CHRONO styles (Night Market v2) — ADDED alongside the v1 faces
+   above. The equipped style re-dresses the chamber clock; its furniture
+   (progress rail / fuse bar / EKG / orbit / EST label) renders as a .tmr
+   row beneath it (SessionTimer.tsx). Overtime flips everything red. ---- */
+
+/* STANDARD ISSUE — soft accent glow (same treatment as 'default') */
+.qm-clock[data-timer="standard"] {
+  text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45), 0 0 60px rgba(var(--accent-rgb), 0.18);
+}
+
+/* SHORT FUSE — amber digits over the burning line */
+.qm-clock[data-timer="fuse"] {
+  color: var(--amber);
+  text-shadow: 0 0 18px rgba(255, 194, 75, 0.45), 0 0 60px rgba(255, 194, 75, 0.16);
+}
+.qm-clock[data-timer="fuse"] .qm-sep { color: var(--amber); }
+
+/* FLATLINE MONITOR — vitals cyan; the EKG row below keeps the pace */
+.qm-clock[data-timer="flatline"] {
+  color: var(--cyan);
+  text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.4);
+}
+
+/* ORBITAL — digits inside the SVG ring (a satellite rides the rim), so
+   the type shrinks to fit; shares .qm-ring-wrap with the v1 ring face. */
+.qm-clock[data-timer="orbital"] {
+  font-size: clamp(44px, 9vw, 104px);
+  text-shadow: 0 0 16px rgba(var(--accent-rgb), 0.4);
+}
+
+/* DETONATOR — red seven-seg; blinks under a minute (and in overtime).
+   The ⟦ ⟧ brackets are markup (FocusView), not pseudo-elements. */
+.qm-clock[data-timer="detonator"] {
+  color: var(--red);
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 16px rgba(255, 77, 109, 0.65);
+}
+.qm-clock[data-timer="detonator"] .qm-sep { color: var(--red); }
+
+/* Overtime (past the limit): every face flips red — "+MM:SS". */
+.qm-clock.overtime, .qm-clock.overtime .qm-digit, .qm-clock.overtime .qm-sep {
+  color: var(--red);
+  text-shadow: 0 0 16px rgba(255, 77, 109, 0.55);
+}
+
+/* ============================================================
+   OS SHELLS (Night Market v2) — deep interface rewires sold at
+   the market. A shell is <html data-shell="tty"|"outrun"> and
+   overrides tokens, fonts, geometry and the ambient backdrop —
+   far beyond a skin's accent remap. Default shell = no attribute
+   (Night City). Ported from the handoff's shells.css, selectors
+   adapted to the app (body frame layers, .panel/.ncx-*).
+   These blocks live at the END of the stylesheet so the locked
+   palettes beat any [data-theme] skin remap in the cascade.
+   ============================================================ */
+
+/* ----------------------------------------------------------------
+   BARE METAL — phosphor mono TTY. Square corners, zero glow, zero
+   chrome. Palette is locked by the shell (green phosphor + amber).
+   ---------------------------------------------------------------- */
+html[data-shell="tty"] {
+  --font-display: var(--font-mono);
+  --font-ui: var(--font-mono);
+  /* !important so the shell beats the inline display-calibration vars
+     App.tsx sets on <html> (stylesheet !important > inline non-!important). */
+  --cut: 0px !important;
+  --cut-sm: 0px !important;
+  --chroma: 0px !important;
+  --text: #c2ffd2; --text-dim: #84dc98; --text-faint: #549665; --text-ghost: #3a6847;
+  --line: rgba(63, 255, 118, 0.16); --line-2: rgba(63, 255, 118, 0.28);
+  --line-bright: rgba(63, 255, 118, 0.5);
+  --cyan: #3fff76;
+  --cyan-deep: #1d9c46;
+  --accent-rgb: 63, 255, 118;
+  --magenta: #ffb000;
+  --violet: #9dffb0;
+  --teal: #6dffa0;
+  --brand: var(--cyan);
+  --glow-cyan: none;
+  --panel: #000;
+  --panel-2: #021407;
+  --panel-3: #052810;
+  --panel-hi: #073018;
+}
+html[data-shell="tty"] body { background: #010401; }
+html[data-shell="tty"] body::before { display: none; }            /* no corner glows */
+html[data-shell="tty"] body::after {                              /* scanlines only, no grid */
+  background-image: repeating-linear-gradient(0deg, rgba(180, 255, 200, 0.035) 0 1px, transparent 1px 3px);
+  background-size: 100% 100%;
+  mask-image: none; -webkit-mask-image: none;
+}
+html[data-shell="tty"] * { text-shadow: none !important; border-radius: 0 !important; }
+html[data-shell="tty"] svg { filter: none !important; }
+html[data-shell="tty"] .panel, html[data-shell="tty"] .ncx-panel { background: #000; }
+html[data-shell="tty"] .panel::before, html[data-shell="tty"] .panel::after,
+html[data-shell="tty"] .ncx-panel::before, html[data-shell="tty"] .ncx-panel::after { display: none; }
+html[data-shell="tty"] .panel-inset, html[data-shell="tty"] .ncx-inset,
+html[data-shell="tty"] .ncx-id, html[data-shell="tty"] .pet-card { background: #000; }
+html[data-shell="tty"] .ncx-deck, html[data-shell="tty"] .ncx-topbar,
+html[data-shell="tty"] .ncx-statusbar { background: #000; backdrop-filter: none; }
+html[data-shell="tty"] .ncx-deck-item { clip-path: none; }
+html[data-shell="tty"] .ncx-deck-item.active { background: #082312; box-shadow: inset 2px 0 0 var(--cyan); color: var(--text); }
+html[data-shell="tty"] .btn, html[data-shell="tty"] .ncx-btn { background: #021407; box-shadow: inset 0 0 0 1px var(--line-2); }
+html[data-shell="tty"] .btn:hover, html[data-shell="tty"] .ncx-btn:hover { background: #073018; box-shadow: inset 0 0 0 1px var(--line-bright); }
+html[data-shell="tty"] .btn-primary, html[data-shell="tty"] .ncx-btn.primary {
+  background: #0c3a1c; color: var(--cyan); box-shadow: inset 0 0 0 1px var(--cyan);
+}
+html[data-shell="tty"] .btn-primary:hover, html[data-shell="tty"] .ncx-btn.primary:hover {
+  background: #11491f; box-shadow: inset 0 0 0 1px var(--cyan);
+}
+html[data-shell="tty"] .btn-ghost { background: transparent; box-shadow: none; }
+html[data-shell="tty"] .ncx-hex { clip-path: none; background: #0c3a1c; color: var(--cyan); box-shadow: inset 0 0 0 1px var(--cyan) !important; }
+html[data-shell="tty"] .ncx-chip { clip-path: none; background: #021407; box-shadow: inset 0 0 0 1px var(--line-2); }
+html[data-shell="tty"] .ncx-bar { background: #000; }
+html[data-shell="tty"] .ncx-bar > i { background: var(--cyan) !important; box-shadow: none !important; }
+html[data-shell="tty"] .ncx-bar .seg-mask { background: repeating-linear-gradient(90deg, transparent 0 10px, #000 10px 12px); }
+html[data-shell="tty"] .ncx-bar.slim .seg-mask { background: repeating-linear-gradient(90deg, transparent 0 6px, #000 6px 8px); }
+html[data-shell="tty"] .ncx-scan .sweep { display: none; }
+html[data-shell="tty"] .ncx-glitch:hover { animation: none; }
+html[data-shell="tty"] .ncx-stamp { transform: none; }
+html[data-shell="tty"] .ncx-cell { box-shadow: inset 0 0 0 1px rgba(63, 255, 118, 0.1) !important; }
+html[data-shell="tty"] .ncx-input { background: #000; clip-path: none; }
+html[data-shell="tty"] .qm-sheet-cell { clip-path: none; background: #021407; }
+
+/* ----------------------------------------------------------------
+   OUTRUN — sunset horizon + scrolling perspective grid. Palette is
+   locked by the shell (hot pink / sunset orange / ultraviolet).
+   ---------------------------------------------------------------- */
+html[data-shell="outrun"] {
+  --cyan: #ff5edb;
+  --cyan-deep: #b8329a;
+  --accent-rgb: 255, 94, 219;
+  --magenta: #ff9e3d;
+  --violet: #8a5cff;
+  --teal: #ff9ee8;
+  --brand: var(--cyan);
+  --line-bright: rgba(255, 94, 219, 0.32);
+  --glow-cyan: 0 0 0.5px rgba(255,94,219,.8), 0 0 12px rgba(255,94,219,.40);
+}
+html[data-shell="outrun"] body {
+  background: linear-gradient(180deg, #0d0420 0%, #190834 42%, #371049 68%, #0d0420 100%);
+}
+html[data-shell="outrun"] body::before {  /* sun + sky glows */
+  background:
+    radial-gradient(440px 440px at 50% 92%, rgba(255, 158, 61, 0.20), transparent 62%),
+    radial-gradient(900px 650px at 8% -10%, rgba(255, 94, 219, 0.13), transparent 60%),
+    radial-gradient(900px 700px at 102% -2%, rgba(138, 92, 255, 0.15), transparent 55%);
+}
+html[data-shell="outrun"] body::after {   /* perspective grid rolling toward the viewer */
+  inset: auto 0 -6% 0; height: 46%;
+  background-image:
+    linear-gradient(rgba(255, 94, 219, 0.25) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255, 94, 219, 0.18) 1.5px, transparent 1.5px);
+  background-size: 100% 44px, 64px 100%;
+  transform: perspective(420px) rotateX(58deg);
+  transform-origin: 50% 100%;
+  mask-image: linear-gradient(to top, #000 50%, transparent);
+  -webkit-mask-image: linear-gradient(to top, #000 50%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-shell="outrun"] body::after { animation: os-outrun-grid 1.5s linear infinite; }
+}
+@keyframes os-outrun-grid { to { background-position: 0 44px, 0 0; } }
+
+html[data-shell="outrun"] .panel, html[data-shell="outrun"] .ncx-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)), rgba(19, 8, 36, 0.86);
+}
+html[data-shell="outrun"] .panel-inset, html[data-shell="outrun"] .ncx-inset,
+html[data-shell="outrun"] .ncx-id, html[data-shell="outrun"] .pet-card { background: rgba(10, 4, 22, 0.85); }
+html[data-shell="outrun"] .ncx-deck { background: linear-gradient(180deg, rgba(24, 10, 44, 0.9), rgba(13, 4, 32, 0.78)); }
+html[data-shell="outrun"] .ncx-topbar { background: rgba(13, 4, 32, 0.85); }
+html[data-shell="outrun"] .ncx-statusbar { background: rgba(13, 4, 32, 0.9); }
+html[data-shell="outrun"] .btn, html[data-shell="outrun"] .ncx-btn { background: #221038; }
+html[data-shell="outrun"] .btn:hover, html[data-shell="outrun"] .ncx-btn:hover { background: #2e1549; }
+html[data-shell="outrun"] .btn-ghost { background: transparent; }
+html[data-shell="outrun"] .ncx-bar { background: #0d0420; }
+html[data-shell="outrun"] .ncx-glitch, html[data-shell="outrun"] .ncx-chroma { font-style: italic; }
+html[data-shell="outrun"] .ncx-chroma {
+  text-shadow:
+    calc(var(--chroma, 1.5px) * -1.4) 0 rgba(255, 94, 219, 0.7),
+    calc(var(--chroma, 1.5px) * 1.4) 0 rgba(255, 158, 61, 0.65);
+}
+
+/* ---- mini shell previews for the shop cards (shell-agnostic) ---- */
+.mkt-shellprev-tty {
+  background: #000; box-shadow: inset 0 0 0 1px rgba(63, 255, 118, 0.25);
+  font-family: var(--font-mono); color: #84dc98; font-size: 10px; line-height: 1.8;
+  padding: 10px 12px; height: 70px; overflow: hidden;
+}
+.mkt-shellprev-outrun {
+  position: relative; overflow: hidden; height: 70px;
+  background: linear-gradient(180deg, #190834 0%, #371049 70%, #0d0420 100%);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.mkt-shellprev-outrun .sun {
+  position: absolute; left: 50%; top: 46%; width: 44px; height: 44px; margin-left: -22px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffd23d, #ff5edb);
+  box-shadow: 0 0 18px rgba(255, 158, 61, 0.6);
+  mask-image: repeating-linear-gradient(0deg, #000 0 5px, transparent 5px 7px);
+  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 5px, transparent 5px 7px);
+}
+.mkt-shellprev-outrun .grid {
+  position: absolute; inset: auto 0 -8% 0; height: 55%;
+  background-image:
+    linear-gradient(rgba(255, 94, 219, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 94, 219, 0.3) 1px, transparent 1px);
+  background-size: 100% 11px, 16px 100%;
+  transform: perspective(120px) rotateX(56deg);
+  transform-origin: 50% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mkt-shellprev-outrun .grid { animation: os-outrun-prevgrid 1.2s linear infinite; }
+}
+@keyframes os-outrun-prevgrid { to { background-position: 0 11px, 0 0; } }

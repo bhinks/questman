@@ -5,11 +5,13 @@
  *   - XP    — permanent progression, drives levels. Earned, never spent.
  *   - Eddies — spendable currency. Earned alongside XP, spent in the Shop.
  *
- * Earn rate is **pegged to XP with a small difficulty bonus** (Brent's
- * call): a quest/habit that pays N XP pays N eddies plus a flat bonus
- * for the harder tiers, so grindier work feels a touch more rewarding to
- * spend. Kept deliberately simple and tunable; the overclock streak
- * multiplier (a later phase) will scale the *eddie* side on top of this.
+ * Earn rate (Night Market v2 rebalance, design handoff): a cleared
+ * contract worth N XP pays **round(N/2) eddies**, plus a small flat bonus
+ * for the harder tiers (Brent's earlier call: grindier work feels a touch
+ * more rewarding to spend). The v2 catalog totals ≈ €$37,000, so the
+ * halved peg is what makes maxing out a long-term goal instead of a
+ * weekend. The overclock streak multiplier still scales the *eddie* side
+ * on top of this.
  */
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
@@ -27,12 +29,13 @@ function asDifficulty(value: string | null | undefined): Difficulty {
 
 /**
  * Eddies awarded for a reward worth `xp` at the given difficulty.
- * Pegged 1:1 to XP plus the difficulty bonus. Never negative.
+ * Pegged at round(xp/2) plus the difficulty bonus (Night Market v2
+ * economy — see the file header). Never negative.
  */
 export function eddiesForReward(xp: number, difficulty?: string | null): number {
   const base = Math.max(0, Math.round(xp));
   if (base === 0) return 0;
-  return base + DIFFICULTY_BONUS[asDifficulty(difficulty)];
+  return Math.round(base / 2) + DIFFICULTY_BONUS[asDifficulty(difficulty)];
 }
 
 // --- Overclock: streaks that mechanically matter (roadmap) -----------

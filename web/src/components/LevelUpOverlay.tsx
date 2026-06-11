@@ -10,7 +10,11 @@
  * for the award itself — this is pure ceremony.
  */
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getSocket } from '../lib/socket';
+import { api } from '../lib/api';
+import type { PersonaResponse } from '../lib/api';
+import { personaMeta } from '../lib/market';
 
 const MODULE_COLORS: Record<string, string> = {
   fitness:  'var(--lime)',
@@ -31,6 +35,14 @@ interface LevelUpInfo {
 
 export function LevelUpOverlay() {
   const [info, setInfo] = useState<LevelUpInfo | null>(null);
+
+  // The equipped Handler narrates the advancement (Night Market v2):
+  // the modal subtitle is the persona's scripted levelUp(level) line.
+  const personaQ = useQuery({
+    queryKey: ['handler', 'persona'],
+    queryFn: () => api.get<PersonaResponse>('/api/handler/persona'),
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
     const s = getSocket();
@@ -74,7 +86,11 @@ export function LevelUpOverlay() {
           <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 54, fontWeight: 700, lineHeight: 1 }}>
             LEVEL {info.level}
           </div>
-          <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.2em', color: 'var(--text-dim)', marginTop: 14 }}>
+          {/* The equipped Handler's scripted line (handoff copy, verbatim). */}
+          <div className="mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--text-dim)', marginTop: 16 }}>
+            {personaMeta(personaQ.data?.persona).levelUp(info.level)}
+          </div>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.2em', color: 'var(--text-faint)', marginTop: 8 }}>
             {info.totalXp.toLocaleString()} LIFETIME XP
           </div>
 

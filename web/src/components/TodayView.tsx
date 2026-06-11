@@ -22,6 +22,7 @@ import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
 import { CityFeed } from './TodayFeed';
 import type { FocusSeed } from './FocusView';
+import { personaMeta } from '../lib/market';
 
 /** Module key → outline icon. NO emoji in this direction (meta.emoji unused). */
 const MODULE_ICONS: Record<string, string> = {
@@ -73,12 +74,8 @@ function fmtHm(min: number): string {
   return m ? `${h}H${String(m).padStart(2, '0')}` : `${h}H`;
 }
 
-/** Persona key → display label + accent. */
-const PERSONA_META: Record<HandlerPersona, { label: string; accent: string }> = {
-  rogue_ai:  { label: 'ROGUE AI',  accent: 'var(--violet)' },
-  fixer:     { label: 'FIXER',     accent: 'var(--cyan)' },
-  ripperdoc: { label: 'RIPPERDOC', accent: 'var(--magenta)' },
-};
+// Persona display meta (name + accent) comes from the Night Market lib —
+// it covers the full v2 handler lineup, the free trio, and retired stock.
 
 /**
  * HandlerCard — the Handler's latest line, full-width under the HUD strip
@@ -112,7 +109,7 @@ function HandlerCard() {
   const msg = data.message;
   if (!msg || msg.seen) return null;
 
-  const meta = PERSONA_META[(msg.persona ?? data.persona) as HandlerPersona] ?? PERSONA_META.rogue_ai;
+  const meta = personaMeta((msg.persona ?? data.persona) as HandlerPersona);
   return (
     <div
       className="panel"
@@ -123,7 +120,7 @@ function HandlerCard() {
       }}
     >
       <span className="kicker" style={{ color: meta.accent, flexShrink: 0, marginTop: 2 }}>
-        HANDLER · {meta.label}
+        HANDLER · {meta.name}
       </span>
       <span style={{ flex: 1, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text)' }}>
         {msg.text}

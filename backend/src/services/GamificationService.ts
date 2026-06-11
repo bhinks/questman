@@ -91,8 +91,15 @@ export interface PlayerSnapshot {
   cosmetics: string[];
   equippedTheme: string | null;
   equippedFont: string | null;  // display-font pack (Night Market)
-  equippedFx: string | null;    // ambient FX pack (Night Market)
-  equippedTimer: string | null; // focus-chamber timer style (Night Market)
+  equippedFx: string | null;    // LEGACY single-equip FX pack (superseded by fxActive)
+  equippedTimer: string | null; // CHRONO session-timer style (Night Market)
+  // Night Market v2 gear slots.
+  equippedShell: string | null; // OS shell ('tty'|'outrun'; null = Night City)
+  equippedTitle: string | null; // vanity title key on the runner ID
+  equippedPet: string | null;   // data-pet key in the nav deck
+  fxActive: string[];           // STACKABLE visual FX currently online
+  focusStims: number;           // banked FOCUS STIMs (effect TBD)
+  overclockChips: number;       // banked OVERCLOCK CHIPs (effect TBD)
   /** Daily capacity/battery (World Mechanics). Optional: only the read path
    *  (getSnapshot) computes it; awardXp leaves it undefined to avoid an extra
    *  per-award query — the HUD reads it from GET /api/player. */
@@ -208,6 +215,12 @@ export class GamificationService {
       equippedFont: p.equippedFont,
       equippedFx: p.equippedFx,
       equippedTimer: p.equippedTimer,
+      equippedShell: p.equippedShell,
+      equippedTitle: p.equippedTitle,
+      equippedPet: p.equippedPet,
+      fxActive: parseCosmetics(p.fxActive),
+      focusStims: p.focusStims,
+      overclockChips: p.overclockChips,
       energy,
     };
   }
@@ -394,6 +407,12 @@ export class GamificationService {
         equippedFont: before.equippedFont,
         equippedFx: before.equippedFx,
         equippedTimer: before.equippedTimer,
+        equippedShell: before.equippedShell,
+        equippedTitle: before.equippedTitle,
+        equippedPet: before.equippedPet,
+        fxActive: parseCosmetics(before.fxActive),
+        focusStims: before.focusStims,
+        overclockChips: before.overclockChips,
         leveledUp: nextLevel > previousLevel,
         previousLevel,
         eddieMultiplierApplied: earn && mult > 1 ? mult : undefined,
