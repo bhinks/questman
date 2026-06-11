@@ -226,7 +226,7 @@ function IceCard({
           <span
             className={`ncx-stamp flat ${ag.difficulty}`}
             title="Stakes"
-            style={{ fontSize: 8.5, padding: '2px 7px' }}
+            style={{ fontSize: 9.5, padding: '2px 7px' }}
           >
             {DIFFICULTY_LABEL[ag.difficulty]} RISK
           </span>

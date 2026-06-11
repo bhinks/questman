@@ -25,6 +25,8 @@ import { GamificationService } from '../services/GamificationService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
 import { QuestCandidate } from '../services/anthropic';
+import { config } from '../config';
+import { pullNow } from '../services/healthSync';
 
 const router = express.Router();
 
@@ -313,5 +315,21 @@ export async function buildVitalsCandidates(
     carryOver: false, // same-day check-in; a missed day is a missed day
   }];
 }
+
+// ---------------------------------------------------------------------
+// Phone pull — on-demand sync from the health-connect-webhook local
+// server (services/healthSync.ts). The Biomonitor's SYNC button.
+// ---------------------------------------------------------------------
+
+/** GET /api/metrics/pull — pull-mode status (UI hides the button if off). */
+router.get('/pull', asyncHandler(async (_req: AuthRequest, res) => {
+  res.json({ configured: !!config.health.pullUrl });
+}));
+
+/** POST /api/metrics/pull — pull from the phone right now. Never throws:
+ *  an unreachable phone reports { ok:false } rather than a 5xx. */
+router.post('/pull', asyncHandler(async (_req: AuthRequest, res) => {
+  res.json(await pullNow(prisma));
+}));
 
 export default router;

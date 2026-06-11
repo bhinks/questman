@@ -66,7 +66,19 @@ const configSchema = z.object({
   // Long-lived shared secret for POST /api/ingest/* (phone-side health
   // bridges that can't do the JWT login dance). Min 16 chars — fail fast
   // on a guessable token rather than expose an unauthenticated writer.
-  ingestToken: z.string().min(16).optional()
+  ingestToken: z.string().min(16).optional(),
+
+  // Health PULL mode: poll the health-connect-webhook app's local HTTP
+  // server on the phone (GET-only, trusted LAN) instead of receiving
+  // webhooks — Android's cleartext policy blocks the app from POSTing to
+  // a plain-HTTP hub, but the phone serving HTTP has no such restriction.
+  health: z.object({
+    pullUrl: z.string().url().optional(),  // e.g. http://192.168.0.42:8787
+    pullMinutes: z.number().int().min(5).default(30),
+    // The app's "Local HTTP auth" bearer token (optional but recommended —
+    // without it the phone's server answers anyone on the LAN).
+    pullToken: z.string().optional()
+  })
 });
 
 const env = {
@@ -126,7 +138,13 @@ const env = {
 
   allowRegistration: process.env.ALLOW_REGISTRATION === 'true',
 
-  ingestToken: process.env.INGEST_TOKEN || undefined
+  ingestToken: process.env.INGEST_TOKEN || undefined,
+
+  health: {
+    pullUrl: process.env.HEALTH_PULL_URL || undefined,
+    pullMinutes: Number(process.env.HEALTH_PULL_MINUTES) || 30,
+    pullToken: process.env.HEALTH_PULL_TOKEN || undefined
+  }
 };
 
 export const config = configSchema.parse(env);

@@ -192,7 +192,7 @@ function Dossier({
             >
               <Icon name={meta.icon} size={26} />
             </div>
-            <div className="mono" style={{ fontSize: 8.5, letterSpacing: '0.2em', marginTop: 8, color: THREAT_LABEL_COLOR[threat] }}>
+            <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.2em', marginTop: 8, color: THREAT_LABEL_COLOR[threat] }}>
               THREAT {threat}
             </div>
             <div style={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: 4 }}>
@@ -339,8 +339,8 @@ function ArchiveRow({ boss }: { boss: Boss }) {
         {defeated ? `DOWN — ${boss.name}` : boss.name}
       </span>
       {defeated
-        ? <span className="ncx-stamp flat" style={{ color: 'var(--lime)', fontSize: 8 }}>FLATLINED</span>
-        : <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)', fontSize: 8 }}>ABANDONED</span>}
+        ? <span className="ncx-stamp flat" style={{ color: 'var(--lime)', fontSize: 9.5 }}>FLATLINED</span>
+        : <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)', fontSize: 9.5 }}>ABANDONED</span>}
       <span style={{ flex: 1 }} />
       {defeated ? (
         <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>

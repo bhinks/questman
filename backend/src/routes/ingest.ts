@@ -10,11 +10,20 @@
  *   { "entries": [ { "date": "2026-06-10", "key": "steps", "value": 9182 }, … ] }
  *
  * Auth is EITHER a normal JWT (manual/browser use) OR the long-lived
- * INGEST_TOKEN shared secret via the X-Ingest-Token header — phone
- * automations can't refresh a 7-day login token. Values upsert on the
- * (userId, date, key) unique, so re-sending a window is idempotent.
- * Bulk-historical by design: it does NOT auto-complete today's vitals
- * quest (PUT /api/metrics stays the interactive path that does).
+ * INGEST_TOKEN shared secret — via the X-Ingest-Token header, or as a
+ * `?token=` query param for webhook apps that can't set custom headers
+ * (secret-URL pattern, same trust model as the calendar ICS URL). Values
+ * upsert on the (userId, date, key) unique, so re-sending a window is
+ * idempotent. Bulk-historical by design: it does NOT auto-complete
+ * today's vitals quest (PUT /api/metrics stays the interactive path
+ * that does).
+ *
+ * Two endpoints:
+ *   POST /metrics         — generic {entries:[{date,key,value}]} rows.
+ *   POST /health-connect  — native receiver for the health-connect-webhook
+ *                           Android app (Pixel Watch → Health Connect →
+ *                           this). Maps its snake_case payload onto
+ *                           Questman's DailyMetric keys.
  */
 import express from 'express';
 import { z } from 'zod';
@@ -24,6 +33,9 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { config } from '../config';
 import { startOfLocalDay } from '../utils/dates';
 import { logger } from '../utils/logger';
+import {
+  healthConnectSchema, ingestHealthConnectPayload, resolveHubUserId,
+} from '../services/healthSync';
 
 const router = express.Router();
 
@@ -40,14 +52,14 @@ const bodySchema = z.object({ entries: z.array(entrySchema).min(1).max(5000) });
  * system): HUB_USER_EMAIL when set, else the oldest account.
  */
 async function resolveUserId(req: express.Request): Promise<string> {
-  const token = req.headers['x-ingest-token'];
+  // Header where possible; `?token=` for webhook apps with no header UI.
+  const headerToken = req.headers['x-ingest-token'];
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+  const token = typeof headerToken === 'string' ? headerToken : queryToken;
   if (typeof token === 'string' && config.ingestToken && token === config.ingestToken) {
-    const email = process.env.HUB_USER_EMAIL;
-    const user = email
-      ? await prisma.user.findUnique({ where: { email }, select: { id: true } })
-      : await prisma.user.findFirst({ orderBy: { createdAt: 'asc' }, select: { id: true } });
-    if (!user) throw new AppError('No hub user to ingest for', 401);
-    return user.id;
+    const userId = await resolveHubUserId(prisma);
+    if (!userId) throw new AppError('No hub user to ingest for', 401);
+    return userId;
   }
 
   const bearer = req.headers.authorization?.replace('Bearer ', '');
@@ -99,6 +111,21 @@ router.post('/metrics', asyncHandler(async (req, res) => {
 
   logger.info(`[ingest] wrote ${written}/${entries.length} metric value(s) for user ${userId}`);
   res.json({ written, skipped: entries.length - written });
+}));
+
+// ---------------------------------------------------------------------
+// POST /api/ingest/health-connect — native health-connect-webhook receiver.
+// Mapping + payload schema live in services/healthSync.ts, shared with the
+// pull-mode poller (startHealthPull) that GETs the same JSON from the
+// phone's local HTTP server.
+// ---------------------------------------------------------------------
+
+router.post('/health-connect', asyncHandler(async (req, res) => {
+  const userId = await resolveUserId(req);
+  const body = healthConnectSchema.parse(req.body ?? {});
+  const { written, days } = await ingestHealthConnectPayload(prisma, userId, body);
+  logger.info(`[ingest] health-connect: ${written} value(s) across ${days} day(s) for user ${userId}`);
+  res.json({ written, days });
 }));
 
 export default router;

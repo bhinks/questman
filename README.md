@@ -159,8 +159,41 @@ unreachable — the app never blocks on an external feed.
 
 ### Health ingest (Pixel Watch / Health Connect / anything)
 
-- **Setup**: set `INGEST_TOKEN` (16+ chars, e.g. `openssl rand -hex 24`).
-  That arms a source-agnostic bulk endpoint:
+- **Setup** — pair the
+  [health-connect-webhook](https://github.com/mcnaveen/health-connect-webhook)
+  Android app with one of three routes, in order of preference:
+
+  **1. Pull mode (recommended for plain-HTTP hubs).** In the app, enable
+  **Local HTTP Server** (default port 8787) and enable the data types you
+  want (steps, sleep, resting heart rate, weight, blood pressure,
+  hydration). Give your phone a DHCP reservation in your router, then set:
+
+  ```
+  HEALTH_PULL_URL="http://<phone-ip>:8787"
+  HEALTH_PULL_MINUTES="30"    # optional, default 30
+  HEALTH_PULL_TOKEN="<token>" # the app's "Local HTTP auth" bearer token
+  ```
+
+  Enable **Local HTTP auth** in the app and copy its token into
+  `HEALTH_PULL_TOKEN` — otherwise the phone's health server answers
+  anyone on your LAN. The backend polls the phone on that interval and
+  quietly retries while the phone is away from home — when it returns,
+  the poll widens its lookback window automatically to backfill the gap. Why pull? Android's
+  cleartext policy blocks apps from POSTing webhooks to a plain `http://`
+  hub, but the phone *serving* HTTP on a trusted LAN is fine.
+
+  **2. Push mode** — if your hub has real HTTPS (e.g. behind Tailscale
+  Serve or a Let's Encrypt reverse proxy), set `INGEST_TOKEN` (16+ chars,
+  `openssl rand -hex 24`) and point the app's webhook at:
+
+  ```
+  https://<your-hub>/api/ingest/health-connect?token=<INGEST_TOKEN>
+  ```
+
+  (Token in the URL because the app can't set custom headers — same
+  secret-URL trust model as the calendar feed.)
+
+  **3. Generic endpoint** — for any other bridge or script:
 
   ```sh
   curl -X POST https://your-hub/api/ingest/metrics \
@@ -169,10 +202,12 @@ unreachable — the app never blocks on an external feed.
                     {"date":"2026-06-10","key":"sleepHours","value":7.5}]}'
   ```
 
-  Pair it with a phone-side bridge such as
-  [health-connect-webhook](https://github.com/mcnaveen/health-connect-webhook)
-  (Health Connect → your webhook, on a schedule) to auto-fill steps, sleep,
-  heart rate, and weight.
+  All routes share one mapper: steps and hydration are summed per local
+  day; sleep is credited to the day you woke up; weight/BP/resting-HR
+  take the latest reading of the day. Weight and water are converted to
+  the units of your metric definitions (kg→lb, L→oz/ml/glasses) so synced
+  values match what you'd log by hand. Raw heart-rate samples are
+  ignored. Re-syncing any window is idempotent.
 - **What it stores**: plain daily metrics (`date`/`key`/`value` upserts) —
   identical to logging vitals by hand. Re-sending a window is idempotent.
 - **What it powers**: vitals quests, the energy tier (from sleep), and the

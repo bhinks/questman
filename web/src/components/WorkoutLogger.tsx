@@ -346,7 +346,7 @@ function PlanSlot({
     <div className="panel-inset" style={{ padding: 7, display: 'flex', flexDirection: 'column', gap: 5, opacity: plan.isActive ? 1 : 0.45 }}>
       <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'break-word' }}>{plan.title}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-        <span className="ncx-stamp flat" style={{ fontSize: 8, padding: '1px 5px', letterSpacing: '0.12em', color: TYPE_COLOR[plan.type] ?? 'var(--text-dim)' }}>
+        <span className="ncx-stamp flat" style={{ fontSize: 9.5, padding: '1px 5px', letterSpacing: '0.12em', color: TYPE_COLOR[plan.type] ?? 'var(--text-dim)' }}>
           {plan.type}
         </span>
         {plan.targetMin != null && (

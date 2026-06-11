@@ -179,16 +179,10 @@ export function ShopView() {
         message: res.message ?? grantedLine(res.granted) ?? 'Purchased',
         ok: true,
       });
-      // Handoff behavior: buying a skin auto-equips it immediately.
-      if (res.purchase.category === 'cosmetic') {
-        const bought = qc.getQueryData<ShopResponse>(['shop'])?.items
-          .find(i => i.key === res.purchase.itemKey);
-        const themeKey = bought?.payload?.themeKey;
-        if (typeof themeKey === 'string') equip.mutate(themeKey);
-      }
-      // Personas auto-equip SERVER-SIDE on buy — refresh the Handler config.
+      // Skins/fonts/FX auto-equip SERVER-SIDE on buy (polish pass §5);
+      // refreshPlayer above re-snapshots the equipped theme for App.tsx.
+      // Personas also auto-equip server-side — refresh the Handler config.
       if (res.purchase.category === 'persona') refreshPersona();
-      // Fonts/FX also auto-equip server-side; refreshPlayer above covers them.
     },
     onError: (err: unknown, itemKey) => {
       const msg = err instanceof ApiError ? err.message : 'Purchase failed';
@@ -280,7 +274,7 @@ export function ShopView() {
       <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
         NEON SKINS — FULL ACCENT REMAP · EQUIP TO PREVIEW LIVE
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
         {skins.map(skin => (
           <SkinCard
             key={skin.key}
@@ -299,7 +293,7 @@ export function ShopView() {
       <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
         HANDLER PERSONAS — NEW VOICES FOR THE EAR-PIECE · AUTO-EQUIP ON BUY
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
         {personas.map(item => {
           const personaKey = typeof item.payload?.personaKey === 'string' ? (item.payload.personaKey as string) : item.key;
           return (
@@ -322,7 +316,7 @@ export function ShopView() {
       <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
         DISPLAY MODS — HEADER FONTS &amp; AMBIENT FX · AUTO-EQUIP ON BUY
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
         {mods.map(renderMod)}
       </div>
 
@@ -330,7 +324,7 @@ export function ShopView() {
       <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
         TIMER STYLES — FOCUS CHAMBER CLOCK FACES · AUTO-EQUIP ON BUY
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
         {timers.map(renderMod)}
       </div>
 
@@ -338,7 +332,7 @@ export function ShopView() {
       <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 4 }}>
         CONSUMABLES
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
         {consumables.map(item => {
           const status = item.category === 'consumable' ? consumableStatus(item.key, player) : null;
           return (
@@ -400,11 +394,14 @@ function SkinCard({ skin, equipped, affordable, busy, feedback, onBuy, onEquip }
         {!equipped && skin.owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
       </div>
 
-      {/* keyed by state — see file header */}
+      {/* keyed by state — see file header. Equipped = nothing to press
+          (polish pass §2a): the hud border + LIVE stamp already say it. */}
       {equipped ? (
-        <button key={skin.key + '-eq'} className="btn btn-primary" style={{ fontSize: 11, padding: 8 }} disabled>
-          EQUIPPED
-        </button>
+        <div key={skin.key + '-eq'} className="mono" style={{
+          fontSize: 10, letterSpacing: '0.2em', color: 'var(--text-faint)',
+          textAlign: 'center', padding: '9px 0',
+          boxShadow: 'inset 0 0 0 1px var(--line)',
+        }}>▸ RUNNING NOW</div>
       ) : skin.owned ? (
         <button key={skin.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
           EQUIP
@@ -452,11 +449,14 @@ function PersonaCard({ item, equipped, owned, affordable, busy, feedback, onBuy,
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{item.description}</div>
 
-      {/* keyed by state — see file header */}
+      {/* keyed by state — see file header. Equipped = nothing to press
+          (polish pass §2a): the hud border + EQUIPPED stamp already say it. */}
       {equipped ? (
-        <button key={item.key + '-eq'} className="btn btn-primary" style={{ fontSize: 11, padding: 8 }} disabled>
-          EQUIPPED
-        </button>
+        <div key={item.key + '-eq'} className="mono" style={{
+          fontSize: 10, letterSpacing: '0.2em', color: 'var(--text-faint)',
+          textAlign: 'center', padding: '9px 0',
+          boxShadow: 'inset 0 0 0 1px var(--line)',
+        }}>▸ RUNNING NOW</div>
       ) : owned ? (
         <button key={item.key + '-own'} className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
           EQUIP
@@ -606,7 +606,7 @@ function ConsumableCard({ item, ownedCount, activeLabel, affordable, busy, feedb
         </div>
         <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
         {activeLabel ? (
-          <span className="ncx-stamp flat" style={{ marginLeft: 'auto', color: 'var(--lime)', fontSize: 8 }}>{activeLabel}</span>
+          <span className="ncx-stamp flat" style={{ marginLeft: 'auto', color: 'var(--lime)', fontSize: 9.5 }}>{activeLabel}</span>
         ) : ownedCount > 0 ? (
           <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)' }}>×{ownedCount}</span>
         ) : null}

@@ -311,10 +311,18 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
   const priority = inPlanPending.find(q => q.targetCount <= 1) ?? pending[0] ?? null;
   const doneRows = all.filter(q => q.status === 'completed' || q.status === 'skipped');
   const ledgerRows = [...inPlanPending.filter(q => q.id !== priority?.id), ...doneRows];
-  const sideJobs: PlanQuest[] = (plan?.quests ?? []).filter(q => !q.inPlan);
+  // Exclude the priority contract: its off-plan fallback (pending[0]) would
+  // otherwise render twice — once as PRIORITY, once under SIDE JOBS.
+  const sideJobs: PlanQuest[] = (plan?.quests ?? []).filter(q => !q.inPlan && q.id !== priority?.id);
   const bestWindowQuest = pending.find(q => q.meta?.bestWindow) ?? null;
   // Outdoor quests on their LAST CLEAR DAY (blocked by tomorrow's forecast).
   const lastClearIds = new Set((plan?.quests ?? []).filter(q => q.lastClearDay).map(q => q.id));
+
+  // Chamber strip stats: today's focus runs (same rows the SESSION LOG
+  // interleaves below).
+  const todayRuns = (focusQ.data ?? []).filter(s => isToday(s.endedAt));
+  const chamberMin = todayRuns.reduce((sum, r) => sum + r.minutes, 0);
+  const bestRunMin = todayRuns.reduce((max, r) => Math.max(max, r.minutes), 0);
 
   // SESSION LOG: today's XP grants + focus runs, oldest → newest
   // (terminal order), interleaved by timestamp.
@@ -342,7 +350,7 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ---- HUD strip ---- */}
       <Ticks focal>
-        <div className="panel hud ncx-scan" style={{ display: 'flex', alignItems: 'center', gap: 26, padding: '18px 24px' }}>
+        <div className="panel hud ncx-scan qm-hud-strip" style={{ display: 'flex', alignItems: 'center', gap: 26, padding: '18px 24px' }}>
           <div className="sweep" />
           <div className="ncx-hex" style={{ width: 58, height: 58, fontSize: 23, flex: 'none', boxShadow: '0 0 24px -4px rgba(var(--accent-rgb),0.6)' }}>
             {player.level}
@@ -367,8 +375,8 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
             </div>
           </div>
           {hudStats.map(([k, v, c]) => (
-            <div key={k} style={{ textAlign: 'right', paddingLeft: 22, borderLeft: '1px solid var(--line)' }}>
-              <div className="kicker" style={{ fontSize: 9 }}>{k}</div>
+            <div key={k} className="qm-hud-stat" style={{ textAlign: 'right', paddingLeft: 22, borderLeft: '1px solid var(--line)' }}>
+              <div className="kicker" style={{ fontSize: 9.5 }}>{k}</div>
               <div className="ncx-val" style={{ fontSize: 24, color: c }}>{v}</div>
             </div>
           ))}
@@ -377,6 +385,44 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
 
       {/* Handler line — full width, full text (moved here from the topbar). */}
       <HandlerCard />
+
+      {/* ---- Chamber strip — JACK IN as a day-level CTA (polish pass §1).
+           The chamber belongs to the DAY, not to any one task: one big
+           bold entry point, detached from the priority contract. ---- */}
+      <Ticks focal>
+        <div className="panel hud ncx-scan" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '16px 24px', flexWrap: 'wrap' }}>
+          <div className="sweep" style={{ animationDelay: '-2s' }} />
+          <div className="ncx-chip" style={{ width: 48, height: 48 }}>
+            <Icon name="zap" size={24} style={{ color: 'var(--cyan)', filter: 'drop-shadow(0 0 5px var(--cyan))' }} />
+          </div>
+          <div>
+            <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+              Focus Chamber
+            </div>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.18em', color: 'var(--text-faint)', marginTop: 3 }}>
+              ONE CLOCK · NO FEEDS · POINT IT AT ANYTHING
+            </div>
+          </div>
+          <span style={{ flex: 1 }} />
+          {([
+            ['RUNS', String(todayRuns.length), undefined],
+            ['IN CHAMBER', chamberMin > 0 ? fmtHm(chamberMin) : '0M', 'var(--violet)'],
+            ['BEST RUN', bestRunMin > 0 ? `${bestRunMin}M` : '—', undefined],
+          ] as const).map(([k, v, c]) => (
+            <div key={k} className="panel-inset" style={{ padding: '8px 16px', textAlign: 'center' }}>
+              <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.2em', color: 'var(--text-faint)' }}>{k}</div>
+              <div className="ncx-val" style={{ fontSize: 16, marginTop: 2, ...(c ? { color: c } : {}) }}>{v}</div>
+            </div>
+          ))}
+          <button
+            className="btn btn-primary"
+            style={{ padding: '14px 38px', fontSize: 13 }}
+            onClick={() => onJackIn(null)}
+          >
+            <Icon name="zap" size={15} /> JACK IN
+          </button>
+        </div>
+      </Ticks>
 
       {today.totalCount === 0 ? (
         <div className="panel hud" style={{ padding: '34px 24px', textAlign: 'center' }}>
@@ -421,17 +467,11 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9, justifyContent: 'center' }}>
-                      {/* JACK IN → the distraction-free FOCUS CHAMBER, seeded
-                          with this contract (focus minutes persist there). */}
-                      <button
-                        key={priority.id + '-jack'}
-                        className="btn btn-primary"
-                        style={{ padding: '12px 24px' }}
-                        onClick={() => onJackIn({ type: 'quest', id: priority.id, label: priority.title })}
-                      >
-                        <Icon name="zap" size={14} /> JACK IN
+                      {/* De-tasked (polish pass §1b): JACK IN lives on the
+                          chamber strip now — COMPLETE is the card's action. */}
+                      <button className="btn" style={{ padding: '11px 26px' }} onClick={() => completeQuest.mutate(priority.id)}>
+                        <Icon name="check" size={13} /> COMPLETE
                       </button>
-                      <button className="btn" onClick={() => completeQuest.mutate(priority.id)}>COMPLETE</button>
                       {/* Burnout relief applies to the top contract too. */}
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                         <button
@@ -522,7 +562,7 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                     ['WIND', `${weather.windMaxMph} MPH`],
                   ].map(([k, v]) => (
                     <div key={k} className="panel-inset" style={{ flex: 1, padding: '7px 4px', textAlign: 'center' }}>
-                      <div className="mono" style={{ fontSize: 8, letterSpacing: '0.2em', color: 'var(--text-ghost)' }}>{k}</div>
+                      <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.2em', color: 'var(--text-ghost)' }}>{k}</div>
                       <div className="ncx-val" style={{ fontSize: 12.5, marginTop: 3 }}>{v}</div>
                     </div>
                   ))}
@@ -685,7 +725,7 @@ function LedgerRow({
             {quest.title}
           </span>
           {!done && !skipped && carriedDays > 0 && (
-            <span className="mono" style={{ flex: 'none', fontSize: 8.5, letterSpacing: '0.14em', color: 'var(--amber)' }}>
+            <span className="mono" style={{ flex: 'none', fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--amber)' }}>
               CARRIED ×{carriedDays}D
             </span>
           )}

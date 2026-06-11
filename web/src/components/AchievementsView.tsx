@@ -159,7 +159,7 @@ function Card({ a }: { a: Achievement }) {
             {a.name}
           </div>
           <div style={{ marginTop: 5 }}>
-            <span className="ncx-stamp flat" style={{ color, fontSize: 8 }}>
+            <span className="ncx-stamp flat" style={{ color, fontSize: 9.5 }}>
               {TIER_META[tier].label}
             </span>
           </div>

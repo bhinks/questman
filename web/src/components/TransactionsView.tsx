@@ -413,7 +413,7 @@ function Row({
             {tx.description || '—'}
           </span>
           {excluded && (
-            <span className="ncx-stamp flat" style={{ fontSize: 8, color: 'var(--text-faint)' }}>
+            <span className="ncx-stamp flat" style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>
               EXCLUDED
             </span>
           )}

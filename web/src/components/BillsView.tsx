@@ -404,7 +404,7 @@ function BillCard({
           {bill.category && (
             <span
               className="ncx-stamp flat"
-              style={{ fontSize: 8.5, color: bill.category.color || 'var(--text-dim)' }}
+              style={{ fontSize: 9.5, color: bill.category.color || 'var(--text-dim)' }}
             >
               {bill.category.name}
             </span>
@@ -744,7 +744,7 @@ function SectionLabel({ icon, color, title, sub }: { icon: string; color: string
 
 function Chip({ children, color }: { children: React.ReactNode; color: string }) {
   return (
-    <span className="ncx-stamp flat" style={{ flexShrink: 0, fontSize: 8.5, color }}>
+    <span className="ncx-stamp flat" style={{ flexShrink: 0, fontSize: 9.5, color }}>
       {children}
     </span>
   );

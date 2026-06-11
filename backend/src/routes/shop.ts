@@ -220,10 +220,15 @@ async function applyGrant(
       return { grant: { rrCredits: n }, message: `+${n} R&R credit${n === 1 ? '' : 's'}` };
     }
     case 'cosmetic': {
+      // Auto-equips server-side, like fonts/FX/personas (polish pass §5) —
+      // kills the client's buy→equip chained mutation and its cache race.
       const themeKey = item.payload?.themeKey as string;
       const next = [...owned, themeKey];
-      await tx.playerProfile.update({ where: { userId }, data: { cosmetics: JSON.stringify(next) } });
-      return { grant: { themeKey }, message: `Unlocked theme: ${themeKey}` };
+      await tx.playerProfile.update({
+        where: { userId },
+        data: { cosmetics: JSON.stringify(next), equippedTheme: themeKey },
+      });
+      return { grant: { themeKey }, message: `Theme unlocked + equipped: ${item.name}` };
     }
     case 'persona': {
       // Owned key is 'persona_<key>' (== the catalog item key). Auto-equips.

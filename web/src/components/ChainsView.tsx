@@ -259,7 +259,7 @@ function StepRow({ step, isLast }: { step: ChainStep; isLast: boolean }) {
           {available && (
             <span
               className="ncx-stamp flat"
-              style={{ fontSize: 8.5, padding: '2px 7px', color: 'var(--cyan)', background: 'rgba(var(--accent-rgb), 0.12)' }}
+              style={{ fontSize: 9.5, padding: '2px 7px', color: 'var(--cyan)', background: 'rgba(var(--accent-rgb), 0.12)' }}
             >
               CURRENT
             </span>
@@ -279,7 +279,7 @@ function StepRow({ step, isLast }: { step: ChainStep; isLast: boolean }) {
         <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span
             className="ncx-stamp flat"
-            style={{ fontSize: 8.5, padding: '2px 7px', color: DIFF_COLOR[step.difficulty] }}
+            style={{ fontSize: 9.5, padding: '2px 7px', color: DIFF_COLOR[step.difficulty] }}
           >
             {step.difficulty.toUpperCase()}
           </span>

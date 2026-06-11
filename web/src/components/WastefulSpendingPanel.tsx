@@ -157,7 +157,7 @@ export function WastefulSpendingPanel({ wastefulSpending }: WastefulSpendingPane
                       <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
                         {getPatternTitle(pattern.type)}
                       </h4>
-                      <span className="ncx-stamp flat" style={{ fontSize: 8.5, color: 'var(--amber)' }}>
+                      <span className="ncx-stamp flat" style={{ fontSize: 9.5, color: 'var(--amber)' }}>
                         WASTE
                       </span>
                       <span className="ncx-val" style={{ marginLeft: 'auto', fontSize: 18, color }}>

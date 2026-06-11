@@ -261,7 +261,7 @@ function InteractionRow({ interaction: i }: { interaction: Interaction }) {
         {new Date(i.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
       </span>
       {i.planned && (
-        <span className="ncx-stamp flat" style={{ fontSize: 8, color: 'var(--violet)' }}>
+        <span className="ncx-stamp flat" style={{ fontSize: 9.5, color: 'var(--violet)' }}>
           PLANNED
         </span>
       )}

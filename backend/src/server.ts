@@ -10,6 +10,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
+import { startHealthPull } from './services/healthSync';
 import { WebSocketService } from './services/WebSocketService';
 
 // Routes
@@ -160,6 +161,9 @@ server.listen(PORT, () => {
   logger.info(`🚀 Questman backend running on port ${PORT}`);
   logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📊 Database: ${config.database.url}`);
+  // Health pull mode (no-op unless HEALTH_PULL_URL is set): poll the
+  // phone's local Health Connect server for daily metrics.
+  startHealthPull(prisma);
 });
 
 export { app, server, io };

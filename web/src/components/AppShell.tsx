@@ -60,6 +60,9 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   ]},
 ];
 
+/** The four tabs pinned to the mobile bottom nav (everything else → MORE). */
+const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
+
 const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', chains: 'OPS // QUESTLINES', bosses: 'OPS // BOSS FIGHTS',
   ice: 'OPS // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
@@ -90,6 +93,8 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
   const qc = useQueryClient();
   const { user, logout } = useAuth();
   const [uplink, setUplink] = useState(true);
+  // Mobile MORE sheet (polish pass §3a): full-deck glass overlay.
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const playerQ = useQuery({
     queryKey: ['player'],
@@ -238,14 +243,15 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
                 }}
               />
               <Clock />
-              {/* JACK IN — start an arbitrary focus run from anywhere. */}
+              {/* Jack in from anywhere — demoted to a ghost icon (polish
+                  pass §1c): the glowing CTA lives on Today's chamber strip;
+                  global access survives without competing with it. */}
               <button
-                className="btn btn-primary"
-                style={{ padding: '7px 14px', fontSize: 10.5 }}
+                className="btn btn-ghost icon-btn"
                 onClick={onJackIn}
                 title="Jack in — open the focus chamber"
               >
-                <Icon name="zap" size={12} /> JACK IN
+                <Icon name="zap" size={15} />
               </button>
               <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
                 <Icon name="upload" size={15} />
@@ -275,18 +281,54 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
         <span className="ncx-serial">QTM//{String(streak).padStart(3, '0')}.076</span>
       </footer>
 
-      {/* MOBILE BOTTOM NAV (preserved from the previous shell) */}
+      {/* MORE sheet — glass overlay exposing the FULL deck on mobile
+          (polish pass §3a). Reuses NAV_GROUPS verbatim so the sheet can
+          never drift out of sync with the desktop deck. */}
+      {moreOpen && (
+        <>
+          <div className="qm-sheet-backdrop" onClick={() => setMoreOpen(false)} />
+          <div className="qm-sheet">
+            <div className="qm-sheet-handle" />
+            {NAV_GROUPS.map(g => (
+              <div key={g.group}>
+                <div className="ncx-deck-group">{g.group}<i /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, margin: '6px 0 12px' }}>
+                  {g.items.map(([id, label, icon]) => (
+                    <button
+                      key={id}
+                      className={'qm-sheet-cell' + (activeTab === id ? ' active' : '')}
+                      onClick={() => { onTabChange(id); setMoreOpen(false); }}
+                    >
+                      <Icon name={icon} size={18} />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* MOBILE BOTTOM NAV — 4 pinned tabs + MORE (the full deck). */}
       <nav className="bottom-nav">
         {([['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'], ['overview', 'Vault', 'wallet'], ['progress', 'Cred', 'layers']] as NavItem[]).map(([id, label, icon]) => (
           <button
             key={id}
-            onClick={() => onTabChange(id)}
-            className={`bn-item${activeTab === id ? ' active' : ''}`}
+            onClick={() => { onTabChange(id); setMoreOpen(false); }}
+            className={`bn-item${activeTab === id && !moreOpen ? ' active' : ''}`}
           >
             <Icon name={icon} size={20} />
             <span>{label}</span>
           </button>
         ))}
+        <button
+          onClick={() => setMoreOpen(o => !o)}
+          className={`bn-item${moreOpen || !PINNED_TABS.includes(activeTab) ? ' active' : ''}`}
+        >
+          <Icon name="grid" size={20} />
+          <span>More</span>
+        </button>
       </nav>
     </div>
   );

@@ -176,16 +176,75 @@ function Header({
       <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
         {loggedCount} / {totalCount} LOGGED
       </span>
+      <span style={{ flex: 1 }} />
+      <PhoneSyncButton />
       <button
         key={`cfg-${configuring}`}
         className={configuring ? 'btn btn-primary' : 'btn btn-ghost'}
-        style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: 11 }}
+        style={{ padding: '6px 12px', fontSize: 11 }}
         onClick={onToggleConfig}
       >
         <Icon name="edit" size={13} style={{ marginRight: 6 }} />
         {configuring ? 'DONE' : 'CONFIGURE'}
       </button>
     </div>
+  );
+}
+
+/**
+ * On-demand pull from the phone's Health Connect server (pull mode).
+ * Hidden entirely unless HEALTH_PULL_URL is configured server-side.
+ * Result feedback lives inline: +N VALUES on success, PHONE OFFLINE when
+ * the poll fails — the scheduled poller keeps retrying either way.
+ */
+function PhoneSyncButton() {
+  const qc = useQueryClient();
+  const statusQ = useQuery({
+    queryKey: ['metrics', 'pull-status'],
+    queryFn: () => api.get<{ configured: boolean }>('/api/metrics/pull'),
+    staleTime: 10 * 60_000,
+  });
+  const pull = useMutation({
+    mutationFn: () => api.post<{ configured: boolean; ok: boolean; written: number; days: number }>('/api/metrics/pull'),
+    onSuccess: (r) => {
+      if (r.ok && r.written > 0) {
+        qc.invalidateQueries({ queryKey: ['metrics'] });
+        qc.invalidateQueries({ queryKey: ['quests', 'today'] });
+      }
+    },
+  });
+
+  if (!statusQ.data?.configured) return null;
+
+  const r = pull.data;
+  const readout = pull.isPending
+    ? { text: 'POLLING…', color: 'var(--amber)' }
+    : pull.isError
+      ? { text: 'SYNC ERROR', color: 'var(--red)' }
+      : r
+        ? r.ok
+          ? { text: `+${r.written} VALUES`, color: 'var(--lime)' }
+          : { text: 'PHONE OFFLINE', color: 'var(--red)' }
+        : null;
+
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {readout && (
+        <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.16em', color: readout.color }}>
+          {readout.text}
+        </span>
+      )}
+      <button
+        className="btn btn-ghost"
+        style={{ padding: '6px 12px', fontSize: 11 }}
+        disabled={pull.isPending}
+        title="Pull the latest readings from your phone now"
+        onClick={() => pull.mutate()}
+      >
+        <Icon name="repeat" size={13} style={{ marginRight: 6 }} />
+        SYNC PHONE
+      </button>
+    </span>
   );
 }
 

@@ -53,6 +53,11 @@ services:
       # Shared secret (16+ chars) for POST /api/ingest/metrics — lets
       # phone-side health bridges push DailyMetrics without a JWT.
       INGEST_TOKEN: ${INGEST_TOKEN:-}
+      # Health PULL mode: poll the phone's Health Connect local server
+      # (health-connect-webhook app) instead of receiving webhooks.
+      HEALTH_PULL_URL: ${HEALTH_PULL_URL:-}
+      HEALTH_PULL_MINUTES: ${HEALTH_PULL_MINUTES:-30}
+      HEALTH_PULL_TOKEN: ${HEALTH_PULL_TOKEN:-}
     volumes:
       - questman-data:/data
     expose:
