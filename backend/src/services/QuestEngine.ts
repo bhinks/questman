@@ -40,7 +40,6 @@ import { isHabitDueToday } from '../routes/habits';
 // domain route; the engine just concatenates their output.
 import { buildProjectCandidates } from '../routes/projects';
 import { buildMediaCandidates } from '../routes/media';
-import { buildChainCandidates } from '../routes/chains';
 import { buildVitalsCandidates } from '../routes/metrics';
 import { buildNpcCandidates } from '../routes/npcs';
 import { buildBudgetCandidates } from '../routes/budgets';
@@ -676,7 +675,6 @@ export class QuestEngine {
       buildMediaCandidates,
       buildVitalsCandidates,
       buildNpcCandidates,
-      buildChainCandidates,   // phase 5: linear questlines
       buildBudgetCandidates,  // phase 7: budget-breach reminders
       buildBillCandidates,    // phase 7: recurring-bill reminders
     ];

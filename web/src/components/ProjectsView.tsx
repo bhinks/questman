@@ -5,6 +5,10 @@
  * Checking a task PUTs done=true; if a matching quest is pending today the
  * server auto-completes it and lands XP/eddies — so toggles invalidate the
  * player + today's quests. Milestones award their bonusXp on completion.
+ *
+ * SEQUENCED projects (ordered=true — the absorbed questlines) render their
+ * objectives as a locked→current→done step track: only the first not-done
+ * task (by sortOrder) is actionable; the rest wait their turn.
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -197,23 +201,39 @@ function ProjectCard({
         </button>
       </div>
 
-      {/* Objectives (tasks) */}
+      {/* Objectives (tasks) — sequenced projects render the step track. */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Icon name="list" size={11} />OBJECTIVES
+            <Icon name={project.ordered ? 'layers' : 'list'} size={11} />OBJECTIVES
           </span>
+          {project.ordered && (
+            <span className="ncx-stamp flat" style={{ color: 'var(--cyan)', fontSize: 9 }}>SEQUENCED</span>
+          )}
           <span className="ncx-serial">{openTasks} OPEN</span>
         </div>
-        {tasks.map(t => (
-          <TaskRow
-            key={t.id}
-            task={t}
-            busy={toggleTask.isPending && toggleTask.variables?.id === t.id}
-            onToggle={() => toggleTask.mutate(t)}
-            onDelete={() => removeTask.mutate(t.id)}
-          />
-        ))}
+        {project.ordered && tasks.length > 0 && <SequenceProgress tasks={tasks} />}
+        {project.ordered
+          ? orderedTasks(tasks).map((t, i, arr) => (
+              <SequencedTaskRow
+                key={t.id}
+                task={t}
+                state={sequenceState(arr, i)}
+                isLast={i === arr.length - 1}
+                busy={toggleTask.isPending && toggleTask.variables?.id === t.id}
+                onToggle={() => toggleTask.mutate(t)}
+                onDelete={() => removeTask.mutate(t.id)}
+              />
+            ))
+          : tasks.map(t => (
+              <TaskRow
+                key={t.id}
+                task={t}
+                busy={toggleTask.isPending && toggleTask.variables?.id === t.id}
+                onToggle={() => toggleTask.mutate(t)}
+                onDelete={() => removeTask.mutate(t.id)}
+              />
+            ))}
         {tasks.length === 0 && (
           <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', paddingLeft: 4 }}>No objectives yet.</div>
         )}
@@ -295,11 +315,24 @@ function TaskRow({
         }}>
           {task.title}
         </span>
+        {task.description && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 1 }}>{task.description}</div>
+        )}
       </div>
 
       {task.priority > 0 && (
         <span className="ncx-stamp flat" title="Priority" style={{ color: 'var(--magenta)', fontSize: 9 }}>
           P{task.priority}
+        </span>
+      )}
+
+      {task.xpReward != null && (
+        <span
+          className="ncx-stamp flat"
+          title="Authored XP reward"
+          style={{ color: 'var(--amber)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          <Icon name="bolt" size={10} /> +{task.xpReward}
         </span>
       )}
 
@@ -316,6 +349,142 @@ function TaskRow({
       <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '4px 6px' }} title="Delete objective" aria-label={`Delete ${task.title}`}>
         <Icon name="close" size={12} />
       </button>
+    </div>
+  );
+}
+
+// ---- Sequenced (ordered) objectives — the absorbed questline track ----
+
+/** Sequence order: sortOrder, then createdAt — the server's done-first
+ *  grouping would scramble the track. */
+function orderedTasks(tasks: ProjectTask[]): ProjectTask[] {
+  return [...tasks].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+}
+
+type SeqState = 'done' | 'current' | 'locked';
+
+/** The first not-done task (in sequence order) is CURRENT; later open ones are locked. */
+function sequenceState(seq: ProjectTask[], index: number): SeqState {
+  if (seq[index].done) return 'done';
+  const firstOpen = seq.findIndex(t => !t.done);
+  return index === firstOpen ? 'current' : 'locked';
+}
+
+function SequenceProgress({ tasks }: { tasks: ProjectTask[] }) {
+  const total = tasks.length;
+  const doneCount = tasks.filter(t => t.done).length;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="ncx-serial">{doneCount}/{total} STEPS</span>
+      <div className="ncx-bar slim">
+        <i style={{
+          width: `${pct}%`,
+          background: pct === 100
+            ? 'linear-gradient(90deg, var(--cyan), var(--teal))'
+            : 'linear-gradient(90deg, var(--lime), var(--teal))',
+          boxShadow: pct > 0 ? 'var(--glow-cyan)' : 'none',
+        }} />
+        <span className="seg-mask" />
+      </div>
+    </div>
+  );
+}
+
+function SequencedTaskRow({
+  task, state, isLast, busy, onToggle, onDelete,
+}: {
+  task: ProjectTask; state: SeqState; isLast: boolean;
+  busy: boolean; onToggle: () => void; onDelete: () => void;
+}) {
+  const done = state === 'done';
+  const current = state === 'current';
+  const locked = state === 'locked';
+  const nodeColor = done ? 'var(--lime)' : current ? 'var(--cyan)' : 'var(--line-2)';
+
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+      {/* Track gutter: node + connector. Done reopens, current completes, locked waits. */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 26 }}>
+        <button
+          onClick={locked ? undefined : onToggle}
+          disabled={busy || locked}
+          aria-label={done ? `Reopen ${task.title}` : current ? `Complete ${task.title}` : `${task.title} (locked)`}
+          title={locked ? 'Locked — finish the current step first' : undefined}
+          style={{
+            width: 26, height: 26, flexShrink: 0,
+            border: `1px solid ${nodeColor}`,
+            background: done
+              ? 'linear-gradient(135deg, var(--lime), var(--teal))'
+              : current ? 'color-mix(in srgb, var(--cyan) 18%, var(--panel-2))'
+              : 'var(--panel-2)',
+            color: done ? 'white' : current ? 'var(--cyan)' : 'var(--text-faint)',
+            boxShadow: current ? 'var(--glow-cyan)' : done ? 'var(--glow-lime)' : 'none',
+            cursor: locked ? 'not-allowed' : busy ? 'wait' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <Icon name={done ? 'check' : locked ? 'lock' : 'bolt'} size={13} />
+        </button>
+        {!isLast && (
+          <div style={{
+            flex: 1, width: 2, minHeight: 10,
+            background: done ? 'var(--lime)' : 'var(--line)',
+            opacity: done ? 0.5 : 1,
+          }} />
+        )}
+      </div>
+
+      {/* Step body */}
+      <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 10, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 13,
+              fontWeight: current ? 700 : 500,
+              color: done ? 'var(--lime)' : current ? 'var(--text)' : 'var(--text-faint)',
+              textDecoration: done ? 'line-through' : 'none',
+              textDecorationColor: 'rgba(67,255,166,0.5)',
+            }}>
+              {task.title}
+            </span>
+            {current && (
+              <span className="ncx-stamp flat" style={{ fontSize: 9.5, padding: '2px 7px', color: 'var(--cyan)', background: 'rgba(var(--accent-rgb), 0.12)' }}>
+                CURRENT
+              </span>
+            )}
+          </div>
+          {task.description && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2, opacity: locked ? 0.6 : 1 }}>
+              {task.description}
+            </div>
+          )}
+        </div>
+
+        {task.xpReward != null && (
+          <span
+            className="ncx-stamp flat"
+            title="Authored XP reward"
+            style={{ color: current ? 'var(--amber)' : 'var(--text-faint)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            <Icon name="bolt" size={10} /> +{task.xpReward}
+          </span>
+        )}
+        {task.estMinutes != null && (
+          <span
+            className="ncx-stamp flat"
+            title="Estimated time"
+            style={{ color: 'var(--violet)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            <Icon name="clock" size={10} /> {task.estMinutes}m
+          </span>
+        )}
+
+        <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '4px 6px' }} title="Delete step" aria-label={`Delete ${task.title}`}>
+          <Icon name="close" size={12} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -370,12 +539,14 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
   const [description, setDescription] = useState(project?.description ?? '');
   const [status, setStatus] = useState<Project['status']>(project?.status ?? 'active');
   const [color, setColor] = useState(project?.color ?? '');
+  const [ordered, setOrdered] = useState(project?.ordered ?? false);
 
   const buildPayload = () => ({
     name: name.trim(),
     description: description.trim() || null,
     status,
     color: color.trim() || null,
+    ordered,
   });
 
   const save = useMutation({
@@ -422,6 +593,20 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
             style={{ ...inputStyle, width: 110 }}
           />
         </label>
+        <label
+          title="Objectives unlock in order — only the current step is actionable (questline mode)"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: '1px solid var(--line-2)', cursor: 'pointer' }}
+        >
+          <input
+            type="checkbox"
+            checked={ordered}
+            onChange={e => setOrdered(e.target.checked)}
+            style={{ accentColor: 'var(--cyan)' }}
+          />
+          <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.14em', color: ordered ? 'var(--cyan)' : 'var(--text-dim)' }}>
+            SEQUENCED
+          </span>
+        </label>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button className="btn btn-ghost" onClick={onClose}>CANCEL</button>
@@ -442,12 +627,14 @@ function TaskForm({ projectId, onClose }: { projectId: string; onClose: () => vo
   const [title, setTitle] = useState('');
   const [estMinutes, setEstMinutes] = useState<number | ''>('');
   const [priority, setPriority] = useState<number>(0);
+  const [xpReward, setXpReward] = useState<number | ''>('');
 
   const create = useMutation({
     mutationFn: () => api.post(`/api/projects/${projectId}/tasks`, {
       title: title.trim(),
       estMinutes: estMinutes === '' ? null : estMinutes,
       priority,
+      xpReward: xpReward === '' ? null : xpReward,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] });
@@ -484,6 +671,16 @@ function TaskForm({ projectId, onClose }: { projectId: string; onClose: () => vo
         value={priority}
         onChange={e => setPriority(Math.max(0, Math.min(100, Number(e.target.value))))}
         style={{ ...inputStyle, width: 70 }}
+      />
+      <input
+        type="number"
+        min={0}
+        max={2000}
+        placeholder="xp auto"
+        title="XP reward (blank = derived from the time estimate)"
+        value={xpReward}
+        onChange={e => setXpReward(e.target.value === '' ? '' : Math.max(0, Math.min(2000, Number(e.target.value))))}
+        style={{ ...inputStyle, width: 80 }}
       />
       <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 11 }}>CANCEL</button>
       <button className="btn btn-primary" disabled={!title.trim() || create.isPending} onClick={submit} style={{ fontSize: 11 }}>

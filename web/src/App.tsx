@@ -25,7 +25,6 @@ import { NpcsView } from './components/NpcsView';
 import { ShopView } from './components/ShopView';
 import { AchievementsView } from './components/AchievementsView';
 import { BossesView } from './components/BossesView';
-import { ChainsView } from './components/ChainsView';
 import { IceView } from './components/IceView';
 import { NetView } from './components/NetView';
 import { DebriefView } from './components/DebriefView';
@@ -376,9 +375,6 @@ function HubApp() {
 
       case 'bosses':
         return <BossesView />;
-
-      case 'chains':
-        return <ChainsView />;
 
       case 'ice':
         return <IceView />;

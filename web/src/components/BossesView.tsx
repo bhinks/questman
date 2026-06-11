@@ -129,6 +129,10 @@ function Dossier({
   const qc = useQueryClient();
   const [amount, setAmount] = useState<number | ''>('');
   const [note, setNote] = useState('');
+  // Debt bosses log either a payment (damage) or the new remaining balance —
+  // the server derives the delta from a balance, so the bar still ticks down.
+  const balanceMode = boss.kind === 'debt' && boss.direction === 'grind_down';
+  const [hitMode, setHitMode] = useState<'payment' | 'balance'>('payment');
 
   const meta = KIND_META[boss.kind];
   const accent = boss.color || meta.color;
@@ -137,7 +141,7 @@ function Dossier({
   const hit = useMutation({
     mutationFn: (amt: number) =>
       api.post<BossHitResponse>(`/api/bosses/${boss.id}/hit`, {
-        amount: amt,
+        ...(balanceMode && hitMode === 'balance' ? { newBalance: amt } : { amount: amt }),
         note: note.trim() || null,
       }),
     onSuccess: (res) => {
@@ -160,15 +164,18 @@ function Dossier({
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bosses'] }),
   });
 
+  // Balance mode accepts 0 (debt cleared → defeat); payment must be > 0.
+  const isBalance = balanceMode && hitMode === 'balance';
+  const canHit = amount !== '' && (isBalance ? amount >= 0 : amount > 0);
   const submit = () => {
-    if (amount !== '' && amount > 0) hit.mutate(amount);
+    if (canHit) hit.mutate(amount as number);
   };
 
   // HP-bar fill semantics: grind_down shows HP left and drains toward 0;
   // charge_up fills toward the target. boss.pct is 0–100 toward defeat.
   const fillPct = Math.max(0, Math.min(100, boss.direction === 'grind_down' ? 100 - boss.pct : boss.pct));
   const logs = (boss.logs ?? []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 2);
-  const verb = actionVerb(boss.direction, boss.kind);
+  const verb = isBalance ? 'SET BALANCE' : actionVerb(boss.direction, boss.kind);
 
   return (
     <div className="ncx-ticks">
@@ -256,7 +263,8 @@ function Dossier({
                 <span key={l.id} className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
                   {fmtDate(l.createdAt)}{' '}
                   <span style={{ color: accent }}>
-                    {(boss.direction === 'charge_up' ? '+' : '−') + fmt(l.amount, boss.unit)}
+                    {/* negative grind_down amount = balance grew (newBalance log) — HP went UP */}
+                    {(boss.direction === 'charge_up' ? '+' : l.amount < 0 ? '+' : '−') + fmt(Math.abs(l.amount), boss.unit)}
                   </span>
                   {l.note ? ` ${l.note}` : l.source === 'project_milestone' ? ' MILESTONE' : ''}
                 </span>
@@ -269,13 +277,33 @@ function Dossier({
               >
                 ABANDON
               </button>
+              {balanceMode && (
+                <span style={{ display: 'inline-flex' }} role="group" aria-label="Logging mode">
+                  {(['payment', 'balance'] as const).map(m => (
+                    <button
+                      key={m}
+                      className="btn btn-ghost"
+                      onClick={() => setHitMode(m)}
+                      title={m === 'payment' ? 'Log a payment (damage)' : 'Log the new remaining balance'}
+                      style={{
+                        fontSize: 9, padding: '5px 8px', letterSpacing: '0.1em',
+                        color: hitMode === m ? accent : 'var(--text-faint)',
+                        background: hitMode === m ? `color-mix(in srgb, ${accent} 12%, transparent)` : undefined,
+                        boxShadow: hitMode === m ? `inset 0 0 0 1px color-mix(in srgb, ${accent} 45%, transparent)` : undefined,
+                      }}
+                    >
+                      {m === 'payment' ? 'PAYMENT' : 'BALANCE'}
+                    </button>
+                  ))}
+                </span>
+              )}
               <input
                 type="number"
                 className="ncx-input"
                 min={0}
                 step="any"
-                placeholder="AMT"
-                title="Hit amount"
+                placeholder={isBalance ? 'NEW BAL' : 'AMT'}
+                title={isBalance ? 'Remaining balance' : 'Hit amount'}
                 value={amount}
                 onChange={e => setAmount(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
                 onKeyDown={e => e.key === 'Enter' && submit()}
@@ -295,7 +323,7 @@ function Dossier({
                 key={boss.id + '-' + (focal ? 'primary' : 'plain')}
                 className={'btn' + (focal ? ' btn-primary' : '')}
                 style={{ padding: '7px 16px', fontSize: 11 }}
-                disabled={amount === '' || amount <= 0 || hit.isPending}
+                disabled={!canHit || hit.isPending}
                 onClick={submit}
               >
                 <Icon name={boss.direction === 'charge_up' ? 'arrowUp' : 'zap'} size={12} />
@@ -405,6 +433,59 @@ function KillOverlay({ boss, onClose }: { boss: Boss; onClose: () => void }) {
 }
 
 // ---- Create form ------------------------------------------------------
+
+/** Accent presets — the base Night City palette (hex, not vars, so a boss
+ *  keeps its chosen accent across theme skins). Empty = kind default. */
+const ACCENT_PRESETS: { label: string; value: string }[] = [
+  { label: 'CYAN',    value: '#1ce2ff' },
+  { label: 'TEAL',    value: '#2ff5d6' },
+  { label: 'LIME',    value: '#43ffa6' },
+  { label: 'AMBER',   value: '#ffc24b' },
+  { label: 'RED',     value: '#ff4d6d' },
+  { label: 'MAGENTA', value: '#ff2e9a' },
+  { label: 'VIOLET',  value: '#9d6bff' },
+];
+
+function AccentPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }} role="radiogroup" aria-label="Accent color">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === ''}
+        title="Kind default"
+        onClick={() => onChange('')}
+        className="mono"
+        style={{
+          height: 24, padding: '0 8px', fontSize: 8.5, letterSpacing: '0.12em',
+          background: 'var(--panel-2)', color: value === '' ? 'var(--text)' : 'var(--text-faint)',
+          border: value === '' ? '1px solid var(--text-dim)' : '1px solid var(--line-2)',
+          cursor: 'pointer',
+        }}
+      >
+        AUTO
+      </button>
+      {ACCENT_PRESETS.map(p => (
+        <button
+          key={p.value}
+          type="button"
+          role="radio"
+          aria-checked={value === p.value}
+          title={p.label}
+          aria-label={p.label}
+          onClick={() => onChange(p.value)}
+          style={{
+            width: 24, height: 24, flexShrink: 0,
+            background: p.value,
+            border: value === p.value ? '2px solid var(--text)' : '1px solid color-mix(in srgb, ' + p.value + ' 50%, transparent)',
+            boxShadow: value === p.value ? `0 0 10px color-mix(in srgb, ${p.value} 70%, transparent)` : 'none',
+            cursor: 'pointer',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 function BossForm({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
@@ -529,13 +610,7 @@ function BossForm({ onClose }: { onClose: () => void }) {
           />
         </Field>
         <Field label="ACCENT">
-          <input
-            className="ncx-input"
-            placeholder="#ff3b6b"
-            value={color}
-            onChange={e => setColor(e.target.value)}
-            style={{ width: 110 }}
-          />
+          <AccentPicker value={color} onChange={setColor} />
         </Field>
       </div>
 

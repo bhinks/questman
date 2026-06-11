@@ -315,7 +315,7 @@ export interface Quest {
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
   xpReward: number;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'chain' | 'insight' | 'bill';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'ai' | 'rule' | 'insight' | 'bill';
   sourceId: string | null;
   status: 'pending' | 'completed' | 'skipped' | 'expired';
   target: number;
@@ -372,10 +372,12 @@ export interface ProjectTask {
   id: string;
   projectId: string;
   title: string;
+  description: string | null;
   done: boolean;
   estMinutes: number | null;
   priority: number;
   sortOrder: number;
+  xpReward: number | null;  // authored override; null = derived from estMinutes
   completedAt: string | null;
 }
 export interface Milestone {
@@ -395,6 +397,8 @@ export interface Project {
   description: string | null;
   status: 'active' | 'paused' | 'done' | 'archived';
   color: string | null;
+  /** Sequenced mode (absorbed questlines): tasks unlock in sortOrder. */
+  ordered: boolean;
   tasks?: ProjectTask[];
   milestones?: Milestone[];
   createdAt: string;
@@ -634,28 +638,6 @@ export interface BossHitResponse {
   boss: Boss;
   defeated: boolean;
   player?: PlayerSnapshot;  // present only when this hit defeated the boss
-}
-
-export interface ChainStep {
-  id: string;
-  order: number;
-  title: string;
-  description: string | null;
-  difficulty: 'easy' | 'medium' | 'hard';
-  xpReward: number;
-  estMinutes: number | null;
-  status: 'locked' | 'available' | 'done';
-  questId: string | null;
-  completedAt: string | null;
-}
-export interface QuestChain {
-  id: string;
-  name: string;
-  description: string | null;
-  status: 'active' | 'done' | 'abandoned';
-  color: string | null;
-  steps: ChainStep[];
-  createdAt: string;
 }
 
 // ---- calendar uplink (private ICS feed → planner budget + Today agenda) ---

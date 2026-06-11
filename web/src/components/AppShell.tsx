@@ -38,13 +38,13 @@ interface AppShellProps {
 type NavItem = [id: string, label: string, icon: string];
 const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   { group: 'OPS', items: [
-    ['today', 'Today', 'target'], ['chains', 'Questlines', 'repeat'],
-    ['bosses', 'Bosses', 'flame'], ['ice', 'ICE', 'shield'],
+    ['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'],
   ]},
   { group: 'LIFE', items: [
     ['habits', 'Habits', 'check'], ['chores', 'Chores', 'list'],
-    ['workouts', 'Workouts', 'spark'], ['projects', 'Projects', 'grid'],
-    ['media', 'Media', 'play'], ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
+    ['ice', 'Anti-Goals', 'shield'], ['workouts', 'Workouts', 'spark'],
+    ['projects', 'Projects', 'grid'], ['media', 'Media', 'play'],
+    ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
   ]},
   { group: 'VAULT', items: [
     ['overview', 'Finance', 'wallet'], ['categories', 'Categories', 'layers'],
@@ -64,8 +64,8 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
 const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
 
 const SCREEN_TITLES: Record<string, string> = {
-  today: 'TODAY // DAY PLAN', chains: 'OPS // QUESTLINES', bosses: 'OPS // BOSS FIGHTS',
-  ice: 'OPS // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
+  today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS',
+  ice: 'LIFE // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
   workouts: 'LIFE // WORKOUTS', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
   vitals: 'LIFE // BIOMONITOR', social: 'LIFE // CREW',
   progress: 'PROGRESS // STREET CRED', achievements: 'PROGRESS // BADGE WALL',

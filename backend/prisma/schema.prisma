@@ -54,7 +54,6 @@ model User {
 
   // World mechanics (phase 5)
   bosses               Boss[]
-  questChains          QuestChain[]
 
   // Intelligence layer (phase 6): AI Handler + insights + weekly debrief
   handlerMessages      HandlerMessage[]
@@ -843,6 +842,9 @@ model Project {
   description String?
   status      String   @default("active") // "active"|"paused"|"done"|"archived"
   color       String?
+  // Sequenced mode (absorbed questlines): tasks unlock in sortOrder — only
+  // the first not-done task is actionable / enters the candidate pool.
+  ordered     Boolean  @default(false)
 
   tasks       ProjectTask[]
   milestones  Milestone[]
@@ -863,10 +865,12 @@ model ProjectTask {
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   title       String
+  description String?
   done        Boolean  @default(false)
   estMinutes  Int?
   priority    Int      @default(0)   // higher = surfaced first
   sortOrder   Int      @default(0)
+  xpReward    Int?     // authored override; null = derived from estMinutes
   completedAt DateTime?
 
   createdAt   DateTime @default(now())
@@ -1111,7 +1115,7 @@ model BossLog {
   boss      Boss     @relation(fields: [bossId], references: [id], onDelete: Cascade)
   userId    String   // scoping; cascades via boss
 
-  amount    Float                  // damage dealt (grind_down) / contribution (charge_up); > 0
+  amount    Float                  // damage dealt (grind_down) / contribution (charge_up); negative = balance-grew correction from a newBalance log
   note      String?
   source    String   @default("manual") // "manual" | "project_milestone"
 
@@ -1121,47 +1125,9 @@ model BossLog {
   @@map("boss_logs")
 }
 
-// A linear questline: ordered steps where finishing one unlocks the next.
-// The current available step enters the daily candidate pool (source:"chain",
-// sourceId=stepId); completing that quest marks the step done and unlocks the
-// next. Projects can be mirrored as chains, but chains are user-authored here.
-model QuestChain {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name        String
-  description String?
-  status      String   @default("active") // "active"|"done"|"abandoned"
-  color       String?
-
-  steps       ChainStep[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId, status])
-  @@map("quest_chains")
-}
-
-model ChainStep {
-  id          String   @id @default(cuid())
-  chainId     String
-  chain       QuestChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
-
-  order       Int                                  // 0-based position in the chain
-  title       String
-  description String?
-  difficulty  String   @default("medium") // "easy"|"medium"|"hard"
-  xpReward    Int      @default(30)
-  estMinutes  Int?
-  status      String   @default("locked") // "locked"|"available"|"done"
-  questId     String?  // the daily Quest generated for this step, when scheduled
-  completedAt DateTime?
-
-  @@index([chainId, order])
-  @@map("chain_steps")
-}
+// Questlines (QuestChain/ChainStep) were consolidated into Projects
+// (migration 20260611090000): a chain is now a Project with ordered=true,
+// its steps are ProjectTasks (order → sortOrder, authored xpReward kept).
 
 // ============================================================
 // Intelligence layer (phase 6) — AI Handler, insights, weekly debrief.

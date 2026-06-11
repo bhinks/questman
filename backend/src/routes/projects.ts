@@ -4,16 +4,22 @@
  * A Project bundles ProjectTasks (the day-to-day grind, each worth a
  * quest) and Milestones (boss clears — a chunky bonusXp on completion).
  *
- * Closed-loop linkage: when a task flips done false→true we auto-complete
- * any pending quest tied to that task today (source='project', sourceId=
- * task.id) and land its XP/eddies, mirroring the habit /check pattern.
+ * Closed-loop linkage runs BOTH ways: when a task flips done false→true we
+ * auto-complete any pending quest tied to it today (source='project',
+ * sourceId=task.id) and land its XP/eddies, mirroring the habit /check
+ * pattern; and when that quest is completed from Today, /complete calls
+ * completeProjectTaskAfterQuest to mark the task done (no extra XP).
+ *
+ * Sequenced projects (ordered=true — the absorbed questlines): tasks
+ * unlock in sortOrder; only the first not-done task is the CURRENT one
+ * and enters the candidate pool.
  *
  * Candidate builder: each active project contributes its top incomplete
- * task as a quest candidate (capped at 2 across all projects).
+ * task as a quest candidate (capped at 3 across all projects).
  */
 import express from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
@@ -40,25 +46,31 @@ const projectCreateSchema = z.object({
   description: z.string().max(2000).nullable().optional(),
   color:       z.string().max(40).nullable().optional(),
   status:      STATUS.default('active'),
+  ordered:     z.boolean().default(false),
 });
 const projectUpdateSchema = z.object({
   name:        z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   color:       z.string().max(40).nullable().optional(),
   status:      STATUS.optional(),
+  ordered:     z.boolean().optional(),
 });
 
 const taskCreateSchema = z.object({
-  title:      z.string().min(1).max(300),
-  estMinutes: z.number().int().min(1).max(1440).nullable().optional(),
-  priority:   z.number().int().min(0).max(100).optional(),
+  title:       z.string().min(1).max(300),
+  description: z.string().max(2000).nullable().optional(),
+  estMinutes:  z.number().int().min(1).max(1440).nullable().optional(),
+  priority:    z.number().int().min(0).max(100).optional(),
+  xpReward:    z.number().int().min(0).max(2000).nullable().optional(),
 });
 const taskUpdateSchema = z.object({
-  title:      z.string().min(1).max(300).optional(),
-  estMinutes: z.number().int().min(1).max(1440).nullable().optional(),
-  priority:   z.number().int().min(0).max(100).optional(),
-  sortOrder:  z.number().int().min(0).max(100000).optional(),
-  done:       z.boolean().optional(),
+  title:       z.string().min(1).max(300).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  estMinutes:  z.number().int().min(1).max(1440).nullable().optional(),
+  priority:    z.number().int().min(0).max(100).optional(),
+  sortOrder:   z.number().int().min(0).max(100000).optional(),
+  xpReward:    z.number().int().min(0).max(2000).nullable().optional(),
+  done:        z.boolean().optional(),
 });
 
 const milestoneCreateSchema = z.object({
@@ -121,6 +133,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
       description: data.description ?? null,
       color: data.color ?? null,
       status: data.status,
+      ordered: data.ordered,
     },
     include: { tasks: true, milestones: true },
   });
@@ -145,6 +158,7 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
       description: data.description === undefined ? undefined : data.description,
       color: data.color === undefined ? undefined : data.color,
       status: data.status,
+      ordered: data.ordered,
     },
     include: {
       tasks: { orderBy: [{ done: 'asc' }, { priority: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }] },
@@ -175,17 +189,31 @@ router.post('/:id/tasks', asyncHandler(async (req: AuthRequest, res) => {
 
   const project = await prisma.project.findFirst({
     where: { id: req.params.id, userId },
-    select: { id: true },
+    select: { id: true, ordered: true },
   });
   if (!project) throw new AppError('Project not found', 404);
+
+  // Sequenced projects append: the new task slots after the current last
+  // step so the unlock order stays stable.
+  let sortOrder = 0;
+  if (project.ordered) {
+    const last = await prisma.projectTask.aggregate({
+      where: { projectId: project.id },
+      _max: { sortOrder: true },
+    });
+    sortOrder = (last._max.sortOrder ?? -1) + 1;
+  }
 
   const task = await prisma.projectTask.create({
     data: {
       userId,
       projectId: project.id,
       title: data.title,
+      description: data.description ?? null,
       estMinutes: data.estMinutes ?? null,
       priority: data.priority ?? 0,
+      sortOrder,
+      xpReward: data.xpReward ?? null,
     },
   });
   res.status(201).json({ task });
@@ -220,11 +248,13 @@ router.put('/tasks/:taskId', asyncHandler(async (req: AuthRequest, res) => {
     task = await tx.projectTask.update({
       where: { id: existing.id },
       data: {
-        title:      data.title,
-        estMinutes: data.estMinutes === undefined ? undefined : data.estMinutes,
-        priority:   data.priority,
-        sortOrder:  data.sortOrder,
-        done:       data.done,
+        title:       data.title,
+        description: data.description === undefined ? undefined : data.description,
+        estMinutes:  data.estMinutes === undefined ? undefined : data.estMinutes,
+        priority:    data.priority,
+        sortOrder:   data.sortOrder,
+        xpReward:    data.xpReward === undefined ? undefined : data.xpReward,
+        done:        data.done,
         completedAt: flippingToDone ? new Date()
           : flippingToOpen ? null
           : undefined,
@@ -403,6 +433,33 @@ router.delete('/milestones/:mId', asyncHandler(async (req: AuthRequest, res) => 
   res.status(204).end();
 }));
 
+// ---- Quest /complete hook (consumed by routes/quests.ts) ------------
+
+/**
+ * Mark the ProjectTask backing a just-completed quest done. Runs inside
+ * the /complete (or completing /progress tick) transaction; `taskId` is
+ * the quest's sourceId. This closes the loop in BOTH directions (checking
+ * the task completes the quest, and vice versa) and is what advances a
+ * SEQUENCED project — the next not-done task by sortOrder becomes current.
+ *
+ * Idempotent (no-op when already done); never mints XP — the quest pays.
+ */
+export async function completeProjectTaskAfterQuest(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  taskId: string,
+): Promise<void> {
+  const task = await tx.projectTask.findFirst({
+    where: { id: taskId, userId },
+    select: { id: true, done: true },
+  });
+  if (!task || task.done) return;
+  await tx.projectTask.update({
+    where: { id: task.id },
+    data: { done: true, completedAt: new Date() },
+  });
+}
+
 // ---- Candidate builder (consumed by QuestEngine) --------------------
 
 const DIFFICULTY_XP: Record<'easy' | 'medium' | 'hard', number> = {
@@ -417,11 +474,21 @@ function difficultyForEst(estMinutes: number | null): 'easy' | 'medium' | 'hard'
   return 'hard';
 }
 
+/** Bucket an authored xpReward back into the tier whose payout it matches —
+ *  keeps the difficulty chip + eddie bonus consistent with the reward. */
+function difficultyForXp(xp: number): 'easy' | 'medium' | 'hard' {
+  if (xp >= DIFFICULTY_XP.hard) return 'hard';
+  if (xp >= DIFFICULTY_XP.medium) return 'medium';
+  return 'easy';
+}
+
 /**
- * For each ACTIVE project, take its top incomplete task (highest priority,
- * then sortOrder). Emit a project candidate per project, then cap at the
- * 2 projects whose top task has the highest priority. Carry-over=true:
- * project work is punt-able. Never throws on empty data.
+ * For each ACTIVE project, take its top incomplete task — highest priority
+ * for free-form projects, strictly next-in-sequence (sortOrder) for ordered
+ * ones. Emit a candidate per project, then cap at the 3 projects whose top
+ * task has the highest priority (3, not 2, since ordered projects absorbed
+ * the formerly-uncapped questlines). Carry-over=true: project work is
+ * punt-able. Never throws on empty data.
  */
 export async function buildProjectCandidates(
   prisma: PrismaClient,
@@ -435,7 +502,6 @@ export async function buildProjectCandidates(
       tasks: {
         where: { done: false },
         orderBy: [{ priority: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
-        take: 1,
       },
       milestones: {
         where: { done: false },
@@ -449,10 +515,17 @@ export async function buildProjectCandidates(
   const picked: Picked[] = [];
 
   for (const project of projects) {
-    const task = project.tasks[0];
+    // Ordered projects ignore priority — the sequence is the law.
+    const task = project.ordered
+      ? [...project.tasks].sort(
+          (a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime(),
+        )[0]
+      : project.tasks[0];
     if (!task) continue; // no actionable task in this project
 
-    const difficulty = difficultyForEst(task.estMinutes);
+    const difficulty = task.xpReward != null
+      ? difficultyForXp(task.xpReward)
+      : difficultyForEst(task.estMinutes);
     const nextMilestone = project.milestones[0];
 
     picked.push({
@@ -464,7 +537,7 @@ export async function buildProjectCandidates(
         moduleKey: 'projects',
         baseTitle: `Advance ${project.name}: ${task.title}`,
         difficulty,
-        xpReward: DIFFICULTY_XP[difficulty],
+        xpReward: task.xpReward ?? DIFFICULTY_XP[difficulty],
         estMinutes: task.estMinutes ?? undefined,
         carryOver: true,
         ...(nextMilestone && { context: `milestone: ${nextMilestone.title}` }),
@@ -472,9 +545,9 @@ export async function buildProjectCandidates(
     });
   }
 
-  // Cap at the 2 projects with the highest-priority pending task.
+  // Cap at the 3 projects with the highest-priority pending task.
   picked.sort((a, b) => b.priority - a.priority);
-  return picked.slice(0, 2).map(p => p.candidate);
+  return picked.slice(0, 3).map(p => p.candidate);
 }
 
 export default router;

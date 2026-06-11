@@ -10,7 +10,7 @@ import { calendarService } from '../services/CalendarService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
-import { advanceChainAfterComplete } from '../routes/chains';
+import { completeProjectTaskAfterQuest } from '../routes/projects';
 import { markBillPaid } from '../routes/recurring';
 
 const router = express.Router();
@@ -158,10 +158,10 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
       await game().bumpHabitStreak(quest.sourceId, today, tx);
     }
 
-    // If this quest is a chain step, advance the questline (mark the step
-    // done, unlock the next / finish the chain) inside the same tx.
-    if (quest.source === 'chain' && quest.sourceId) {
-      await advanceChainAfterComplete(tx, userId, quest.sourceId);
+    // If this quest tracks a project task, mark the task done inside the
+    // same tx (closed loop both ways; advances sequenced projects).
+    if (quest.source === 'project' && quest.sourceId) {
+      await completeProjectTaskAfterQuest(tx, userId, quest.sourceId);
     }
 
     // If this quest is a recurring-bill reminder, stamp the bill paid.
@@ -372,9 +372,9 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
         }
         await game().bumpHabitStreak(quest.sourceId, today, tx);
       }
-      // Mirror the chain + bill side effects from /complete on the completing tick.
-      if (quest.source === 'chain' && quest.sourceId) {
-        await advanceChainAfterComplete(tx, userId, quest.sourceId);
+      // Mirror the project-task + bill side effects from /complete on the completing tick.
+      if (quest.source === 'project' && quest.sourceId) {
+        await completeProjectTaskAfterQuest(tx, userId, quest.sourceId);
       }
       if (quest.source === 'bill' && quest.sourceId) {
         await markBillPaid(tx, userId, quest.sourceId);

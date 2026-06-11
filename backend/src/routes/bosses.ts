@@ -263,12 +263,24 @@ router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
 // --- hit (the core action) ----------------------------------------------
 
 const hitSchema = z.object({
-  amount: z.number().positive().max(1e12),
-  note:   z.string().max(500).nullable().optional(),
-});
+  amount:     z.number().positive().max(1e12).optional(),
+  // grind_down only: log the remaining balance instead of a payment — the
+  // hit becomes (currentValue - newBalance). A higher-than-current balance
+  // is allowed (debt grew; HP goes back up).
+  newBalance: z.number().min(0).max(1e12).optional(),
+  note:       z.string().max(500).nullable().optional(),
+}).refine(
+  d => (d.amount !== undefined) !== (d.newBalance !== undefined),
+  { message: 'Provide exactly one of amount or newBalance' },
+);
 
 /**
  * POST /api/bosses/:id/hit — deal a manual hit (damage / contribution).
+ *
+ * Two logging modes for grind_down bosses (debt): a payment (`amount`,
+ * positive damage) or the new remaining balance (`newBalance` — the server
+ * derives the delta, so the bar still ticks down; a negative delta raises
+ * HP when the debt grew).
  *
  * Applies the gauge move + a manual BossLog + the defeat check inside ONE
  * transaction via the shared helper. Responds BossHitResponse: the updated
@@ -287,8 +299,19 @@ router.post('/:id/hit', asyncHandler(async (req: AuthRequest, res) => {
     throw new AppError('That boss is no longer active', 400);
   }
 
+  let amount: number;
+  if (data.newBalance !== undefined) {
+    if (existing.direction !== 'grind_down') {
+      throw new AppError('newBalance only applies to grind-down bosses', 400);
+    }
+    amount = existing.currentValue - data.newBalance;
+    if (amount === 0) throw new AppError('Balance unchanged — nothing to log', 400);
+  } else {
+    amount = data.amount!;
+  }
+
   const result = await prisma.$transaction((tx) =>
-    applyBossHit(tx, userId, existing, data.amount, 'manual', data.note ?? null),
+    applyBossHit(tx, userId, existing, amount, 'manual', data.note ?? null),
   );
 
   const ws = (global as any).wsService;
