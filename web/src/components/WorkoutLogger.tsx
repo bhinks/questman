@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { Workout, WorkoutPlan, WorkoutPlanResponse } from '../lib/api';
 import { useFocusTotals, fmtFocusMin } from '../lib/useFocusTotals';
+import { uid } from '../lib/uid';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -45,7 +46,9 @@ export function WorkoutLogger() {
   // Idempotency key for THIS log attempt. A double-click fires two POSTs with
   // the same key; the server dedupes the second (no double XP/eddie payout).
   // Reset to a fresh key after a successful log so the next session is its own.
-  const [clientRequestId, setClientRequestId] = useState(() => crypto.randomUUID());
+  // uid(), not crypto.randomUUID — the latter is undefined over LAN http
+  // (insecure context) and crashed this whole view on non-localhost machines.
+  const [clientRequestId, setClientRequestId] = useState(() => uid());
 
   // "LOG" on a weekly-protocol slot pre-fills the form below and jumps to it.
   const formRef = useRef<HTMLFormElement>(null);
@@ -84,7 +87,7 @@ export function WorkoutLogger() {
     }),
     onSuccess: () => {
       setTitle(''); setNotes(''); setExercises([]);
-      setClientRequestId(crypto.randomUUID()); // fresh key for the next log
+      setClientRequestId(uid()); // fresh key for the next log
       qc.invalidateQueries({ queryKey: ['workouts', 'recent'] });
       qc.invalidateQueries({ queryKey: ['player'] });
       qc.invalidateQueries({ queryKey: ['quests', 'today'] });

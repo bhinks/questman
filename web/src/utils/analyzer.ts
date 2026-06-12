@@ -35,17 +35,6 @@ export function analyzeSpending(transactions: Transaction[], filters?: FilterOpt
   const endMonth = dateRange.end.getFullYear() * 12 + dateRange.end.getMonth();
   const actualMonths = Math.max(1, endMonth - startMonth + 1); // At least 1 month
   
-  // Debug logging
-  console.log('Date Range Debug:', {
-    start: dateRange.start,
-    end: dateRange.end,
-    startMonth: dateRange.start.getFullYear() + '-' + (dateRange.start.getMonth() + 1),
-    endMonth: dateRange.end.getFullYear() + '-' + (dateRange.end.getMonth() + 1),
-    calculatedMonths: actualMonths,
-    totalSpent,
-    days
-  });
-  
   const avgDaily = totalSpent / days;
   const avgWeekly = avgDaily * 7;
   const avgMonthly = totalSpent / actualMonths; // Use actual number of months

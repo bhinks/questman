@@ -253,9 +253,7 @@ function HubApp() {
   const chartData = useMemo(() => {
     const expenses = includedTransactions.filter(t => t.amount < 0);
     const income = includedTransactions.filter(t => t.amount > 0);
-    
-    console.log('Filtered:', { expenses: expenses.length, income: income.length });
-    
+
     // Monthly data
     const monthlyData = expenses.reduce((acc, transaction) => {
       const month = transaction.date.toISOString().substring(0, 7); // YYYY-MM
