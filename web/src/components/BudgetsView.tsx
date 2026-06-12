@@ -35,6 +35,7 @@ import type {
   FinanceCategory,
 } from '../lib/api';
 import { Icon } from './Icon';
+import { AccentPicker } from './AccentPicker';
 
 /** Status → accent color for the fill bar / chips. */
 const STATUS_COLOR: Record<BudgetStatus, string> = {
@@ -513,15 +514,9 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
               placeholder="Name"
               style={{ ...inputStyle, flex: 1, minWidth: 120 }}
             />
-            {/* Native hex picker — the API validates color as hex, so a
-                free-text CSS-var would 400. */}
-            <input
-              type="color"
-              value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#7c5cff'}
-              onChange={e => setColor(e.target.value)}
-              title="Category color"
-              style={{ width: 44, height: 34, padding: 2, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 0, cursor: 'pointer' }}
-            />
+            {/* Pick list, never hex entry (Brent's rule) — preset values are
+                hex, which is exactly what the API validates color as. */}
+            <AccentPicker value={color} onChange={setColor} autoTitle="Default" />
             <button
               className="btn btn-primary"
               style={{ padding: '6px 12px', fontSize: 11 }}
@@ -681,13 +676,8 @@ function NewCategoryForm({ onClose, onDone }: { onClose: () => void; onDone: () 
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker" style={{ color: 'var(--text-faint)' }}>COLOR</span>
-          <input
-            type="color"
-            value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#19d3ff'}
-            onChange={e => setColor(e.target.value)}
-            title="Category color"
-            style={{ width: 48, height: 38, padding: 2, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 0, cursor: 'pointer' }}
-          />
+          {/* Pick list, never hex entry — same swatches as bosses/projects. */}
+          <AccentPicker value={color} onChange={setColor} autoTitle="Default" />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 120 }}>
           <span className="kicker" style={{ color: 'var(--text-faint)' }}>CAP $</span>

@@ -17,6 +17,7 @@ import type { Project, ProjectTask, Milestone } from '../lib/api';
 import { useFocusTotals, fmtFocusMin } from '../lib/useFocusTotals';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
+import { AccentPicker } from './AccentPicker';
 
 const STATUS_META: Record<Project['status'], { label: string; color: string }> = {
   active:   { label: 'ACTIVE',   color: 'var(--lime)' },
@@ -586,12 +587,8 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker">ACCENT</span>
-          <input
-            placeholder="#48d1ff"
-            value={color}
-            onChange={e => setColor(e.target.value)}
-            style={{ ...inputStyle, width: 110 }}
-          />
+          {/* Pick list, never hex entry — same swatches as boss fights. */}
+          <AccentPicker value={color} onChange={setColor} autoTitle="Stock cyan" />
         </label>
         <label
           title="Objectives unlock in order — only the current step is actionable (questline mode)"

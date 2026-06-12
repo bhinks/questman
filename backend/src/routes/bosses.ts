@@ -85,9 +85,12 @@ async function applyBossHit(
   player: Awaited<ReturnType<GamificationService['awardXp']>> | null;
 }> {
   const target = boss.targetValue;
+  // Negative amounts are legal in BOTH directions (a newBalance log that
+  // moved the wrong way): grind_down HP can rise past target (debt grew);
+  // charge_up floors at 0 and caps at target.
   const nextValue = boss.direction === 'grind_down'
     ? Math.max(0, boss.currentValue - amount)
-    : Math.min(target, boss.currentValue + amount);
+    : Math.min(target, Math.max(0, boss.currentValue + amount));
 
   const reachedThreshold = boss.direction === 'grind_down'
     ? nextValue <= 0
@@ -264,9 +267,11 @@ router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
 
 const hitSchema = z.object({
   amount:     z.number().positive().max(1e12).optional(),
-  // grind_down only: log the remaining balance instead of a payment — the
-  // hit becomes (currentValue - newBalance). A higher-than-current balance
-  // is allowed (debt grew; HP goes back up).
+  // Either direction: log the gauge's new absolute value instead of a
+  // delta — the server derives the hit. grind_down: remaining balance
+  // (hit = current − newBalance; higher-than-current = debt grew, HP up).
+  // charge_up: new total (hit = newBalance − current; lower-than-current
+  // = the pot shrank, gauge back down).
   newBalance: z.number().min(0).max(1e12).optional(),
   note:       z.string().max(500).nullable().optional(),
 }).refine(
@@ -277,10 +282,11 @@ const hitSchema = z.object({
 /**
  * POST /api/bosses/:id/hit — deal a manual hit (damage / contribution).
  *
- * Two logging modes for grind_down bosses (debt): a payment (`amount`,
- * positive damage) or the new remaining balance (`newBalance` — the server
- * derives the delta, so the bar still ticks down; a negative delta raises
- * HP when the debt grew).
+ * Two logging modes for EVERY boss (Brent: "sometimes it's just easier to
+ * drop in the new value"): a payment/contribution (`amount`, positive) or
+ * the gauge's new absolute value (`newBalance` — the server derives the
+ * delta, so the bar still moves; a wrong-way delta is allowed and moves
+ * the gauge back).
  *
  * Applies the gauge move + a manual BossLog + the defeat check inside ONE
  * transaction via the shared helper. Responds BossHitResponse: the updated
@@ -301,10 +307,9 @@ router.post('/:id/hit', asyncHandler(async (req: AuthRequest, res) => {
 
   let amount: number;
   if (data.newBalance !== undefined) {
-    if (existing.direction !== 'grind_down') {
-      throw new AppError('newBalance only applies to grind-down bosses', 400);
-    }
-    amount = existing.currentValue - data.newBalance;
+    amount = existing.direction === 'grind_down'
+      ? existing.currentValue - data.newBalance   // payment = balance drop
+      : data.newBalance - existing.currentValue;  // contribution = pot growth
     if (amount === 0) throw new AppError('Balance unchanged — nothing to log', 400);
   } else {
     amount = data.amount!;
