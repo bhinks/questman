@@ -1,12 +1,17 @@
 import { Icon } from './Icon';
-import type { CategorySpending } from '../types';
+import type { CategorySpending, SpendingPeriod } from '../types';
 import { fmtMoney } from '../utils/formatters';
+import { usePeriodMode, framing } from '../lib/periodFraming';
 
 interface CategoryChartProps {
   categories: CategorySpending[];
   onCategoryClick: (category: string) => void;
   selectedCategory?: string | null;
   showAll?: boolean;
+  /** Analyzed span. When provided and the active framing is a rate, rows lead
+      with the per-period average and show the full-period total as a faint
+      secondary. Omit to show plain totals (e.g. legacy/standalone usage). */
+  period?: SpendingPeriod;
 }
 
 /* Positional neon palette — cycled per row (theme-reactive CSS vars). */
@@ -55,19 +60,32 @@ export function CategoryChart({
   onCategoryClick,
   selectedCategory,
   showAll = false,
+  period,
 }: CategoryChartProps) {
+  const { mode } = usePeriodMode();
+  const f = period ? framing(period, mode) : null;
   const displayCategories = showAll ? categories : categories.slice(0, 6);
   const maxCat = Math.max(...displayCategories.map(c => c.amount), 1);
+  // Reframe rows to a rate only when we have a span and the toggle isn't TOTAL.
+  const asRate = !!f && mode !== 'total';
 
   return (
     <div className="panel" style={{ padding: 20 }}>
-      <div style={{ display: 'flex', marginBottom: 16 }}>
+      <div style={{ display: 'flex', marginBottom: 16, alignItems: 'baseline' }}>
         <span
           className="mono"
           style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
         >
           CATEGORY BREAKDOWN
         </span>
+        {asRate && (
+          <span
+            className="mono"
+            style={{ fontSize: 8.5, letterSpacing: '0.18em', color: 'var(--text-faint)', marginLeft: 8 }}
+          >
+            AVG {f!.unit}
+          </span>
+        )}
         <span style={{ flex: 1 }}></span>
         <span className="ncx-serial">{monthSerial()}</span>
       </div>
@@ -89,7 +107,7 @@ export function CategoryChart({
               }}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '18px 104px 1fr 60px',
+                gridTemplateColumns: '18px 104px 1fr 72px',
                 gap: 10,
                 alignItems: 'center',
                 cursor: 'pointer',
@@ -117,8 +135,18 @@ export function CategoryChart({
                 ></i>
                 <span className="seg-mask"></span>
               </div>
-              <span className="mono" style={{ fontSize: 11, textAlign: 'right' }}>
-                {fmtMoney(c.amount)}
+              <span
+                className="mono"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.25 }}
+              >
+                <span style={{ fontSize: 11 }}>
+                  {fmtMoney(asRate ? f!.rate(c.amount) : c.amount)}
+                </span>
+                {asRate && (
+                  <span style={{ fontSize: 8.5, color: 'var(--text-faint)' }}>
+                    {fmtMoney(c.amount)} TOT
+                  </span>
+                )}
               </span>
             </div>
           );

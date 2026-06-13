@@ -1,5 +1,6 @@
 import type { SpendingAnalysis } from '../types';
 import { fmtMoney } from '../utils/formatters';
+import { usePeriodMode, framing } from '../lib/periodFraming';
 
 interface OverviewCardsProps {
   analysis: SpendingAnalysis;
@@ -33,14 +34,27 @@ function normalize(values: number[]): number[] | null {
 }
 
 export function OverviewCards({ analysis }: OverviewCardsProps) {
+  // Framing comes from the shared PeriodBar toggle (defaults to monthly), so
+  // these cards stay in lockstep with the rest of the finance views.
+  const { mode } = usePeriodMode();
+  const { rate, unit } = framing(analysis.period, mode);
+  const months = analysis.period.months;
+
   // SpendingAnalysis carries no income/net time series — the only real series
   // on it is the per-category spend distribution, which drives the BURN spark.
-  // Metrics without a derivable series fall back to a mono sub-caption
-  // (the mock does the same for RECLAIMABLE).
+  // Metrics without a derivable series fall back to a mono sub-caption.
   const burnSpark = normalize(analysis.topCategories.map(c => c.amount));
   const savingsRate = analysis.totalIncome > 0
     ? Math.round((analysis.netAmount / analysis.totalIncome) * 100)
     : null;
+  const wastePct = analysis.wastefulSpending.percentage;
+
+  // Reciprocal context line: when showing a rate, surface the full-period total;
+  // when showing the total, surface the monthly rate. Always one extra anchor.
+  const reciprocal = (total: number) =>
+    mode === 'total'
+      ? `~${fmtMoney(total / months)} / MO`
+      : `TOTAL ${fmtMoney(total)}`;
 
   const metrics: Array<{
     k: string;
@@ -52,29 +66,29 @@ export function OverviewCards({ analysis }: OverviewCardsProps) {
   }> = [
     {
       k: 'NET BALANCE',
-      v: analysis.netAmount,
+      v: rate(analysis.netAmount),
       c: 'var(--cyan)',
       focal: true,
       sub: savingsRate !== null ? `SAVINGS RATE ${savingsRate}%` : 'INCOME - BURN',
     },
     {
       k: 'INCOME',
-      v: analysis.totalIncome,
+      v: rate(analysis.totalIncome),
       c: 'var(--lime)',
-      sub: 'TOTAL CREDITS // PERIOD',
+      sub: reciprocal(analysis.totalIncome),
     },
     {
       k: 'BURN',
-      v: analysis.totalSpent,
+      v: rate(analysis.totalSpent),
       c: 'var(--red)',
       spark: burnSpark,
-      sub: `AVG MONTHLY ${fmtMoney(analysis.avgMonthly)}`,
+      sub: reciprocal(analysis.totalSpent),
     },
     {
       k: 'RECLAIMABLE',
-      v: analysis.wastefulSpending.total,
+      v: rate(analysis.wastefulSpending.total),
       c: 'var(--amber)',
-      sub: `${analysis.wastefulSpending.patterns.length} WASTEFUL PATTERNS FLAGGED`,
+      sub: `${analysis.wastefulSpending.patterns.length} PATTERNS · ${(wastePct > 0 ? wastePct : 0).toFixed(0)}% OF SPEND`,
     },
   ];
 
@@ -89,7 +103,22 @@ export function OverviewCards({ analysis }: OverviewCardsProps) {
           className={'panel' + (m.focal ? ' hud' : '')}
           style={{ padding: '16px 18px' }}
         >
-          <div className="kicker" style={{ fontSize: 9.5, marginBottom: 8 }}>{m.k}</div>
+          <div
+            className="kicker"
+            style={{
+              fontSize: 9.5,
+              marginBottom: 8,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              gap: 6,
+            }}
+          >
+            <span>{m.k}</span>
+            <span style={{ color: 'var(--text-faint)', fontSize: 8.5, letterSpacing: '0.12em' }}>
+              {unit}
+            </span>
+          </div>
           <div
             className="ncx-val"
             style={{

@@ -28,21 +28,22 @@ export function analyzeSpending(transactions: Transaction[], filters?: FilterOpt
   const netAmount = totalIncome - totalSpent;
   
   const dateRange = getDateRange(filteredTransactions);
-  const days = differenceInDays(dateRange.end, dateRange.start) || 1;
-  
+  const days = Math.max(1, differenceInDays(dateRange.end, dateRange.start));
+  const weeks = Math.max(1, days / 7);
+
   // Calculate actual months between start and end dates
   const startMonth = dateRange.start.getFullYear() * 12 + dateRange.start.getMonth();
   const endMonth = dateRange.end.getFullYear() * 12 + dateRange.end.getMonth();
   const actualMonths = Math.max(1, endMonth - startMonth + 1); // At least 1 month
-  
+
   const avgDaily = totalSpent / days;
   const avgWeekly = avgDaily * 7;
   const avgMonthly = totalSpent / actualMonths; // Use actual number of months
-  
+
   const topCategories = calculateCategorySpending(expenses);
   const topVendors = calculateVendorSpending(expenses);
   const wastefulSpending = analyzeWastefulSpending(expenses);
-  
+
   return {
     totalSpent,
     totalIncome,
@@ -52,7 +53,15 @@ export function analyzeSpending(transactions: Transaction[], filters?: FilterOpt
     avgMonthly,
     topCategories,
     topVendors,
-    wastefulSpending
+    wastefulSpending,
+    period: {
+      start: dateRange.start,
+      end: dateRange.end,
+      days,
+      weeks,
+      months: actualMonths,
+      transactionCount: filteredTransactions.length,
+    },
   };
 }
 

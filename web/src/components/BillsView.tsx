@@ -52,6 +52,7 @@ export function BillsView() {
   // Candidates dismissed locally this session (keyed by candidate.key).
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [showCancelled, setShowCancelled] = useState(false);
+  const [showAllDetected, setShowAllDetected] = useState(false);
   const [editing, setEditing] = useState<RecurringExpense | null>(null);
 
   const listQ = useQuery({
@@ -88,54 +89,55 @@ export function BillsView() {
   const cats = catsQ.data ?? [];
 
   const candidates = (detectQ.data?.candidates ?? []).filter(c => !dismissed.has(c.key));
+  const detectedSubCount = candidates.filter(c => c.isSubscription).length;
+  const DETECTED_CAP = 4;
+  const shownCandidates = showAllDetected ? candidates : candidates.slice(0, DETECTED_CAP);
 
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <Header monthlyTotal={monthlyTotal} activeCount={active.length} />
 
-      {!adding ? (
-        <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setAdding(true)}>
-          <Icon name="plus" size={14} /> ADD BILL
-        </button>
-      ) : (
-        <BillForm
-          categories={cats}
-          onClose={() => setAdding(false)}
-          onDone={invalidateAll}
-        />
-      )}
-
-      {editing && (
-        <BillForm
-          key={editing.id}
-          existing={editing}
-          categories={cats}
-          onClose={() => setEditing(null)}
-          onDone={invalidateAll}
-        />
-      )}
-
-      {/* 2 — DETECTED, confirm to track */}
-      {candidates.length > 0 && (
-        <DetectedSection
-          candidates={candidates}
-          onDismiss={(key) => setDismissed(prev => new Set(prev).add(key))}
-          onTracked={invalidateAll}
-        />
-      )}
-
-      {/* 3 — TRACKED BILLS */}
+      {/* 1 — TRACKED BILLS (the user's managed list — keep it on top) */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <SectionLabel
-          icon="repeat"
-          color="var(--magenta)"
-          title="LEECH PROCESSES"
-          sub="active recurring drains"
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <SectionLabel
+            icon="repeat"
+            color="var(--magenta)"
+            title="TRACKED BILLS"
+            sub="the recurring charges you're watching"
+          />
+          {!adding && (
+            <button
+              className="btn"
+              style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: 11 }}
+              onClick={() => setAdding(true)}
+            >
+              <Icon name="plus" size={14} /> ADD BILL
+            </button>
+          )}
+        </div>
+
+        {adding && (
+          <BillForm
+            categories={cats}
+            onClose={() => setAdding(false)}
+            onDone={invalidateAll}
+          />
+        )}
+        {editing && (
+          <BillForm
+            key={editing.id}
+            existing={editing}
+            categories={cats}
+            onClose={() => setEditing(null)}
+            onDone={invalidateAll}
+          />
+        )}
+
         {active.length === 0 ? (
           <Splash>
-            No leeches tracked. Confirm a detected charge above or add a bill manually —
-            recurring drains quietly siphon eddies every cycle.
+            No bills tracked yet. Add one with <b>ADD BILL</b>, or confirm a detected
+            charge below — tracked bills show their next due date and monthly cost here.
           </Splash>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -161,7 +163,7 @@ export function BillsView() {
               }}
             >
               <Icon name={showCancelled ? 'arrowUp' : 'arrowDn'} size={12} />
-              {showCancelled ? 'HIDE' : 'SHOW'} KILLED · {cancelled.length}
+              {showCancelled ? 'HIDE' : 'SHOW'} CANCELLED · {cancelled.length}
             </button>
             {showCancelled && cancelled.map(bill => (
               <BillCard
@@ -176,11 +178,25 @@ export function BillsView() {
         )}
       </section>
 
-      {/* 4 — SUBSCRIPTION AUDIT */}
+      {/* 2 — DETECTED suggestions (secondary, capped so it can't bury the page) */}
+      {candidates.length > 0 && (
+        <DetectedSection
+          candidates={shownCandidates}
+          totalCount={candidates.length}
+          cap={DETECTED_CAP}
+          showingAll={showAllDetected}
+          onToggleShowAll={() => setShowAllDetected(v => !v)}
+          onDismiss={(key) => setDismissed(prev => new Set(prev).add(key))}
+          onTracked={invalidateAll}
+        />
+      )}
+
+      {/* 3 — SUBSCRIPTION AUDIT */}
       <AuditSection
         audit={auditQ.data}
         loading={auditQ.isLoading}
         error={auditQ.isError}
+        detectedSubCount={detectedSubCount}
         onChanged={invalidateAll}
       />
     </div>
@@ -200,8 +216,12 @@ function Header({ monthlyTotal, activeCount }: { monthlyTotal: number; activeCou
         <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
           LEECH PROCESSES
         </h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
-          recurring drains siphoning your eddies · {activeCount} active
+        <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3, maxWidth: 420, lineHeight: 1.5 }}>
+          Track recurring bills &amp; subscriptions, see what they cost, and cancel
+          what you don&rsquo;t need.
+        </div>
+        <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 4, letterSpacing: '0.08em' }}>
+          {activeCount} ACTIVE
         </div>
       </div>
       <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
@@ -219,9 +239,13 @@ function Header({ monthlyTotal, activeCount }: { monthlyTotal: number; activeCou
 /* --------------------------------------------------------------- detected -- */
 
 function DetectedSection({
-  candidates, onDismiss, onTracked,
+  candidates, totalCount, cap, showingAll, onToggleShowAll, onDismiss, onTracked,
 }: {
   candidates: RecurringCandidate[];
+  totalCount: number;
+  cap: number;
+  showingAll: boolean;
+  onToggleShowAll: () => void;
   onDismiss: (key: string) => void;
   onTracked: () => void;
 }) {
@@ -237,16 +261,32 @@ function DetectedSection({
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Icon name="search" size={16} style={{ color: 'var(--amber)' }} />
-        <span className="kicker" style={{ color: 'var(--amber)' }}>DETECTED — CONFIRM TO TRACK</span>
+        <span className="kicker" style={{ color: 'var(--amber)' }}>DETECTED CHARGES — REVIEW</span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
-          · {candidates.length} suspected leech{candidates.length === 1 ? '' : 'es'} in your transactions
+          · {totalCount} recurring charge{totalCount === 1 ? '' : 's'} found in your transactions
         </span>
       </div>
+      <p className="mono" style={{ margin: 0, fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.55 }}>
+        These look like recurring charges in your history.{' '}
+        <b style={{ color: 'var(--text)' }}>Track</b> the ones you want to watch — they&rsquo;ll
+        move up to your bills (and the subscription audit). <b style={{ color: 'var(--text)' }}>Dismiss</b>{' '}
+        the rest; that only hides the suggestion and never touches your transactions.
+      </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {candidates.map(c => (
           <CandidateCard key={c.key} candidate={c} onDismiss={() => onDismiss(c.key)} onTracked={onTracked} />
         ))}
       </div>
+      {totalCount > cap && (
+        <button
+          className="btn btn-ghost"
+          onClick={onToggleShowAll}
+          style={{ alignSelf: 'center', padding: '5px 12px', fontSize: 11, color: 'var(--amber)' }}
+        >
+          <Icon name={showingAll ? 'arrowUp' : 'arrowDn'} size={12} />
+          {showingAll ? 'SHOW FEWER' : `SHOW ALL ${totalCount}`}
+        </button>
+      )}
     </section>
   );
 }
@@ -303,6 +343,7 @@ function CandidateCard({
           className="btn btn-primary"
           disabled={track.isPending}
           onClick={() => track.mutate()}
+          title="Add this to your tracked bills"
           style={{ padding: '7px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}
         >
           <Icon name="check" size={13} /> {track.isPending ? 'TRACKING…' : 'TRACK'}
@@ -311,11 +352,11 @@ function CandidateCard({
           className="btn btn-ghost"
           disabled={track.isPending}
           onClick={onDismiss}
-          title="Not a recurring drain — hide it"
+          title="Hide this suggestion — your transactions are untouched"
           aria-label={`Dismiss ${candidate.name}`}
-          style={{ padding: '7px 9px', fontSize: 11, color: 'var(--text-faint)' }}
+          style={{ padding: '7px 12px', fontSize: 11, color: 'var(--text-faint)' }}
         >
-          <Icon name="close" size={14} />
+          <Icon name="close" size={13} /> DISMISS
         </button>
       </div>
       {track.isError && (
@@ -411,7 +452,7 @@ function BillCard({
           )}
           {inactive && (
             <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.06em' }}>
-              KILLED
+              CANCELLED
             </span>
           )}
         </div>
@@ -481,11 +522,12 @@ function BillCard({
 /* ------------------------------------------------------------------ audit -- */
 
 function AuditSection({
-  audit, loading, error, onChanged,
+  audit, loading, error, detectedSubCount, onChanged,
 }: {
   audit: SubscriptionAudit | undefined;
   loading: boolean;
   error: boolean;
+  detectedSubCount: number;
   onChanged: () => void;
 }) {
   const subs = audit?.subscriptions ?? [];
@@ -495,8 +537,8 @@ function AuditSection({
       <SectionLabel
         icon="bolt"
         color="var(--red)"
-        title="KILL RUNNING PROCESSES"
-        sub="subscription audit · keep or cancel"
+        title="SUBSCRIPTION AUDIT"
+        sub="keep or cancel what's running"
       />
 
       {loading ? (
@@ -504,7 +546,19 @@ function AuditSection({
       ) : error ? (
         <Splash color="var(--red)">AUDIT UNREACHABLE</Splash>
       ) : subs.length === 0 ? (
-        <Splash>No active subscriptions. Nothing running in the background.</Splash>
+        // The audit only lists TRACKED subscriptions. If detection flagged some
+        // that aren't tracked yet, the empty audit looks broken — so point the
+        // user back up to the Track action rather than just saying "nothing here".
+        detectedSubCount > 0 ? (
+          <Splash color="var(--amber)">
+            {detectedSubCount} detected charge{detectedSubCount === 1 ? '' : 's'} look like
+            subscription{detectedSubCount === 1 ? '' : 's'}, but the audit only covers bills
+            you&rsquo;ve tracked. Hit <b>TRACK</b> on them in <b>DETECTED CHARGES</b> above to
+            audit and cancel them here.
+          </Splash>
+        ) : (
+          <Splash>No tracked subscriptions yet. Mark a bill as a subscription (or track a detected one) to audit it here.</Splash>
+        )
       ) : (
         <>
           <div

@@ -1,6 +1,7 @@
 import { Icon } from './Icon';
 import { fmtMoney } from '../utils/formatters';
 import type { SpendingAnalysis } from '../types';
+import { usePeriodMode, framing, type Framing } from '../lib/periodFraming';
 
 interface SavingsMissionsProps {
   analysis: SpendingAnalysis;
@@ -53,7 +54,7 @@ function ProgressRing({ progress }: { progress: number }) {
   );
 }
 
-function MissionCard({ mission }: { mission: Mission }) {
+function MissionCard({ mission, f }: { mission: Mission; f: Framing }) {
   const isCompleted = mission.progress >= 100;
   
   return (
@@ -132,15 +133,21 @@ function MissionCard({ mission }: { mission: Mission }) {
             <div className="kicker" style={{ color: 'var(--text-faint)' }}>
               {mission.category.toUpperCase()}
             </div>
-            <div 
-              style={{ 
-                fontSize: 14, 
-                fontWeight: 600, 
-                color: 'var(--lime)' 
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--lime)',
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 4,
               }}
               className="mono"
             >
-              +{fmtMoney(mission.potential)}
+              +{fmtMoney(f.rate(mission.potential))}
+              <span style={{ fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                {f.unit}
+              </span>
             </div>
           </div>
         </div>
@@ -168,7 +175,12 @@ function MissionCard({ mission }: { mission: Mission }) {
 }
 
 export function SavingsMissions({ analysis }: SavingsMissionsProps) {
-  // Convert wasteful spending into gamified missions
+  const { mode } = usePeriodMode();
+  const f = framing(analysis.period, mode);
+
+  // Convert wasteful spending into gamified missions. Potentials stay as
+  // full-period totals internally (so the >$20 filter is span-stable); the
+  // active framing only rescales them at display time.
   const totalWasteful = analysis.wastefulSpending.total;
   const missions: Mission[] = [
     {
@@ -267,9 +279,14 @@ export function SavingsMissions({ analysis }: SavingsMissionsProps) {
           gap: 20 
         }}>
           <div className="panel-inset" style={{ padding: 16, textAlign: 'center' }}>
-            <div className="kicker" style={{ marginBottom: 8 }}>TOTAL POTENTIAL</div>
+            <div className="kicker" style={{ marginBottom: 8 }}>
+              POTENTIAL {mode === 'total' ? '' : f.unit}
+            </div>
             <div className="ncx-val" style={{ fontSize: 26, color: 'var(--lime)' }}>
-              {fmtMoney(totalPotential)}
+              {fmtMoney(f.rate(totalPotential))}
+            </div>
+            <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 6, letterSpacing: '0.1em' }}>
+              ~{fmtMoney(f.perYear(totalPotential))} / YR
             </div>
           </div>
 
@@ -302,7 +319,7 @@ export function SavingsMissions({ analysis }: SavingsMissionsProps) {
             <span className="ncx-serial">// {missions.length} ACTIVE</span>
           </div>
           {missions.map(mission => (
-            <MissionCard key={mission.id} mission={mission} />
+            <MissionCard key={mission.id} mission={mission} f={f} />
           ))}
         </div>
       ) : (

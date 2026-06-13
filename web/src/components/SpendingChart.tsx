@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { fmtMoney } from '../utils/formatters';
 
 interface SpendingChartProps {
   monthlyData: Array<{ month: string; spending: number; income: number; net: number }>;
@@ -21,6 +22,11 @@ export function SpendingChart({ monthlyData }: SpendingChartProps) {
   const lastIdx = data.length - 1;
   const step = data.length > 1 ? 480 / (data.length - 1) : 0;
 
+  // Average monthly burn across the visible window — the reference line the
+  // bars/line are measured against, so a "big month" reads as big vs. typical.
+  const avg = data.length > 0 ? data.reduce((s, d) => s + d.spending, 0) / data.length : 0;
+  const avgY = 118 - Math.min(100, (avg / maxMon) * 100); // line-chart y for the avg
+
   return (
     <div className="ncx-ticks">
       <span className="tick" style={{ top: -4, left: -4 }}></span>
@@ -33,6 +39,14 @@ export function SpendingChart({ monthlyData }: SpendingChartProps) {
           >
             MONTHLY BURN — 12 MO
           </span>
+          {avg > 0 && (
+            <span
+              className="mono"
+              style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-faint)' }}
+            >
+              AVG {fmtMoney(avg)} / MO
+            </span>
+          )}
           <span style={{ flex: 1 }}></span>
           <button
             key={'bar-' + (chart === 'bar')}
@@ -106,6 +120,18 @@ export function SpendingChart({ monthlyData }: SpendingChartProps) {
               {[0.25, 0.5, 0.75].map(g => (
                 <line key={g} x1="0" x2="480" y1={122 * g} y2={122 * g} stroke="var(--line)" strokeWidth="1" />
               ))}
+              {avg > 0 && (
+                <line
+                  x1="0"
+                  x2="480"
+                  y1={avgY}
+                  y2={avgY}
+                  stroke="var(--amber)"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                  opacity="0.7"
+                />
+              )}
               <polyline
                 points={data.map((d, i) => `${i * step},${118 - (d.spending / maxMon) * 100}`).join(' ')}
                 fill="none"

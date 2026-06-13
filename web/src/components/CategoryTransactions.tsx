@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import type { Transaction } from '../types';
+import type { Transaction, SpendingPeriod } from '../types';
 import { Icon } from './Icon';
+import { fmtMoney } from '../utils/formatters';
+import { usePeriodMode, framing } from '../lib/periodFraming';
 
 interface CategoryTransactionsProps {
   category: string;
   transactions: Transaction[];
   onClose: () => void;
+  /** Analyzed span — adds a per-period average to the header when set. */
+  period?: SpendingPeriod;
 }
 
 type GroupBy = 'none' | 'date' | 'vendor';
@@ -25,8 +29,11 @@ interface TxGroup {
  * Mirrors the category breakdown's basis (expenses only) so the totals
  * here reconcile with the chart slice the user clicked.
  */
-export function CategoryTransactions({ category, transactions, onClose }: CategoryTransactionsProps) {
+export function CategoryTransactions({ category, transactions, onClose, period }: CategoryTransactionsProps) {
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  const { mode } = usePeriodMode();
+  const f = period ? framing(period, mode) : null;
+  const asRate = !!f && mode !== 'total';
 
   const items = useMemo(
     () =>
@@ -104,6 +111,11 @@ export function CategoryTransactions({ category, transactions, onClose }: Catego
             <span className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
               ${total.toLocaleString()}
             </span>
+            {asRate && (
+              <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+                · ~{fmtMoney(f!.rate(total))} {f!.unit}
+              </span>
+            )}
           </div>
         </div>
 

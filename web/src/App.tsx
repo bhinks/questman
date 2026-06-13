@@ -7,6 +7,7 @@ import { api } from './lib/api';
 import type { ApiTransaction, TransactionListResponse, ImportPreviewResponse, ImportResultResponse, PlayerResponse } from './lib/api';
 import { AppShell } from './components/AppShell';
 import { OverviewCards } from './components/OverviewCards';
+import { PeriodFramingProvider, PeriodBar } from './components/PeriodFraming';
 import { SavingsMissions } from './components/SavingsMissions';
 import { CategoryChart } from './components/CategoryChart';
 import { CategoryTransactions } from './components/CategoryTransactions';
@@ -401,16 +402,17 @@ function HubApp() {
       case 'overview':
         return (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            <PeriodBar period={analysis.period} />
             <OverviewCards analysis={analysis} />
-            
+
             {/* Spending trends chart */}
             {chartData.monthly.length > 0 && (
-              <SpendingChart 
+              <SpendingChart
                 monthlyData={chartData.monthly}
                 dailyData={chartData.daily}
               />
             )}
-            
+
             {/* Category breakdown chart */}
             {analysis.topCategories.length > 0 && (
               <CategoryChart
@@ -418,6 +420,7 @@ function HubApp() {
                 onCategoryClick={setSelectedCategory}
                 selectedCategory={selectedCategory}
                 showAll={false}
+                period={analysis.period}
               />
             )}
 
@@ -427,6 +430,7 @@ function HubApp() {
                 category={selectedCategory}
                 transactions={includedTransactions}
                 onClose={() => setSelectedCategory(null)}
+                period={analysis.period}
               />
             )}
           </div>
@@ -435,12 +439,14 @@ function HubApp() {
       case 'categories':
         return (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            <PeriodBar period={analysis.period} />
             {analysis.topCategories.length > 0 ? (
               <CategoryChart
                 categories={analysis.topCategories}
                 onCategoryClick={setSelectedCategory}
                 selectedCategory={selectedCategory}
                 showAll={true}
+                period={analysis.period}
               />
             ) : (
               <div className="panel hud" style={{ padding: 60, textAlign: 'center', color: 'var(--text-faint)' }}>
@@ -454,6 +460,7 @@ function HubApp() {
                 category={selectedCategory}
                 transactions={includedTransactions}
                 onClose={() => setSelectedCategory(null)}
+                period={analysis.period}
               />
             )}
           </div>
@@ -461,7 +468,8 @@ function HubApp() {
 
       case 'savings':
         return (
-          <div className="fade-up">
+          <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            <PeriodBar period={analysis.period} />
             <SavingsMissions analysis={analysis} />
           </div>
         );
@@ -493,6 +501,7 @@ function HubApp() {
   }
 
   return (
+    <PeriodFramingProvider>
     <AppShell
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -586,6 +595,7 @@ function HubApp() {
         />
       )}
     </AppShell>
+    </PeriodFramingProvider>
   );
 }
 

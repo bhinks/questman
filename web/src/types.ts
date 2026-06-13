@@ -36,6 +36,18 @@ export interface SpendingAnalysis {
   topCategories: CategorySpending[];
   topVendors: VendorSpending[];
   wastefulSpending: WastefulSpending;
+  // Time context for the analyzed set: lets the UI label what span the
+  // totals cover and re-express them as monthly / weekly rates.
+  period: SpendingPeriod;
+}
+
+export interface SpendingPeriod {
+  start: Date;
+  end: Date;
+  days: number;   // calendar days spanned (>= 1)
+  weeks: number;  // days / 7 (>= 1)
+  months: number; // inclusive calendar-month span (>= 1)
+  transactionCount: number;
 }
 
 export interface CategorySpending {
