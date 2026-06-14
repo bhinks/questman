@@ -25,6 +25,12 @@ import { Icon } from './Icon';
 interface TransactionsViewProps {
   transactions: Transaction[];
   onEdit: (t: Transaction) => void;
+  /** Drill filters driven by the Finance charts above (click a month / a
+   *  category). Both optional so the log still works standalone. */
+  monthFilter?: string | null;     // "YYYY-MM"
+  categoryFilter?: string | null;  // category name
+  onClearMonth?: () => void;
+  onClearCategory?: () => void;
 }
 
 /** Cap rendered rows for perf — the log can run to thousands of records. */
@@ -32,11 +38,15 @@ const RENDER_CAP = 200;
 
 type BulkOp = 'exclude' | 'include' | 'delete' | 'categorize';
 
-export function TransactionsView({ transactions, onEdit }: TransactionsViewProps) {
+export function TransactionsView({
+  transactions, onEdit, monthFilter, categoryFilter, onClearMonth, onClearCategory,
+}: TransactionsViewProps) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // ACCOUNT filter — '' means all accounts.
   const [accountFilter, setAccountFilter] = useState('');
+  // Free-text description/vendor search — '' means no text filter.
+  const [search, setSearch] = useState('');
 
   // Categories for the bulk RECATEGORIZE picker (shared cache).
   const catsQ = useQuery({
@@ -53,12 +63,21 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
   });
   const accounts = accountsQ.data ?? [];
 
-  // The component receives transactions as props — the ACCOUNT filter is
-  // applied client-side; count chips reflect the filtered set.
-  const filtered = useMemo(
-    () => (accountFilter ? transactions.filter(t => t.account === accountFilter) : transactions),
-    [transactions, accountFilter],
-  );
+  // The component receives the full list as props — every filter (account,
+  // the chart-driven month + category, and the text search) is applied
+  // client-side here; the count chips reflect the filtered set.
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return transactions.filter(t => {
+      if (accountFilter && t.account !== accountFilter) return false;
+      if (monthFilter && monthKey(t.date) !== monthFilter) return false;
+      if (categoryFilter && (t.category || 'Uncategorized') !== categoryFilter) return false;
+      if (q && !`${t.description ?? ''} ${t.vendor ?? ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [transactions, accountFilter, monthFilter, categoryFilter, search]);
+
+  const anyFilter = !!(accountFilter || monthFilter || categoryFilter || search.trim());
 
   const total = filtered.length;
   const excludedCount = useMemo(
@@ -123,22 +142,33 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
     bulk.mutate({ operation, data });
   };
 
+  const filterProps = {
+    search, onSearch: setSearch,
+    monthFilter: monthFilter ?? null,
+    categoryFilter: categoryFilter ?? null,
+    onClearMonth, onClearCategory,
+  };
+
   if (transactions.length === 0) {
     return (
       <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-        <Header total={0} excluded={0} accounts={[]} account="" onAccount={setAccountFilter} />
+        <Header total={0} excluded={0} accounts={[]} account="" onAccount={setAccountFilter} {...filterProps} />
         <Empty>NO TRANSACTIONS LOADED — import a statement to populate the log.</Empty>
       </div>
     );
   }
 
-  // Data exists but the account filter matched nothing — keep the filter
-  // visible so it can be switched back.
+  // Data exists but the active filters matched nothing — keep them visible
+  // (with clear affordances) so the log can be opened back up.
   if (total === 0) {
     return (
       <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-        <Header total={0} excluded={0} accounts={accounts} account={accountFilter} onAccount={setAccountFilter} />
-        <Empty>NO RECORDS ON THIS ACCOUNT — switch the filter to see the rest of the log.</Empty>
+        <Header total={0} excluded={0} accounts={accounts} account={accountFilter} onAccount={setAccountFilter} {...filterProps} />
+        <Empty>
+          {anyFilter
+            ? 'NO RECORDS MATCH THESE FILTERS — adjust or clear them to see the rest of the log.'
+            : 'NO RECORDS IN THE LOG.'}
+        </Empty>
       </div>
     );
   }
@@ -151,6 +181,7 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
         accounts={accounts}
         account={accountFilter}
         onAccount={setAccountFilter}
+        {...filterProps}
       />
 
       <BulkBar
@@ -221,56 +252,124 @@ export function TransactionsView({ transactions, onEdit }: TransactionsViewProps
 
 function Header({
   total, excluded, accounts, account, onAccount,
+  search, onSearch, monthFilter, categoryFilter, onClearMonth, onClearCategory,
 }: {
   total: number;
   excluded: number;
   accounts: string[];
   account: string;
   onAccount: (account: string) => void;
+  search: string;
+  onSearch: (q: string) => void;
+  monthFilter: string | null;
+  categoryFilter: string | null;
+  onClearMonth?: () => void;
+  onClearCategory?: () => void;
 }) {
+  const hasChips = !!(monthFilter || categoryFilter);
   return (
-    <div className="panel hud" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
-        <Icon name="list" size={18} />
-      </div>
-      <div>
-        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
-          TRANSACTION LOG
-        </h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
-          every movement on the ledger · select to bulk-mark transfers
+    <div className="panel hud" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className="ncx-chip" style={{ color: 'var(--cyan)' }}>
+          <Icon name="list" size={18} />
+        </div>
+        <div>
+          <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
+            TRANSACTION LOG
+          </h2>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+            every movement on the ledger · filter by month, category, account or text
+          </div>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Icon name="search" size={12} style={{ position: 'absolute', left: 9, color: 'var(--text-faint)', pointerEvents: 'none' }} />
+            <input
+              value={search}
+              onChange={e => onSearch(e.target.value)}
+              placeholder="FIND DESCRIPTION…"
+              title="Filter by description or vendor text"
+              style={{
+                padding: '7px 26px 7px 26px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.05em', width: 180,
+                background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)', outline: 'none',
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => onSearch('')}
+                title="Clear search"
+                style={{ position: 'absolute', right: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: 2, lineHeight: 1 }}
+              >
+                <Icon name="close" size={11} />
+              </button>
+            )}
+          </div>
+          {accounts.length > 0 && (
+            <select
+              value={account}
+              onChange={e => onAccount(e.target.value)}
+              title="Filter the log by source account"
+              style={{
+                padding: '7px 10px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.05em',
+                background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)',
+              }}
+            >
+              <option value="">ALL ACCOUNTS</option>
+              {accounts.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          )}
+          <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>
+            {total.toLocaleString()} RECORDS
+          </span>
+          {excluded > 0 && (
+            <span
+              className="ncx-stamp flat"
+              title="Excluded from all totals (transfers, refunds, etc.)"
+              style={{ color: 'var(--text-faint)' }}
+            >
+              {excluded.toLocaleString()} EXCLUDED
+            </span>
+          )}
         </div>
       </div>
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-        {accounts.length > 0 && (
-          <select
-            value={account}
-            onChange={e => onAccount(e.target.value)}
-            title="Filter the log by source account"
-            style={{
-              padding: '7px 10px', fontSize: 11, fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.05em',
-              background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)',
-            }}
-          >
-            <option value="">ALL ACCOUNTS</option>
-            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        )}
-        <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>
-          {total.toLocaleString()} RECORDS
-        </span>
-        {excluded > 0 && (
-          <span
-            className="ncx-stamp flat"
-            title="Excluded from all totals (transfers, refunds, etc.)"
-            style={{ color: 'var(--text-faint)' }}
-          >
-            {excluded.toLocaleString()} EXCLUDED
-          </span>
-        )}
-      </div>
+
+      {hasChips && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.16em', color: 'var(--text-faint)' }}>FILTERED BY</span>
+          {monthFilter && <FilterChip label="MONTH" value={monthChipLabel(monthFilter)} onClear={onClearMonth} />}
+          {categoryFilter && <FilterChip label="CATEGORY" value={categoryFilter} onClear={onClearCategory} />}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** An active drill-filter pill (month / category) with a clear ✕. */
+function FilterChip({ label, value, onClear }: { label: string; value: string; onClear?: () => void }) {
+  return (
+    <span
+      className="mono"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10, letterSpacing: '0.06em',
+        padding: '4px 6px 4px 10px', color: 'var(--cyan)',
+        border: '1px solid color-mix(in srgb, var(--cyan) 40%, transparent)',
+        background: 'color-mix(in srgb, var(--cyan) 12%, transparent)',
+      }}
+    >
+      <span style={{ color: 'var(--text-faint)' }}>{label}</span>
+      {value}
+      {onClear && (
+        <button
+          onClick={onClear}
+          title={`Clear ${label.toLowerCase()} filter`}
+          style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cyan)', padding: 0, lineHeight: 1 }}
+        >
+          <Icon name="close" size={11} />
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -539,6 +638,20 @@ function fmtDate(d: Date): string {
   const dt = d instanceof Date ? d : new Date(d);
   if (Number.isNaN(dt.getTime())) return '—';
   return dt.toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' });
+}
+
+const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/** A transaction's bucket key "YYYY-MM" — matches the burn chart's buckets. */
+function monthKey(d: Date): string {
+  const dt = d instanceof Date ? d : new Date(d);
+  return dt.toISOString().substring(0, 7);
+}
+
+/** "YYYY-MM" → "MMM YYYY" for the active-filter chip. */
+function monthChipLabel(month: string): string {
+  const m = Number(month.slice(5, 7));
+  return `${MONTH_ABBR[m - 1] ?? month} ${month.slice(0, 4)}`;
 }
 
 /** "$1,234.56" / "-$12.00" — sign in front of the $ for negatives. */

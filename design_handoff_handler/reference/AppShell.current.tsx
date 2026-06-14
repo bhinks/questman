@@ -25,8 +25,6 @@ import type {
 } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
-import { FxLayer, useGlitchBurst } from './FxOverlays';
-import { PET_META, TITLE_META, type PetMeta } from '../lib/market';
 
 interface AppShellProps {
   activeTab: string;
@@ -40,17 +38,18 @@ interface AppShellProps {
 type NavItem = [id: string, label: string, icon: string];
 const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   { group: 'OPS', items: [
-    ['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'],
+    ['today', 'Today', 'target'], ['chains', 'Questlines', 'repeat'],
+    ['bosses', 'Bosses', 'flame'], ['ice', 'ICE', 'shield'],
   ]},
   { group: 'LIFE', items: [
     ['habits', 'Habits', 'check'], ['chores', 'Chores', 'list'],
-    ['ice', 'Anti-Goals', 'shield'], ['workouts', 'Workouts', 'spark'],
-    ['projects', 'Projects', 'grid'], ['media', 'Media', 'play'],
-    ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
+    ['workouts', 'Workouts', 'spark'], ['projects', 'Projects', 'grid'],
+    ['media', 'Media', 'play'], ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
   ]},
   { group: 'VAULT', items: [
-    ['overview', 'Finance', 'wallet'], ['budgets', 'Budgets', 'target'],
-    ['bills', 'Bills', 'clock'], ['savings', 'Savings', 'trend'],
+    ['overview', 'Finance', 'wallet'], ['categories', 'Categories', 'layers'],
+    ['budgets', 'Budgets', 'target'], ['bills', 'Bills', 'clock'],
+    ['savings', 'Savings', 'trend'], ['transactions', 'Transactions', 'list'],
   ]},
   { group: 'PROGRESSION', items: [
     ['progress', 'Progress', 'layers'], ['achievements', 'Street Cred', 'trophy'],
@@ -61,18 +60,15 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   ]},
 ];
 
-/** The four tabs pinned to the mobile bottom nav (everything else → MORE). */
-const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
-
 const SCREEN_TITLES: Record<string, string> = {
-  today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS',
-  ice: 'LIFE // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
+  today: 'TODAY // DAY PLAN', chains: 'OPS // QUESTLINES', bosses: 'OPS // BOSS FIGHTS',
+  ice: 'OPS // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
   workouts: 'LIFE // WORKOUTS', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
   vitals: 'LIFE // BIOMONITOR', social: 'LIFE // CREW',
   progress: 'PROGRESS // STREET CRED', achievements: 'PROGRESS // BADGE WALL',
   shop: 'SHOP // NIGHT MARKET', intel: 'NET // DATA-SHADOW', debrief: 'PROGRESS // DEBRIEF',
-  overview: 'VAULT // FINANCE', budgets: 'VAULT // BUDGETS',
-  bills: 'VAULT // BILLS', savings: 'VAULT // SAVINGS',
+  overview: 'VAULT // FINANCE', categories: 'VAULT // CATEGORIES', budgets: 'VAULT // BUDGETS',
+  bills: 'VAULT // BILLS', savings: 'VAULT // SAVINGS', transactions: 'VAULT // TRANSACTIONS',
   calibration: 'SYS // CALIBRATION',
 };
 
@@ -90,43 +86,10 @@ function Clock() {
   );
 }
 
-/**
- * PetWidget — the equipped data pet, living above the runner ID card
- * (Night Market v2 handoff). 32px emoji chip with a 2.6s bob (NULL also
- * flickers ~1 frame every 7s), name // SPECIES, and a rotating status
- * line (7s interval) ending in a blinking cursor. Emoji are allowed ONLY
- * inside gradient .ncx-chip containers (brand rule).
- */
-function PetWidget({ pet }: { pet: PetMeta }) {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setI(x => x + 1), 7000);
-    return () => clearInterval(id);
-  }, []);
-  const status = pet.status[i % pet.status.length];
-  return (
-    <div className="pet-card">
-      <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 32, height: 32, fontSize: 16 }}>
-        {pet.emoji}
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em' }}>
-          {pet.name} <span style={{ color: 'var(--text-ghost)' }}>// {pet.species}</span>
-        </div>
-        <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {status}<span className="cursor-blink" style={{ color: 'var(--cyan)' }}>_</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn }: AppShellProps) {
   const qc = useQueryClient();
   const { user, logout } = useAuth();
   const [uplink, setUplink] = useState(true);
-  // Mobile MORE sheet (polish pass §3a): full-deck glass overlay.
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const playerQ = useQuery({
     queryKey: ['player'],
@@ -168,15 +131,8 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
   const activeIce = (iceQ.data ?? []).filter(a => a.isActive).length;
   const topBoss = (bossQ.data ?? []).find(b => b.status === 'active');
 
-  // Night Market v2 gear on the shell: equipped title (runner ID), data pet
-  // (deck companion), stackable visual FX (+ the GLITCH PROTOCOL burst).
-  const equippedTitle = p?.equippedTitle ? TITLE_META[p.equippedTitle] ?? null : null;
-  const equippedPet = p?.equippedPet ? PET_META[p.equippedPet] ?? null : null;
-  const fxActive = p?.fxActive ?? [];
-  const burst = useGlitchBurst(fxActive);
-
   return (
-    <div className={'app-shell' + (burst ? ' fx-burst' : '')}>
+    <div className="app-shell">
       <div className="ncx-shell">
         {/* ---- DECK ---- */}
         <aside className="ncx-deck">
@@ -206,15 +162,13 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
               </div>
             ))}
           </nav>
-          {/* Data pet — the deck companion lives just above the ID card. */}
-          {equippedPet && <PetWidget pet={equippedPet} />}
-          {/* Runner ID card — an equipped vanity title replaces RUNNER-01. */}
+          {/* Runner ID card */}
           <div className="ncx-id">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>{p?.level ?? '—'}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {handle} <span style={{ color: equippedTitle ? 'var(--cyan)' : 'var(--text-ghost)' }}>// {equippedTitle ? equippedTitle.name : 'RUNNER-01'}</span>
+                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {handle} <span style={{ color: 'var(--text-ghost)' }}>// RUNNER-01</span>
                 </div>
                 <div className="ncx-bar slim" style={{ marginTop: 6 }}>
                   <i style={{ width: `${xpPct}%`, background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))' }} />
@@ -284,15 +238,14 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
                 }}
               />
               <Clock />
-              {/* Jack in from anywhere — demoted to a ghost icon (polish
-                  pass §1c): the glowing CTA lives on Today's chamber strip;
-                  global access survives without competing with it. */}
+              {/* JACK IN — start an arbitrary focus run from anywhere. */}
               <button
-                className="btn btn-ghost icon-btn"
+                className="btn btn-primary"
+                style={{ padding: '7px 14px', fontSize: 10.5 }}
                 onClick={onJackIn}
                 title="Jack in — open the focus chamber"
               >
-                <Icon name="zap" size={15} />
+                <Icon name="zap" size={12} /> JACK IN
               </button>
               <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
                 <Icon name="upload" size={15} />
@@ -319,62 +272,21 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
         <span>SKIPS ×{p?.skipTokens ?? 0}</span>
         <span>REROLL ×{p?.rerollTokens ?? 0}</span>
         {(p?.streakShields ?? 0) > 0 && <span style={{ color: 'var(--teal)' }}>SHIELD ×{p!.streakShields}</span>}
-        {fxActive.length > 0 && <span>FX ×{fxActive.length}</span>}
         <span className="ncx-serial">QTM//{String(streak).padStart(3, '0')}.076</span>
       </footer>
 
-      {/* Night Market v2 visual FX — stackable ambient overlays (z-30,
-          pointer-events none) + the GLITCH PROTOCOL burst veil. */}
-      <FxLayer fxActive={fxActive} />
-
-      {/* MORE sheet — glass overlay exposing the FULL deck on mobile
-          (polish pass §3a). Reuses NAV_GROUPS verbatim so the sheet can
-          never drift out of sync with the desktop deck. */}
-      {moreOpen && (
-        <>
-          <div className="qm-sheet-backdrop" onClick={() => setMoreOpen(false)} />
-          <div className="qm-sheet">
-            <div className="qm-sheet-handle" />
-            {NAV_GROUPS.map(g => (
-              <div key={g.group}>
-                <div className="ncx-deck-group">{g.group}<i /></div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, margin: '6px 0 12px' }}>
-                  {g.items.map(([id, label, icon]) => (
-                    <button
-                      key={id}
-                      className={'qm-sheet-cell' + (activeTab === id ? ' active' : '')}
-                      onClick={() => { onTabChange(id); setMoreOpen(false); }}
-                    >
-                      <Icon name={icon} size={18} />
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* MOBILE BOTTOM NAV — 4 pinned tabs + MORE (the full deck). */}
+      {/* MOBILE BOTTOM NAV (preserved from the previous shell) */}
       <nav className="bottom-nav">
         {([['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'], ['overview', 'Vault', 'wallet'], ['progress', 'Cred', 'layers']] as NavItem[]).map(([id, label, icon]) => (
           <button
             key={id}
-            onClick={() => { onTabChange(id); setMoreOpen(false); }}
-            className={`bn-item${activeTab === id && !moreOpen ? ' active' : ''}`}
+            onClick={() => onTabChange(id)}
+            className={`bn-item${activeTab === id ? ' active' : ''}`}
           >
             <Icon name={icon} size={20} />
             <span>{label}</span>
           </button>
         ))}
-        <button
-          onClick={() => setMoreOpen(o => !o)}
-          className={`bn-item${moreOpen || !PINNED_TABS.includes(activeTab) ? ' active' : ''}`}
-        >
-          <Icon name="grid" size={20} />
-          <span>More</span>
-        </button>
       </nav>
     </div>
   );

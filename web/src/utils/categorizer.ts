@@ -143,13 +143,3 @@ export function updateCategoryRule(rules: CategoryRule[], ruleId: string, update
 export function removeCategoryRule(rules: CategoryRule[], ruleId: string): CategoryRule[] {
   return rules.filter(rule => rule.id !== ruleId);
 }
-
-export function getUniqueCategories(transactions: Transaction[]): string[] {
-  const categories = new Set(transactions.map(t => t.category).filter((cat): cat is string => Boolean(cat)));
-  return Array.from(categories).sort();
-}
-
-export function getUniqueVendors(transactions: Transaction[]): string[] {
-  const vendors = new Set(transactions.map(t => t.vendor).filter((vendor): vendor is string => Boolean(vendor)));
-  return Array.from(vendors).sort();
-}

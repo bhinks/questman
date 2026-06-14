@@ -10,7 +10,6 @@ import { OverviewCards } from './components/OverviewCards';
 import { PeriodFramingProvider, PeriodBar } from './components/PeriodFraming';
 import { SavingsMissions } from './components/SavingsMissions';
 import { CategoryChart } from './components/CategoryChart';
-import { CategoryTransactions } from './components/CategoryTransactions';
 import { SpendingChart } from './components/SpendingChart';
 import { TransactionEditor } from './components/TransactionEditor';
 import { Icon } from './components/Icon';
@@ -85,6 +84,8 @@ function HubApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState('today');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // Finance drill: clicking a month in the burn chart filters the log below.
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // FOCUS CHAMBER (JACK IN): when open, FocusView replaces the whole shell
@@ -236,10 +237,10 @@ function HubApp() {
     [transactions]
   );
 
-  // Finance depth: excluded rows (transfers) drop out of the charts + category
-  // drill-downs. analyzeSpending already filters them internally; chartData and
-  // CategoryTransactions read the transaction list directly, so filter here too.
-  // The Transactions tab keeps the FULL list (it greys excluded rows in place).
+  // Finance depth: excluded rows (transfers) drop out of the charts.
+  // analyzeSpending already filters them internally; chartData reads the
+  // transaction list directly, so filter them out here too. (The transaction
+  // log below keeps the FULL list — it greys excluded rows in place.)
   const includedTransactions = useMemo(
     () => categorizedTransactions.filter(t => !t.excluded),
     [categorizedTransactions],
@@ -399,70 +400,46 @@ function HubApp() {
         return <BillsView />;
 
       // --- Existing finance tabs (still local-CSV mode for now) ---
+      // Finance is now the unified vault page: overview + burn chart + the full
+      // category breakdown + the transaction log, all cross-filtered. Clicking a
+      // month (burn chart) or a category drills the log below; a text search
+      // narrows it further. (Categories + Transactions are no longer separate.)
       case 'overview':
         return (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
             <PeriodBar period={analysis.period} />
             <OverviewCards analysis={analysis} />
 
-            {/* Spending trends chart */}
+            {/* Monthly burn — click a month to filter the log below */}
             {chartData.monthly.length > 0 && (
               <SpendingChart
                 monthlyData={chartData.monthly}
                 dailyData={chartData.daily}
+                selectedMonth={selectedMonth}
+                onSelectMonth={setSelectedMonth}
               />
             )}
 
-            {/* Category breakdown chart */}
+            {/* Full category breakdown — click a category to filter the log */}
             {analysis.topCategories.length > 0 && (
               <CategoryChart
                 categories={analysis.topCategories}
-                onCategoryClick={setSelectedCategory}
+                onCategoryClick={cat => setSelectedCategory(prev => (prev === cat ? null : cat))}
                 selectedCategory={selectedCategory}
-                showAll={false}
+                showAll
                 period={analysis.period}
               />
             )}
 
-            {/* Drill-down: transactions for the clicked category */}
-            {selectedCategory && (
-              <CategoryTransactions
-                category={selectedCategory}
-                transactions={includedTransactions}
-                onClose={() => setSelectedCategory(null)}
-                period={analysis.period}
-              />
-            )}
-          </div>
-        );
-
-      case 'categories':
-        return (
-          <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-            <PeriodBar period={analysis.period} />
-            {analysis.topCategories.length > 0 ? (
-              <CategoryChart
-                categories={analysis.topCategories}
-                onCategoryClick={setSelectedCategory}
-                selectedCategory={selectedCategory}
-                showAll={true}
-                period={analysis.period}
-              />
-            ) : (
-              <div className="panel hud" style={{ padding: 60, textAlign: 'center', color: 'var(--text-faint)' }}>
-                <div className="mono" style={{ fontSize: 13 }}>NO CATEGORY DATA AVAILABLE</div>
-              </div>
-            )}
-
-            {/* Drill-down: transactions for the clicked category */}
-            {selectedCategory && (
-              <CategoryTransactions
-                category={selectedCategory}
-                transactions={includedTransactions}
-                onClose={() => setSelectedCategory(null)}
-                period={analysis.period}
-              />
-            )}
+            {/* The transaction log, cross-filtered by the selections above + text */}
+            <TransactionsView
+              transactions={categorizedTransactions}
+              onEdit={handleEditTransaction}
+              monthFilter={selectedMonth}
+              categoryFilter={selectedCategory}
+              onClearMonth={() => setSelectedMonth(null)}
+              onClearCategory={() => setSelectedCategory(null)}
+            />
           </div>
         );
 
@@ -474,14 +451,6 @@ function HubApp() {
           </div>
         );
       
-      case 'transactions':
-        return (
-          <TransactionsView
-            transactions={categorizedTransactions}
-            onEdit={handleEditTransaction}
-          />
-        );
-
       case 'calibration':
         return <CalibrationView />;
 

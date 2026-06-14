@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Icon } from './Icon';
 import type { CategorySpending, SpendingPeriod } from '../types';
 import { fmtMoney } from '../utils/formatters';
@@ -64,7 +65,14 @@ export function CategoryChart({
 }: CategoryChartProps) {
   const { mode } = usePeriodMode();
   const f = period ? framing(period, mode) : null;
-  const displayCategories = showAll ? categories : categories.slice(0, 6);
+  // Collapsed shows the top 6; expanded shows every category. Defaults to the
+  // `showAll` prop, but the user can toggle inline (no separate page needed).
+  const [expanded, setExpanded] = useState(showAll);
+  const collapsedCount = 6;
+  const canToggle = categories.length > collapsedCount;
+  const displayCategories = expanded ? categories : categories.slice(0, collapsedCount);
+  // Scale bars against the widest visible category so the list reads clearly
+  // in either state.
   const maxCat = Math.max(...displayCategories.map(c => c.amount), 1);
   // Reframe rows to a rate only when we have a span and the toggle isn't TOTAL.
   const asRate = !!f && mode !== 'total';
@@ -87,6 +95,19 @@ export function CategoryChart({
           </span>
         )}
         <span style={{ flex: 1 }}></span>
+        {canToggle && (
+          <button
+            className="mono"
+            onClick={() => setExpanded(e => !e)}
+            title={expanded ? 'Show the top 6 only' : 'Show every category'}
+            style={{
+              cursor: 'pointer', fontSize: 9, letterSpacing: '0.12em', padding: '4px 9px', marginRight: 10,
+              border: '1px solid var(--line-2)', background: 'var(--panel-2)', color: 'var(--text-dim)',
+            }}
+          >
+            {expanded ? 'TOP 6' : `ALL ${categories.length}`}
+          </button>
+        )}
         <span className="ncx-serial">{monthSerial()}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

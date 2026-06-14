@@ -1,0 +1,1137 @@
+/* ============================================================
+   Questman — Cyberpunk Life Terminal
+   Design tokens + base styles
+   ============================================================ */
+
+:root {
+  /* ---- Surfaces ---- */
+  --bg:            #06060c;
+  --bg-2:          #090a12;
+  --panel:         #0d0e18;
+  --panel-2:       #11131f;
+  --panel-3:       #161827;
+  --panel-hi:      #1c1f30;
+
+  /* ---- Lines ---- */
+  --line:          rgba(150, 168, 224, 0.10);
+  --line-2:        rgba(150, 168, 224, 0.18);
+  --line-bright:   rgba(0, 229, 255, 0.30);
+
+  /* ---- Text ---- */
+  --text:          #e7e9f5;
+  --text-dim:      #969cba;
+  --text-faint:    #5a6080;
+  --text-ghost:    #383d54;
+
+  /* ---- Neon palette ---- */
+  --cyan:          #1ce2ff;
+  --cyan-deep:     #0a9bcf;
+  --magenta:       #ff2e9a;
+  --violet:        #9d6bff;
+  --lime:          #43ffa6;
+  --amber:         #ffc24b;
+  --red:           #ff4d6d;
+  --blue:          #4d8bff;
+  --pink:          #ff77c8;
+  --teal:          #2ff5d6;
+
+  /* ---- Semantic ---- */
+  --positive:      var(--lime);
+  --negative:      var(--red);
+  --warn:          var(--amber);
+  --brand:         var(--cyan);
+
+  /* Primary accent as raw RGB triplet so component rules can build their
+     own rgba() alphas. Cosmetic themes ([data-theme]) override this (and
+     the neon palette) to reskin the whole UI. CRITICAL theme rule: never
+     hard-code the accent in rgba() — always rgba(var(--accent-rgb), α). */
+  --accent-rgb:    28, 226, 255;
+
+  /* ---- NIGHT CITY geometry + CRT character (design handoff baselines).
+     These five are the user-tunable "display calibration" knobs — the app
+     overrides them on <html> from UserSettings. Everything derives. ---- */
+  --cut:     24px;     /* panel corner clip size */
+  --cut-sm:  13px;     /* button/input chamfer (~cut × 0.56) */
+  --chroma:  2px;      /* chroma-split text-shadow offset */
+  --scan-a:  0.0263;   /* scanline overlay alpha (75% × 0.035) */
+  --sweep-a: 0.105;    /* scan-sweep gradient alpha (75% × 0.14) */
+
+  /* ---- Glow helpers ---- */
+  --glow-cyan:     0 0 0.5px rgba(28,226,255,.8), 0 0 12px rgba(28,226,255,.35);
+  --glow-magenta:  0 0 0.5px rgba(255,46,154,.8), 0 0 12px rgba(255,46,154,.35);
+  --glow-lime:     0 0 0.5px rgba(67,255,166,.8), 0 0 12px rgba(67,255,166,.30);
+
+  /* ---- Radius / spacing ---- */
+  --r-sm: 6px;
+  --r:    10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  /* ---- Fonts ---- */
+  --font-ui:   'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Chakra Petch', 'Space Grotesk', sans-serif;
+
+  --maxw: 1320px;
+}
+
+/* ============================================================
+   Cosmetic themes (Shop → "Neon Skins"). Applied via
+   <html data-theme="KEY">. Each remaps the neon ACCENT palette
+   only — surfaces and text stay constant so contrast always
+   holds. The Shop cosmetic catalog's themeKey payloads must
+   match these keys: synthwave | matrix | vaporwave | gold |
+   bloodmoon | arctic.  --accent-rgb mirrors --cyan as a triplet.
+   ============================================================ */
+
+/* Synthwave Sunset — hot pink + violet */
+[data-theme="synthwave"] {
+  --cyan:        #ff3d8b;
+  --cyan-deep:   #c01e63;
+  --magenta:     #ff9de0;
+  --violet:      #b06bff;
+  --teal:        #ff9de0;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 61, 139;
+  --line-bright: rgba(255, 61, 139, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,61,139,.8), 0 0 12px rgba(255,61,139,.40);
+}
+
+/* Matrix — phosphor-green terminal */
+[data-theme="matrix"] {
+  --cyan:        #43ff8e;
+  --cyan-deep:   #1fae5c;
+  --magenta:     #2ff5a6;
+  --violet:      #8bff43;
+  --lime:        #8bff43;
+  --teal:        #2ff5a6;
+  --brand:       var(--cyan);
+  --accent-rgb:  67, 255, 142;
+  --line-bright: rgba(67, 255, 142, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(67,255,142,.85), 0 0 12px rgba(67,255,142,.40);
+}
+
+/* Vaporwave — pastel cyan + pink */
+[data-theme="vaporwave"] {
+  --cyan:        #67e8ff;
+  --cyan-deep:   #38b6cf;
+  --magenta:     #ff9ed6;
+  --violet:      #c9a6ff;
+  --teal:        #9ef7e4;
+  --brand:       var(--cyan);
+  --accent-rgb:  103, 232, 255;
+  --line-bright: rgba(103, 232, 255, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(103,232,255,.8), 0 0 12px rgba(255,158,214,.35);
+}
+
+/* Gold Chrome — amber luxe */
+[data-theme="gold"] {
+  --cyan:        #ffc24b;
+  --cyan-deep:   #c9912a;
+  --magenta:     #ffb347;
+  --violet:      #ffe08a;
+  --teal:        #ffd76b;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 194, 75;
+  --line-bright: rgba(255, 194, 75, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(255,194,75,.85), 0 0 12px rgba(255,194,75,.40);
+}
+
+/* Blood Moon — crimson */
+[data-theme="bloodmoon"] {
+  --cyan:        #ff4d6d;
+  --cyan-deep:   #c01e3c;
+  --magenta:     #ff7a99;
+  --violet:      #ff6b6b;
+  --teal:        #ff9db0;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 77, 109;
+  --line-bright: rgba(255, 77, 109, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,77,109,.8), 0 0 12px rgba(255,77,109,.40);
+}
+
+/* Arctic — ice white-blue */
+[data-theme="arctic"] {
+  --cyan:        #8fd8ff;
+  --cyan-deep:   #4d9bcf;
+  --magenta:     #c9e6ff;
+  --violet:      #a6c8ff;
+  --teal:        #b8f0ff;
+  --brand:       var(--cyan);
+  --accent-rgb:  143, 216, 255;
+  --line-bright: rgba(143, 216, 255, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(143,216,255,.85), 0 0 12px rgba(143,216,255,.40);
+}
+
+/* Low-battery day (World Mechanics): the HUD content visibly dims/desaturates
+   as a gentle "running on empty" cue. Set via <html data-energy="low">. */
+[data-energy="low"] .content { filter: saturate(0.72) brightness(0.93); transition: filter .4s ease; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* NIGHT CITY CRT frame layers: corner glows (theme-aware via --accent-rgb)
+   + 40px engineering grid + horizontal scanlines, radially masked to fade
+   at the bottom. --scan-a is the user-calibrated scanline alpha. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1000px 650px at 8% -10%, rgba(var(--accent-rgb),0.10), transparent 60%),
+    radial-gradient(900px 700px at 102% -2%, rgba(255,46,154,0.09), transparent 55%),
+    radial-gradient(900px 650px at 88% 112%, rgba(157,107,255,0.08), transparent 60%);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(150,168,224,0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(150,168,224,0.055) 1px, transparent 1px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,var(--scan-a)) 0 1px, transparent 1px 3px);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+  mask-image: radial-gradient(130% 130% at 50% 0%, #000 25%, transparent 95%);
+  -webkit-mask-image: radial-gradient(130% 130% at 50% 0%, #000 25%, transparent 95%);
+}
+
+#root { position: relative; z-index: 1; }
+
+::selection { background: rgba(28,226,255,0.30); color: #fff; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--panel-hi);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #2a2f48; background-clip: padding-box; }
+
+/* ---- Typography utilities ---- */
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1, "zero" 1; }
+.tnum { font-variant-numeric: tabular-nums; }
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+
+/* Buttons inherit text color/font by default — UA defaults to black, which is
+   unreadable on this dark theme. Components that need a specific color set it explicitly. */
+button { font-family: inherit; color: inherit; }
+input, textarea, select { font-family: inherit; }
+
+/* ---- HUD focal marker ----
+   .hud (legacy "panel hud" combo) now maps to the Night City FOCAL panel:
+   accent border + accent notch lines. The old corner brackets are gone —
+   their replacement is the .ncx-ticks "+" crosses (a wrapper element). */
+.hud { position: relative; }
+
+/* ---- Buttons: chamfered (Night City) ----
+   PITFALL (verified during prototyping): never `transition: all` on these —
+   a className flip (primary ↔ plain) can freeze the transition at the FROM
+   state. Properties are listed explicitly; conditional buttons should also
+   be keyed by state so React remounts instead of morphing. */
+.btn, .ncx-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  color: var(--text);
+  background: #131525;
+  clip-path: polygon(var(--cut-sm) 0, 100% 0, 100% calc(100% - var(--cut-sm)), calc(100% - var(--cut-sm)) 100%, 0 100%, 0 var(--cut-sm));
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  transition: background .15s, box-shadow .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.btn:hover, .ncx-btn:hover { background: #1a1d31; box-shadow: inset 0 0 0 1px var(--line-bright); }
+.btn:disabled, .ncx-btn:disabled { cursor: default; opacity: 0.55; }
+.btn-primary, .ncx-btn.primary {
+  background: linear-gradient(180deg, var(--cyan), color-mix(in srgb, var(--cyan) 72%, #033));
+  color: #03161c;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 0 24px -4px rgba(var(--accent-rgb),0.55);
+}
+.btn-primary:hover, .ncx-btn.primary:hover {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4), 0 0 34px -4px rgba(var(--accent-rgb),0.8);
+}
+.btn-primary svg, .ncx-btn.primary svg { color: inherit; }
+.ncx-btn.danger { color: var(--red); box-shadow: inset 0 0 0 1px rgba(255,77,109,0.4); }
+.btn-ghost { background: transparent; box-shadow: none; color: var(--text-dim); }
+.btn-ghost:hover { background: rgba(150,168,224,0.07); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ---- Animations ---- */
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes pulse-glow {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+@keyframes scan-down {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(2400%); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes draw-stroke { to { stroke-dashoffset: 0; } }
+@keyframes ring-fill { to { stroke-dashoffset: var(--ring-target); } }
+@keyframes flicker-in {
+  0% { opacity: 0; }
+  10% { opacity: .6; }
+  12% { opacity: .2; }
+  20% { opacity: 1; }
+  22% { opacity: .5; }
+  100% { opacity: 1; }
+}
+@keyframes confetti {
+  0% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(-90px) translateX(var(--cx, 0)) scale(.4) rotate(220deg); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.fade-up { animation: fade-up .5s cubic-bezier(.22,.61,.36,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}
+
+.cursor-blink { animation: blink 1.1s step-end infinite; }
+
+/* ---- Panels: clipped corners (Night City signature) ----
+   Cut top-right + bottom-left, with 1px diagonal "notch lines" drawn by the
+   pseudo-elements over each cut. `.panel.hud` / `.focal` brightens the
+   border + notches to the accent. NOTE: clip-path clips children/shadows
+   that overflow the box — keep absolutely-positioned chrome inside. */
+.panel, .ncx-panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+    #0b0c16;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+.panel::before, .panel::after, .ncx-panel::before, .ncx-panel::after {
+  content: ""; position: absolute; width: calc(var(--cut) * 1.44); height: 1px;
+  background: var(--line-2); pointer-events: none; z-index: 2;
+}
+.panel::before, .ncx-panel::before { top: calc(var(--cut) * 0.47); right: calc(var(--cut) * -0.22); transform: rotate(45deg); }
+.panel::after, .ncx-panel::after { bottom: calc(var(--cut) * 0.47); left: calc(var(--cut) * -0.22); transform: rotate(45deg); }
+.panel.hud, .panel.focal, .ncx-panel.focal { border-color: rgba(var(--accent-rgb),0.35); }
+.panel.hud::before, .panel.hud::after,
+.panel.focal::before, .panel.focal::after,
+.ncx-panel.focal::before, .ncx-panel.focal::after { background: rgba(var(--accent-rgb),0.45); }
+
+/* square variant (no cuts) for dense internals */
+.panel-inset, .ncx-inset { background: #070811; border: 1px solid var(--line); border-radius: 0; }
+
+/* clip helper */
+.noscroll::-webkit-scrollbar { display: none; }
+.noscroll { scrollbar-width: none; }
+
+/* ============================================================
+   App shell layout + responsive
+   ============================================================ */
+.app-shell {
+  display: grid;
+  grid-template-rows: 1fr auto; /* shell | status rail */
+  min-height: 100vh;
+  height: 100vh;
+}
+.ncx-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+
+/* ---- deck (left nav) ---- */
+.ncx-deck {
+  display: flex; flex-direction: column; min-height: 0;
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(10,11,20,0.85), rgba(5,6,12,0.7));
+  backdrop-filter: blur(10px);
+}
+.ncx-deck nav { flex: 1; overflow-y: auto; overflow-x: hidden !important; padding-top: 2px; }
+.ncx-deck-group {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.3em;
+  color: var(--text-ghost); padding: 9px 16px 4px; display: flex; gap: 8px; align-items: center;
+  text-transform: uppercase;
+}
+.ncx-deck-group i { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); transform: skewY(-6deg); }
+.ncx-deck-item {
+  position: relative; display: flex; align-items: center; gap: 11px;
+  margin: 1px 10px; padding: 6.5px 12px;
+  background: transparent; border: none; cursor: pointer; width: calc(100% - 20px);
+  color: var(--text-dim); font-family: var(--font-ui); font-size: 13px; text-align: left;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+  transition: background .14s, color .14s, box-shadow .14s;
+}
+.ncx-deck-item:hover { background: rgba(150,168,224,0.07); color: var(--text); }
+.ncx-deck-item.active {
+  background: linear-gradient(90deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.04) 70%, transparent);
+  color: #eafdff;
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
+.ncx-deck-item.active svg { color: var(--cyan); filter: drop-shadow(0 0 5px var(--cyan)); }
+.ncx-deck-item.active::after {
+  content: "▸"; margin-left: auto; color: var(--cyan); font-size: 10px;
+}
+
+/* runner ID card at deck bottom */
+.ncx-id {
+  margin: 10px 12px 12px; padding: 12px 13px; position: relative;
+  background: #070811; border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+
+/* ---- topbar + ticker ---- */
+.main-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ncx-topbar {
+  display: flex; align-items: stretch; gap: 0;
+  border-bottom: 1px solid var(--line);
+  background: rgba(4,4,10,0.85); backdrop-filter: blur(12px);
+}
+.ncx-topcell { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-right: 1px solid var(--line); }
+.ncx-ticker-wrap { flex: 1; overflow: hidden; display: flex; align-items: center; min-width: 0; }
+.ncx-ticker-track { display: flex; gap: 56px; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-dim); }
+@media (prefers-reduced-motion: no-preference) {
+  .ncx-ticker-track { animation: ncx-marquee 26s linear infinite; }
+}
+.no-ticker .ncx-ticker-track { animation: none; }
+@keyframes ncx-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.mobile-brand { display: none; }
+.icon-btn { padding: 9px; color: var(--text-dim); }
+.icon-btn:hover { color: var(--text); }
+
+/* ---- bottom status rail ---- */
+.ncx-statusbar {
+  display: flex; align-items: center; gap: 22px;
+  padding: 7px 20px; border-top: 1px solid var(--line);
+  background: rgba(4,4,10,0.9);
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em;
+  color: var(--text-faint); text-transform: uppercase;
+}
+.ncx-statusbar .lit { color: var(--cyan); }
+
+.content {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 22px 26px 26px;
+  max-width: var(--maxw);
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* bottom nav (mobile) */
+.bottom-nav { display: none; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+
+/* Today: ledger | rail (+ city feed). Below 1600px the feed panels stack
+   under the rail in the same 330px column; on big monitors they get their
+   own third column so the page actually uses the width. */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-areas: "main rail" "main feed";
+  gap: 16px;
+  align-items: start;
+}
+.today-main { grid-area: main; min-width: 0; }
+.today-rail { grid-area: rail; min-width: 0; }
+.today-feed { grid-area: feed; min-width: 0; }
+
+/* ---- Scale-UP: Brent's big monitors. The app was capped at 1320px with
+   no upward breakpoints — a sea of margin on 1440p/4K. Widen the cap, give
+   Today its third column, and gently zoom the whole content plane on very
+   wide displays (inline styles are px-based, so zoom is the one lever that
+   makes everything "a little bigger" without retouching every panel). */
+@media (min-width: 1600px) {
+  :root { --maxw: 1720px; }
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr) 330px 330px;
+    grid-template-areas: "main rail feed";
+  }
+}
+@media (min-width: 2100px) {
+  :root { --maxw: 1880px; }
+  .content { zoom: 1.08; }
+}
+
+@media (max-width: 1100px) {
+  .split-grid { grid-template-columns: 1fr !important; }
+  .hero-grid { grid-template-columns: 1fr !important; }
+  .hero-grid > div:last-child { border-left: none !important; border-top: 1px solid var(--line); }
+  .today-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "main" "rail" "feed";
+  }
+}
+@media (max-width: 860px) {
+  .ncx-shell { grid-template-columns: 1fr; }
+  .ncx-deck { display: none; }
+  .ncx-statusbar { display: none; }
+  .ncx-topcell.cell-title { display: none; }
+  .mobile-brand { display: block; padding: 0 0 0 14px; align-self: center; }
+  .metric-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .upload-grid { grid-template-columns: 1fr !important; }
+  .upload-grid > div:last-child { border-left: none !important; }
+  .content { padding: 18px 16px 92px; }
+  .bottom-nav {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+    background: rgba(8,9,16,0.92);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line-2);
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  }
+  .bn-item {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 7px 4px; border: none; background: none; cursor: pointer;
+    color: var(--text-faint); font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.03em; border-radius: 9px;
+    transition: color .15s, background .15s; /* never `all` — stuck-transition pitfall */
+  }
+  .bn-item.active { color: var(--cyan); }
+  .bn-item.active svg { filter: drop-shadow(0 0 5px var(--cyan)); }
+}
+@media (max-width: 480px) {
+  .metric-grid { grid-template-columns: 1fr !important; }
+  .split-grid, .hero-grid { gap: 16px; }
+}
+
+/* ============================================================
+   NIGHT CITY utilities (.ncx-*) — ported verbatim from the design
+   handoff (design_handoff_night_city/mocks/nightcity.css). The
+   seven signature pieces + supporting bits. Theme rule: accent
+   alphas ALWAYS via rgba(var(--accent-rgb), α).
+   ============================================================ */
+
+/* ---- corner tick decorations ("+" crosses outside panel corners) ---- */
+.ncx-ticks { position: relative; }
+.ncx-ticks > .tick {
+  position: absolute; width: 9px; height: 9px; pointer-events: none;
+  color: rgba(var(--accent-rgb),0.55); font-size: 0; z-index: 2;
+}
+.ncx-ticks > .tick::before, .ncx-ticks > .tick::after { content: ""; position: absolute; background: currentColor; }
+.ncx-ticks > .tick::before { left: 4px; top: 0; width: 1px; height: 9px; }
+.ncx-ticks > .tick::after { left: 0; top: 4px; width: 9px; height: 1px; }
+
+/* ---- glitch + chroma display type ---- */
+.ncx-glitch { position: relative; display: inline-block; }
+.ncx-glitch:hover { animation: ncx-jitter .25s steps(2) 2; }
+@keyframes ncx-jitter { 0% { transform: translate(0); } 25% { transform: translate(-1px, 1px) skewX(-2deg); } 75% { transform: translate(1px, -1px); } 100% { transform: translate(0); } }
+.ncx-chroma { text-shadow: calc(var(--chroma) * -1) 0 rgba(var(--accent-rgb),0.55), var(--chroma) 0 rgba(255,46,154,0.55); }
+
+/* ---- segmented bars (XP / HP) ---- */
+.ncx-bar { position: relative; height: 12px; background: #0a0b14; box-shadow: inset 0 0 0 1px var(--line-2); overflow: hidden; }
+.ncx-bar > i { position: absolute; inset: 1px auto 1px 1px; display: block; transition: width .6s cubic-bezier(.22,.61,.36,1); }
+.ncx-bar .seg-mask {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 10px, #04040a 10px 12px);
+}
+.ncx-bar.slim { height: 7px; }
+.ncx-bar.slim .seg-mask { background: repeating-linear-gradient(90deg, transparent 0 6px, #04040a 6px 8px); }
+
+/* ---- scanline sweep overlay (gate on reduced motion) ---- */
+.ncx-scan { position: relative; overflow: hidden; }
+.ncx-scan .sweep {
+  position: absolute; left: 0; right: 0; height: 56px; top: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(var(--accent-rgb),var(--sweep-a)), transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ncx-scan .sweep { animation: scan-down 7s linear infinite; }
+}
+
+/* ---- serial codes ---- */
+.ncx-serial {
+  font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.32em;
+  color: var(--text-ghost); text-transform: uppercase; white-space: nowrap;
+}
+.ncx-serial.vert { writing-mode: vertical-rl; }
+
+/* ---- stamps (difficulty / status) ---- */
+.ncx-stamp {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.2em; font-weight: 700;
+  padding: 3px 9px; border: 1px solid currentColor; text-transform: uppercase;
+  transform: rotate(-3deg); display: inline-block;
+}
+.ncx-stamp.hard { color: var(--magenta); background: rgba(255,46,154,0.08); box-shadow: 0 0 12px -4px var(--magenta); }
+.ncx-stamp.medium { color: var(--amber); background: rgba(255,194,75,0.08); }
+.ncx-stamp.easy { color: var(--teal); background: rgba(47,245,214,0.08); }
+.ncx-stamp.flat { transform: none; }
+
+/* ---- hex badge (brand Q, level, boss sigils, achievement chips) ---- */
+.ncx-hex {
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(160deg, var(--cyan), var(--violet) 70%, var(--magenta));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 700; color: #061018;
+}
+
+/* ---- contract rows ---- */
+.ncx-contract {
+  position: relative; display: flex; gap: 16px; align-items: center;
+  padding: 15px 18px; cursor: pointer;
+  transition: background .15s, box-shadow .15s;
+}
+.ncx-contract:hover { background: linear-gradient(90deg, rgba(var(--accent-rgb),0.05), transparent 60%), #0d0e1a; }
+.ncx-contract + .ncx-contract { border-top: 1px solid var(--line); }
+.ncx-contract .num {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-ghost); letter-spacing: 0.1em;
+  width: 30px; flex: none;
+}
+.ncx-row-done { opacity: 0.45; }
+.ncx-row-done .ncx-row-title-text { text-decoration: line-through; text-decoration-color: rgba(150,168,224,0.4); }
+
+/* ---- icon chip (42px chamfered, outline icons ONLY — never emoji) ---- */
+.ncx-chip {
+  width: 42px; height: 42px; flex: none; font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb),0.14), rgba(255,46,154,0.12));
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.22);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+
+/* ---- table ---- */
+.ncx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ncx-table th {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--text-faint); text-align: left; font-weight: 500;
+  padding: 9px 16px; border-bottom: 1px solid var(--line-2); background: rgba(150,168,224,0.03);
+}
+.ncx-table td { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.ncx-table tr:hover td { background: rgba(var(--accent-rgb),0.04); }
+
+/* ---- heat cells (sharp squares, 5-step accent scale) ---- */
+.ncx-cell { width: 13px; height: 13px; background: #0c0d18; box-shadow: inset 0 0 0 1px rgba(150,168,224,0.07); }
+.ncx-cell.l1 { background: rgba(var(--accent-rgb),0.18); }
+.ncx-cell.l2 { background: rgba(var(--accent-rgb),0.38); }
+.ncx-cell.l3 { background: rgba(var(--accent-rgb),0.62); }
+.ncx-cell.l4 { background: var(--cyan); box-shadow: 0 0 7px rgba(var(--accent-rgb),0.6); }
+
+/* ---- terminal log + chamfered input ---- */
+.ncx-term {
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.85; letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.ncx-term .ok { color: var(--lime); }
+.ncx-term .cy { color: var(--cyan); }
+.ncx-input {
+  font-family: var(--font-mono); font-size: 13px; color: var(--text);
+  background: #070811; border: 1px solid var(--line-2); padding: 11px 14px;
+  outline: none; width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+.ncx-input:focus { border-color: rgba(var(--accent-rgb),0.5); box-shadow: 0 0 16px -6px rgba(var(--accent-rgb),0.5); }
+
+/* ---- big mono value ---- */
+.ncx-val { font-family: var(--font-mono); font-feature-settings: "tnum" 1, "zero" 1; font-weight: 600; letter-spacing: -0.01em; }
+
+/* ---- entrance stagger (re-runs when the container is keyed by screen) ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .qm-stagger > * { animation: fade-up .5s cubic-bezier(.22,.61,.36,1) both; }
+  .qm-stagger > *:nth-child(2) { animation-delay: .06s; }
+  .qm-stagger > *:nth-child(3) { animation-delay: .12s; }
+  .qm-stagger > *:nth-child(4) { animation-delay: .18s; }
+  .qm-stagger > *:nth-child(5) { animation-delay: .24s; }
+  .qm-stagger > *:nth-child(6) { animation-delay: .30s; }
+}
+
+/* ---- theme-equip pulse (applied ~450ms then removed) ---- */
+html.theming, html.theming * { transition: background .35s, box-shadow .35s, color .35s, border-color .35s; }
+
+/* ---- level-up overlay ---- */
+@keyframes ncx-levelup-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes ncx-flash { 0% { box-shadow: inset 0 0 0 1px var(--line-2), 0 0 0 0 rgba(var(--accent-rgb),0.5); } 100% { box-shadow: inset 0 0 0 1px var(--line-2), 0 0 24px 6px rgba(var(--accent-rgb),0); } }
+
+/* ---- dark thin scrollbars frame-wide (default white is glaring) ---- */
+* { scrollbar-width: thin; scrollbar-color: rgba(150,168,224,0.22) transparent; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { background: rgba(150,168,224,0.18); border-radius: 4px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+/* Tailwind integration */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Cosmetic themes — SECOND WAVE (Shop "Neon Skins"). Same contract
+   as the blocks above: accent remap only, surfaces/text constant,
+   --lime/--amber/--red stay semantic, accent alphas ALWAYS built
+   via rgba(var(--accent-rgb), α).
+   ============================================================ */
+
+/* Toxic — acid green-yellow biohazard */
+[data-theme="toxic"] {
+  --cyan:        #b4ff39;
+  --cyan-deep:   #7fc41c;
+  --magenta:     #6dff6d;
+  --violet:      #d8ff4d;
+  --teal:        #8aff5e;
+  --brand:       var(--cyan);
+  --accent-rgb:  180, 255, 57;
+  --line-bright: rgba(180, 255, 57, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(180,255,57,.85), 0 0 12px rgba(180,255,57,.40);
+}
+
+/* Sakura — soft blossom pink */
+[data-theme="sakura"] {
+  --cyan:        #ff9ecf;
+  --cyan-deep:   #cf639d;
+  --magenta:     #ffd1e8;
+  --violet:      #d8a6ff;
+  --teal:        #ffc1de;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 158, 207;
+  --line-bright: rgba(255, 158, 207, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,158,207,.8), 0 0 12px rgba(255,158,207,.38);
+}
+
+/* Ronin — burnt ember orange */
+[data-theme="ronin"] {
+  --cyan:        #ff6a3d;
+  --cyan-deep:   #c2421c;
+  --magenta:     #ffb03d;
+  --violet:      #ff4d6d;
+  --teal:        #ff9d6b;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 106, 61;
+  --line-bright: rgba(255, 106, 61, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,106,61,.85), 0 0 12px rgba(255,106,61,.40);
+}
+
+/* Ultraviolet — electric purple, past the visible spectrum */
+[data-theme="ultraviolet"] {
+  --cyan:        #b14dff;
+  --cyan-deep:   #7e22cc;
+  --magenta:     #ff4dd8;
+  --violet:      #7a4dff;
+  --teal:        #c98aff;
+  --brand:       var(--cyan);
+  --accent-rgb:  177, 77, 255;
+  --line-bright: rgba(177, 77, 255, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(177,77,255,.85), 0 0 12px rgba(177,77,255,.40);
+}
+
+/* ============================================================
+   Cosmetic themes — THIRD WAVE (corpo/runner editions). Same
+   contract: accent remap only, surfaces/text constant, accent
+   alphas ALWAYS built via rgba(var(--accent-rgb), α).
+   ============================================================ */
+
+/* Edgerunner — construct yellow with a cyan pop (the 2077 duo) */
+[data-theme="edgerunner"] {
+  --cyan:        #fcf300;
+  --cyan-deep:   #c2bb00;
+  --magenta:     #00f0ff;
+  --violet:      #ffdd00;
+  --teal:        #f5ff66;
+  --brand:       var(--cyan);
+  --accent-rgb:  252, 243, 0;
+  --line-bright: rgba(252, 243, 0, 0.30);
+  --glow-cyan:   0 0 0.5px rgba(252,243,0,.85), 0 0 12px rgba(252,243,0,.38);
+}
+
+/* Arasaka — cold corporate crimson (colder + harder than bloodmoon) */
+[data-theme="arasaka"] {
+  --cyan:        #ff0040;
+  --cyan-deep:   #b8002e;
+  --magenta:     #ff6d00;
+  --violet:      #ff4d8b;
+  --teal:        #ff8c7a;
+  --brand:       var(--cyan);
+  --accent-rgb:  255, 0, 64;
+  --line-bright: rgba(255, 0, 64, 0.32);
+  --glow-cyan:   0 0 0.5px rgba(255,0,64,.85), 0 0 12px rgba(255,0,64,.40);
+}
+
+/* Militech — muted mil-spec tactical green (matrix's disciplined cousin) */
+[data-theme="militech"] {
+  --cyan:        #52b788;
+  --cyan-deep:   #2d6a4f;
+  --magenta:     #95d5b2;
+  --violet:      #74c69d;
+  --teal:        #95d5b2;
+  --brand:       var(--cyan);
+  --accent-rgb:  82, 183, 136;
+  --line-bright: rgba(82, 183, 136, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(82,183,136,.85), 0 0 12px rgba(82,183,136,.40);
+}
+
+/* Netrunner — deep-dive electric blue */
+[data-theme="netrunner"] {
+  --cyan:        #3d7bff;
+  --cyan-deep:   #2451c4;
+  --magenta:     #00d4ff;
+  --violet:      #7a5cff;
+  --teal:        #5cb8ff;
+  --brand:       var(--cyan);
+  --accent-rgb:  61, 123, 255;
+  --line-bright: rgba(61, 123, 255, 0.34);
+  --glow-cyan:   0 0 0.5px rgba(61,123,255,.85), 0 0 12px rgba(61,123,255,.42);
+}
+
+/* Ghost — monochrome white phosphor (war-room mainframe) */
+[data-theme="ghost"] {
+  --cyan:        #f2f5ff;
+  --cyan-deep:   #aab3cc;
+  --magenta:     #c9d1e8;
+  --violet:      #aab4d0;
+  --teal:        #dde3f5;
+  --brand:       var(--cyan);
+  --accent-rgb:  242, 245, 255;
+  --line-bright: rgba(242, 245, 255, 0.28);
+  --glow-cyan:   0 0 0.5px rgba(242,245,255,.8), 0 0 12px rgba(242,245,255,.30);
+}
+
+/* ============================================================
+   Display font packs (Shop "Display Mods"). Applied via
+   <html data-font="KEY"> from PlayerSnapshot.equippedFont — only
+   --font-display swaps; UI/mono faces stay constant.
+   ============================================================ */
+
+html[data-font="orbitron"] {
+  --font-display: 'Orbitron', 'Chakra Petch', sans-serif;
+}
+
+html[data-font="vt323"] {
+  --font-display: 'VT323', 'Chakra Petch', monospace;
+}
+/* VT323 renders small at a given px size — open the tracking a touch. */
+html[data-font="vt323"] .ncx-chroma { letter-spacing: 0.04em; }
+
+html[data-font="spacemono"] {
+  --font-display: 'Space Mono', 'Chakra Petch', monospace;
+}
+
+html[data-font="sharetech"] {
+  --font-display: 'Share Tech Mono', 'Chakra Petch', monospace;
+}
+/* Share Tech Mono runs narrow — open display tracking like VT323. */
+html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
+
+/* ============================================================
+   Ambient FX packs (Shop "Display Mods"). Applied via
+   <html data-fx="KEY"> from PlayerSnapshot.equippedFx. A single
+   fixed pseudo-element overlay: pointer-events none, z-index 2
+   (above the body frame layers, far below modals), texture alphas
+   kept ≤ 0.06 so content always reads through. Motion is gated
+   behind prefers-reduced-motion: no-preference.
+   ============================================================ */
+
+/* Neon Drizzle — thin near-vertical streaks drifting down */
+html[data-fx="rain"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(
+      100deg,
+      transparent 0px,
+      transparent 22px,
+      rgba(var(--accent-rgb), 0.05) 22px,
+      rgba(var(--accent-rgb), 0.05) 23px
+    ),
+    repeating-linear-gradient(
+      100deg,
+      transparent 0px,
+      transparent 30px,
+      rgba(190, 210, 255, 0.04) 30px,
+      rgba(190, 210, 255, 0.04) 31px
+    );
+}
+
+/* Aurora Shift — slow drifting accent-tinted light fields (re-tints
+   with the equipped theme via --accent-rgb) */
+html[data-fx="aurora"]::after {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    radial-gradient(620px 420px at 18% 22%, rgba(var(--accent-rgb), 0.05), transparent 70%),
+    radial-gradient(720px 480px at 78% 28%, rgba(157, 107, 255, 0.04), transparent 70%),
+    radial-gradient(660px 520px at 55% 82%, rgba(var(--accent-rgb), 0.04), transparent 70%);
+}
+
+/* VHS Tracking — wide interference bands drifting down with a tape wobble.
+   Band period 160px; the X nudge at the animation midpoint is the wobble. */
+html[data-fx="vhs"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 89px,
+      rgba(var(--accent-rgb), 0.05) 89px,
+      rgba(var(--accent-rgb), 0.05) 92px,
+      rgba(255, 255, 255, 0.03) 92px,
+      rgba(255, 255, 255, 0.03) 94px,
+      transparent 94px,
+      transparent 160px
+    ),
+    repeating-linear-gradient(90deg, rgba(190, 210, 255, 0.02) 0 1px, transparent 1px 6px);
+}
+
+/* Data Stream — thin vertical code columns sliding sideways (corpo net
+   traffic). Column period 74px. */
+html[data-fx="datastream"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 58px,
+      rgba(var(--accent-rgb), 0.05) 58px,
+      rgba(var(--accent-rgb), 0.05) 59px,
+      transparent 59px,
+      transparent 73px,
+      rgba(190, 210, 255, 0.03) 73px,
+      rgba(190, 210, 255, 0.03) 74px
+    );
+}
+
+/* Tac-Sweep — a rotating radar wedge centered on the viewport. The element
+   is an oversized square so the rotation never exposes a corner; without
+   motion it degrades to a faint static wedge. */
+html[data-fx="radar"]::after {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 160vmax;
+  height: 160vmax;
+  margin: -80vmax 0 0 -80vmax;
+  pointer-events: none;
+  z-index: 2;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(var(--accent-rgb), 0.055) 0deg,
+    rgba(var(--accent-rgb), 0.018) 26deg,
+    transparent 60deg,
+    transparent 360deg
+  );
+}
+
+/* CRT Retrace — a phosphor refresh line crawling down the tube over a faint
+   scanline wash. The line lives in a 300%-tall gradient; animating its
+   background-position 100%→0% sends it top-to-bottom. */
+html[data-fx="crt"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 47%,
+      rgba(var(--accent-rgb), 0.06) 50%,
+      transparent 53%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px);
+  background-size: 100% 300%, 100% 100%;
+  background-position: 0 100%, 0 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-fx="rain"]::after {
+    animation: qm-fx-rain 9s linear infinite;
+  }
+  /* Layer periods 23px/31px at 100deg → vertical tiling ≈ 89px/120px;
+     8 and 6 loops land both layers back on phase together. */
+  @keyframes qm-fx-rain {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 0 712px, 0 720px; }
+  }
+
+  html[data-fx="aurora"]::after {
+    animation: qm-fx-aurora 26s ease-in-out infinite alternate;
+  }
+  @keyframes qm-fx-aurora {
+    from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
+    to   { transform: translate3d(1.5%, 1%, 0) scale(1.05); }
+  }
+
+  html[data-fx="vhs"]::after {
+    animation: qm-fx-vhs 11s linear infinite;
+  }
+  /* One 160px band period per loop; the 2px X excursion at 50% is the
+     tape-tracking wobble (returns to 0 so the loop is seamless). */
+  @keyframes qm-fx-vhs {
+    0%   { background-position: 0 0, 0 0; }
+    50%  { background-position: 2px 80px, 0 0; }
+    100% { background-position: 0 160px, 0 0; }
+  }
+
+  html[data-fx="datastream"]::after {
+    animation: qm-fx-datastream 18s linear infinite;
+  }
+  /* Two 74px column periods per loop. */
+  @keyframes qm-fx-datastream {
+    from { background-position: 0 0; }
+    to   { background-position: 148px 0; }
+  }
+
+  html[data-fx="radar"]::after {
+    animation: qm-fx-radar 14s linear infinite;
+  }
+  @keyframes qm-fx-radar {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  html[data-fx="crt"]::after {
+    animation: qm-fx-crt 8s linear infinite;
+  }
+  /* 100%→0% with a 300%-tall image moves the bright line downscreen. */
+  @keyframes qm-fx-crt {
+    from { background-position: 0 100%, 0 0; }
+    to   { background-position: 0 0%, 0 0; }
+  }
+}
+
+/* ============================================================
+   FOCUS CHAMBER (JACK IN) — the distraction-free deep-work page
+   (FocusView replaces the whole shell) + timer style packs (Shop
+   "Timer Styles"). The clock renders one .qm-digit / .qm-sep span
+   per character; packs restyle via .qm-clock[data-timer="KEY"]
+   from PlayerSnapshot.equippedTimer.
+   ============================================================ */
+
+.qm-focus {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 28px;
+}
+.qm-focus-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  min-height: 0;
+}
+
+.qm-clock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-size: clamp(72px, 16vw, 190px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  user-select: none;
+}
+/* Fixed digit width so the clock doesn't wobble as numbers change. */
+.qm-clock .qm-digit { display: inline-block; min-width: 0.62em; text-align: center; }
+.qm-clock .qm-sep { display: inline-block; color: var(--cyan); padding: 0 0.04em; transform: translateY(-0.06em); }
+.qm-clock.running .qm-sep { animation: blink 1s step-end infinite; }
+
+/* Standard face — soft accent glow */
+.qm-clock[data-timer="default"] {
+  text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45), 0 0 60px rgba(var(--accent-rgb), 0.18);
+}
+
+/* Split-Flap Chrono — departure-board digit panels with a center seam */
+.qm-clock[data-timer="flip"] { gap: 0.06em; }
+.qm-clock[data-timer="flip"] .qm-digit {
+  position: relative;
+  padding: 0.12em 0.02em;
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4);
+  background: linear-gradient(180deg, #14162a 0%, #0d0e1c 49%, #090a14 51%, #101224 100%);
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 10px 26px -12px rgba(0, 0, 0, 0.85);
+  clip-path: polygon(0.08em 0, 100% 0, 100% calc(100% - 0.08em), calc(100% - 0.08em) 100%, 0 100%, 0 0.08em);
+}
+.qm-clock[data-timer="flip"] .qm-digit::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.qm-clock[data-timer="flip"] .qm-sep { color: var(--text-faint); }
+
+/* Orbital Gauge — digits sit inside the FocusView SVG ring, so the type
+   shrinks to fit; the ring drains the countdown / laps the minute. */
+.qm-ring-wrap {
+  position: relative;
+  width: min(64vmin, 440px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qm-ring-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.qm-clock[data-timer="ring"] {
+  font-size: clamp(44px, 9vw, 104px);
+  text-shadow: 0 0 16px rgba(var(--accent-rgb), 0.4);
+}
+
+/* Biorhythm — digits beat like a monitored heart */
+.qm-clock[data-timer="pulse"] { color: var(--cyan); }
+@media (prefers-reduced-motion: no-preference) {
+  .qm-clock[data-timer="pulse"], .qm-preview-pulse {
+    animation: qm-timer-beat 1.15s ease-in-out infinite;
+  }
+}
+@keyframes qm-timer-beat {
+  0%, 55%, 100% { text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.35); transform: scale(1); }
+  12% { text-shadow: 0 0 26px rgba(var(--accent-rgb), 0.75), 0 0 70px rgba(var(--accent-rgb), 0.3); transform: scale(1.012); }
+  24% { text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45); transform: scale(1.004); }
+  36% { text-shadow: 0 0 30px rgba(var(--accent-rgb), 0.8), 0 0 80px rgba(var(--accent-rgb), 0.35); transform: scale(1.018); }
+}
