@@ -56,6 +56,42 @@ async function mediaModuleId(userId: string): Promise<string> {
   return mod.id;
 }
 
+// --- R&R "earn your leisure" budget helpers -----------------------------
+
+/** Day-of-week R&R allowance fallback (JS getDay() Sun..Sat): weekends get more. */
+const DEFAULT_RR_BUDGET = [2, 1, 1, 1, 1, 2, 3];
+
+/** Parse the stored rrBudgetByDay JSON → 7 non-negative ints (fallback default). */
+function parseRrBudget(raw: string | null | undefined): number[] {
+  const arr = parseJson<unknown[]>(raw ?? null);
+  if (!Array.isArray(arr) || arr.length !== 7) return DEFAULT_RR_BUDGET;
+  return arr.map(n => {
+    const v = Math.round(Number(n));
+    return Number.isFinite(v) && v >= 0 ? v : 0;
+  });
+}
+
+/** Read the user's R&R settings (budget array + soft-gate target id). */
+async function rrSettings(userId: string): Promise<{ budget: number[]; overrunAntiGoalId: string | null }> {
+  const s = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { rrBudgetByDay: true, rrOverrunAntiGoalId: true },
+  });
+  return { budget: parseRrBudget(s?.rrBudgetByDay), overrunAntiGoalId: s?.rrOverrunAntiGoalId ?? null };
+}
+
+// Default per-medium pace, used when the ledger is too sparse to derive a rate.
+// minutes-per-page mirrors the estimator's DEFAULT_READING_MIN_PER_PAGE.
+const PACE_FALLBACK = {
+  book:  { minPerPage: DEFAULT_READING_MIN_PER_PAGE, pagesPerDay: 20, minPerDay: 60 },
+  show:  { epsPerDay: 1, minPerDay: 45 },
+  game:  { minPerDay: 26, minPerWeek: 180 },
+  movie: { perWeek: 2 },
+  refEpisodeMin: 45,
+};
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
 // --- schemas ------------------------------------------------------------
 
 const metaSchema = z.record(z.unknown());
@@ -99,6 +135,12 @@ const progressSchema = z.object({
   status:    STATUS.optional(),
 });
 
+const sessionSchema = z.object({
+  kind:    z.enum(['start', 'progress', 'finish']).default('progress'),
+  minutes: z.number().int().min(0).max(100000).optional(),   // time consumed this session
+  units:   z.number().int().min(0).max(100000).optional(),   // eps/pages advanced (show/book)
+});
+
 // --- list ---------------------------------------------------------------
 
 /** GET /api/media?status=&type= */
@@ -116,6 +158,92 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   });
 
   res.json({ items: items.map(serialize) });
+}));
+
+// --- pace + R&R status (drives the planner's ETAs, chunks, this-week) ----
+
+/**
+ * GET /api/media/pace
+ *
+ * Returns history-derived consumption PACE (per medium), the trailing-7-day
+ * minutes consumed ("this week"), and the R&R "earn your leisure" status:
+ * today's day-of-week budget, how much is used, the banked stockpile, what's
+ * left, and the configured soft-gate anti-goal. Rates fall back to sensible
+ * defaults when the session ledger is too sparse to derive one.
+ */
+router.get('/pace', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const today = startOfLocalDay();
+
+  const since28 = startOfLocalDay();
+  since28.setDate(since28.getDate() - 27);
+  const since7 = startOfLocalDay();
+  since7.setDate(since7.getDate() - 6);
+
+  const [sessions, player, { budget, overrunAntiGoalId }] = await Promise.all([
+    prisma.mediaSession.findMany({
+      where: { userId, createdAt: { gte: since28 } },
+      select: { mediaItemId: true, type: true, minutes: true, units: true, createdAt: true, charged: true, chargeSource: true },
+    }),
+    prisma.playerProfile.findUnique({ where: { userId }, select: { rrCredits: true } }),
+    rrSettings(userId),
+  ]);
+
+  // Per-type 28-day rollups.
+  const agg: Record<string, { min: number; units: number; count: number }> = {
+    book: { min: 0, units: 0, count: 0 }, show: { min: 0, units: 0, count: 0 },
+    game: { min: 0, units: 0, count: 0 }, movie: { min: 0, units: 0, count: 0 },
+  };
+  let weekMinutes = 0;
+  let budgetUsedToday = 0;
+  // Titles already charged today → the planner skips the soft-gate confirm for
+  // them (per-title-per-day: they're free for the rest of the day).
+  const chargedTodayItemIds = new Set<string>();
+  for (const s of sessions) {
+    const a = agg[s.type];
+    if (a) { a.min += s.minutes; a.units += s.units ?? 0; a.count += 1; }
+    if (s.createdAt >= since7) weekMinutes += s.minutes;
+    if (s.charged && s.createdAt >= today) chargedTodayItemIds.add(s.mediaItemId);
+    if (s.charged && s.chargeSource === 'budget' && s.createdAt >= today) budgetUsedToday += 1;
+  }
+  const DAYS = 28;
+
+  const book = agg.book.units > 0
+    ? { minPerPage: r2(agg.book.min / agg.book.units), pagesPerDay: Math.round(agg.book.units / DAYS), minPerDay: Math.round(agg.book.min / DAYS) }
+    : PACE_FALLBACK.book;
+  const show = agg.show.units > 0
+    ? { epsPerDay: r1(agg.show.units / DAYS), minPerDay: Math.round(agg.show.min / DAYS) }
+    : PACE_FALLBACK.show;
+  const game = agg.game.min > 0
+    ? { minPerDay: Math.round(agg.game.min / DAYS), minPerWeek: Math.round(agg.game.min / 4) }
+    : PACE_FALLBACK.game;
+  const movie = agg.movie.count > 0
+    ? { perWeek: r1(agg.movie.count / 4) }
+    : PACE_FALLBACK.movie;
+
+  const dow = today.getDay();
+  const dayBudget = budget[dow] ?? 0;
+  const banked = player?.rrCredits ?? 0;
+  const remaining = Math.max(0, dayBudget - budgetUsedToday) + banked;
+
+  let overrunTargetName: string | null = null;
+  if (overrunAntiGoalId) {
+    const h = await prisma.habit.findFirst({
+      where: { id: overrunAntiGoalId, userId, polarity: 'avoid' },
+      select: { title: true },
+    });
+    overrunTargetName = h?.title ?? null;
+  }
+
+  res.json({
+    pace: { book, show, game, movie, refEpisodeMin: PACE_FALLBACK.refEpisodeMin },
+    weekMinutes,
+    chargedTodayItemIds: [...chargedTodayItemIds],
+    rr: {
+      dayBudget, usedToday: budgetUsedToday, banked, remaining,
+      overrunTargetId: overrunAntiGoalId, overrunTargetName,
+    },
+  });
 }));
 
 // --- lookup (estimate only, does NOT persist) ---------------------------
@@ -143,9 +271,14 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
   const moduleId = await mediaModuleId(userId);
 
-  // Auto-estimate to fill gaps only when the client didn't provide a time.
+  // Endless games (fighting/roguelike/multiplayer) have no finish line — no
+  // estimate, no total. They track lifetime minutes via unitsDone.
+  const endless = data.type === 'game' && (data.meta as Record<string, unknown> | undefined)?.endless === true;
+
+  // Auto-estimate to fill gaps only when the client didn't provide a time
+  // (and never for endless games).
   let est = null as Awaited<ReturnType<typeof estimateMedia>>;
-  if (data.estMinutes == null) {
+  if (data.estMinutes == null && !endless) {
     est = await estimateMedia(data.type as MediaType, data.title);
   }
 
@@ -168,10 +301,11 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
       type: data.type,
       title: data.title,
       status: data.status ?? 'backlog',
-      estMinutes: data.estMinutes ?? est?.estMinutes ?? null,
-      totalUnits: data.totalUnits ?? est?.totalUnits ?? null,
+      estMinutes: endless ? null : (data.estMinutes ?? est?.estMinutes ?? null),
+      totalUnits: endless ? null : (data.totalUnits ?? est?.totalUnits ?? null),
       unitsDone: data.unitsDone ?? 0,
-      coverUrl: data.coverUrl ?? est?.coverUrl ?? null,
+      coverUrl: data.coverUrl ?? null, // cover art intentionally not fetched anymore
+
       externalId: data.externalId ?? est?.externalId ?? null,
       externalSource: data.externalSource ?? est?.externalSource ?? null,
       metaJson: Object.keys(meta).length > 0 ? JSON.stringify(meta) : null,
@@ -332,6 +466,135 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
   }
 
   res.json({ item: serialize(item), player, questAutoCompleted });
+}));
+
+// --- session log (consumption + the soft R&R charge) --------------------
+
+/**
+ * POST /api/media/:id/session  { kind, minutes?, units? }
+ *
+ * The unified consumption logger — every JACK IN (kind:'start') and every
+ * time/units log goes through here. In one transaction it:
+ *   1. advances the item's progress (unitsDone in its natural unit: eps/pages
+ *      for show/book, minutes for movie/game/endless) and flips a 'start' to
+ *      status:'active';
+ *   2. writes a MediaSession ledger row (powers PACE + "this week"); and
+ *   3. runs the SOFT R&R charge, PER TITLE PER DAY: the first charged session
+ *      on this item today spends one credit — today's day-of-week budget
+ *      first, then the banked/bought stockpile, else a SOFT GATE (always
+ *      allowed) that logs a breach on the user's configured anti-goal. Further
+ *      logging on the same title the same day is free.
+ *
+ * Status transitions to done/dropped stay on /progress (the quest closed-loop).
+ */
+router.post('/:id/session', asyncHandler(async (req: AuthRequest, res) => {
+  const data = sessionSchema.parse(req.body ?? {});
+  const userId = req.user!.id;
+
+  const existing = await prisma.mediaItem.findFirst({ where: { id: req.params.id, userId } });
+  if (!existing) throw new AppError('Media item not found', 404);
+
+  const meta = parseJson<Record<string, unknown>>(existing.metaJson) ?? {};
+  const endless = meta.endless === true;
+  const today = startOfLocalDay();
+  const { budget, overrunAntiGoalId } = await rrSettings(userId);
+
+  const minutes = data.minutes ?? 0;
+  const units = data.units ?? 0;
+
+  // Advance progress in the item's natural unit.
+  let nextUnitsDone = existing.unitsDone;
+  if (existing.type === 'show' || existing.type === 'book') {
+    const cap = existing.totalUnits ?? Number.MAX_SAFE_INTEGER;
+    nextUnitsDone = Math.max(0, Math.min(cap, existing.unitsDone + units));
+  } else {
+    // movie / game: progress is minutes. Finite items cap at estMinutes.
+    const cap = !endless && existing.estMinutes != null ? existing.estMinutes : Number.MAX_SAFE_INTEGER;
+    nextUnitsDone = Math.max(0, Math.min(cap, existing.unitsDone + minutes));
+  }
+
+  let charged = false;
+  let chargeSource: 'budget' | 'banked' | 'overrun' | null = null;
+  let overran = false;
+  let overrunTargetName: string | null = null;
+  let breachedHabitId: string | null = null;
+
+  const item = await prisma.$transaction(async (tx) => {
+    // Has this title already taken its daily R&R charge?
+    const priorCharged = await tx.mediaSession.count({
+      where: { mediaItemId: existing.id, charged: true, createdAt: { gte: today } },
+    });
+
+    if (priorCharged === 0) {
+      const dayBudget = budget[today.getDay()] ?? 0;
+      const budgetUsedToday = await tx.mediaSession.count({
+        where: { userId, charged: true, chargeSource: 'budget', createdAt: { gte: today } },
+      });
+      if (budgetUsedToday < dayBudget) {
+        charged = true; chargeSource = 'budget';                 // within today's free allowance
+      } else {
+        const dec = await tx.playerProfile.updateMany({
+          where: { userId, rrCredits: { gt: 0 } },
+          data: { rrCredits: { decrement: 1 } },
+        });
+        if (dec.count === 1) {
+          charged = true; chargeSource = 'banked';               // spend a bought/banked credit
+        } else {
+          // Soft gate: allowed, but it logs a breach on the chosen anti-goal.
+          charged = true; chargeSource = 'overrun'; overran = true;
+          if (overrunAntiGoalId) {
+            const habit = await tx.habit.findFirst({
+              where: { id: overrunAntiGoalId, userId, polarity: 'avoid' },
+              select: { id: true, title: true },
+            });
+            if (habit) {
+              overrunTargetName = habit.title;
+              try {
+                await tx.habitCompletion.create({
+                  data: { userId, habitId: habit.id, completedOn: today, xpAwarded: 0, source: 'media-overrun' },
+                });
+              } catch (err: any) {
+                if (err?.code !== 'P2002') throw err;             // already breached today — no-op
+              }
+              await tx.habit.update({ where: { id: habit.id }, data: { currentStreak: 0 } });
+              breachedHabitId = habit.id;
+            }
+          }
+        }
+      }
+    }
+
+    await tx.mediaSession.create({
+      data: {
+        userId, mediaItemId: existing.id, type: existing.type,
+        minutes, units: (existing.type === 'show' || existing.type === 'book') ? units : null,
+        kind: data.kind, charged, chargeSource,
+      },
+    });
+
+    return tx.mediaItem.update({
+      where: { id: existing.id },
+      data: {
+        unitsDone: nextUnitsDone,
+        status: data.kind === 'start' && existing.status === 'backlog' ? 'active' : undefined,
+      },
+    });
+  });
+
+  // Fire breach side-effects outside the tx (mirrors /antigoals breach).
+  if (breachedHabitId) {
+    const ws = (global as any).wsService;
+    if (ws?.broadcastGameEvent) ws.broadcastGameEvent(userId, 'antigoal-breached', { antigoalId: breachedHabitId });
+    void emitHandlerEvent(prisma, userId, { type: 'antigoal_breached', name: overrunTargetName ?? 'leisure', antigoalId: breachedHabitId });
+  }
+
+  res.json({
+    item: serialize(item),
+    charged,
+    chargeSource,
+    overran,
+    overrunTargetName,
+  });
 }));
 
 // --- R&R redemption (spend a downtime credit to activate a backlog item) -

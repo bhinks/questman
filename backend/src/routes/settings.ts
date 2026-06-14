@@ -44,6 +44,10 @@ const updateSchema = z.object({
   ollamaUrl: z.string().url().max(200).optional(),
   ollamaModel: z.string().min(1).max(80).optional(),
   aiDailyTokenCap: z.number().int().min(0).max(10_000_000).optional(),
+  // R&R "earn your leisure" (Media): day-of-week budget JSON + the soft-gate
+  // anti-goal the planner breaches when you overrun it (null = inert).
+  rrBudgetByDay: z.string().max(100).optional(),
+  rrOverrunAntiGoalId: z.string().max(60).nullable().optional(),
 });
 
 const SETTINGS_SELECT = {
@@ -54,6 +58,7 @@ const SETTINGS_SELECT = {
   aiProvider: true, aiModelQuests: true, aiModelHandler: true,
   ollamaUrl: true, ollamaModel: true, aiDailyTokenCap: true,
   aiTokensUsed: true, aiTokensUsedOn: true,
+  rrBudgetByDay: true, rrOverrunAntiGoalId: true,
 } as const;
 
 type SettingsRow = {
@@ -64,6 +69,7 @@ type SettingsRow = {
   aiProvider: string; aiModelQuests: string | null; aiModelHandler: string | null;
   ollamaUrl: string; ollamaModel: string; aiDailyTokenCap: number;
   aiTokensUsed: number; aiTokensUsedOn: Date | null;
+  rrBudgetByDay: string; rrOverrunAntiGoalId: string | null;
 };
 
 function project(s: SettingsRow | null) {
@@ -84,6 +90,8 @@ function project(s: SettingsRow | null) {
     aiDailyTokenCap: AI_DEFAULTS.aiDailyTokenCap,
     aiTokensUsed: 0,
     aiTokensUsedOn: null as Date | null,
+    rrBudgetByDay: '[2,1,1,1,1,2,3]',
+    rrOverrunAntiGoalId: null as string | null,
   };
   const { aiTokensUsed, aiTokensUsedOn, ...rest } = base;
   return {

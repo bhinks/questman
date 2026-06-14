@@ -449,6 +449,50 @@ export interface DailyMetric {
   value: number;
 }
 
+// ---- Media planner: pace + R&R status (GET /api/media/pace) --------------
+export interface MediaPace {
+  book: { minPerPage: number; pagesPerDay: number; minPerDay: number };
+  show: { epsPerDay: number; minPerDay: number };
+  game: { minPerDay: number; minPerWeek: number };
+  movie: { perWeek: number };
+  refEpisodeMin: number;
+}
+export interface MediaRrStatus {
+  dayBudget: number;       // today's day-of-week allowance
+  usedToday: number;       // budget credits spent today
+  banked: number;          // bought/banked stockpile (rrCredits)
+  remaining: number;       // (dayBudget − usedToday) + banked
+  overrunTargetId: string | null;
+  overrunTargetName: string | null;
+}
+export interface MediaPaceResponse {
+  pace: MediaPace;
+  weekMinutes: number;     // minutes consumed in the trailing 7 days
+  chargedTodayItemIds: string[]; // titles already charged R&R today (free rest of day)
+  rr: MediaRrStatus;
+}
+/** Response from POST /api/media/:id/session (the consumption logger). */
+export interface MediaSessionResult {
+  item: MediaItem;
+  charged: boolean;
+  chargeSource: 'budget' | 'banked' | 'overrun' | null;
+  overran: boolean;
+  overrunTargetName: string | null;
+}
+/** AUTO-ESTIMATE result (POST /api/media/lookup) — length data only, no cover art. */
+export interface MediaEstimate {
+  pages?: number;       // book
+  episodes?: number;    // show
+  perEpMin?: number;    // show — minutes per episode
+  runtimeMin?: number;  // movie
+  gameHours?: number;   // game — main-story time-to-beat
+  estMinutes?: number;  // total time commitment
+  totalUnits?: number;  // pages | episodes
+  externalId?: string;
+  externalSource?: string;
+  meta?: Record<string, unknown>;
+}
+
 export interface Interaction {
   id: string;
   npcId: string;
@@ -695,8 +739,14 @@ export interface AiSettings {
   aiTokensUsedToday: number; // burned against the cap so far today
 }
 
-/** The full /api/settings payload: display + AI calibration blocks. */
-export interface AppSettings extends DisplaySettings, AiSettings {}
+// ---- R&R "earn your leisure" budget (Media page) -------------------------
+export interface RrSettings {
+  rrBudgetByDay: string;             // JSON of 7 ints (getDay() Sun..Sat)
+  rrOverrunAntiGoalId: string | null; // soft-gate target anti-goal (null = inert)
+}
+
+/** The full /api/settings payload: display + AI calibration + R&R blocks. */
+export interface AppSettings extends DisplaySettings, AiSettings, RrSettings {}
 export interface SettingsResponse { settings: AppSettings; }
 
 // ---- intelligence layer (phase 6): Handler, insights, weekly debrief -----

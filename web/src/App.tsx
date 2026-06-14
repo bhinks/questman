@@ -361,7 +361,7 @@ function HubApp() {
         return <ProjectsView />;
 
       case 'media':
-        return <MediaView />;
+        return <MediaView onJackIn={openFocus} />;
 
       case 'social':
         return <NpcsView />;

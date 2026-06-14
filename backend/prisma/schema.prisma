@@ -44,6 +44,7 @@ model User {
   // New quest pools (phase 2)
   projects             Project[]
   mediaItems           MediaItem[]
+  mediaSessions        MediaSession[]
   dailyMetrics         DailyMetric[]
   metricDefs           MetricDef[]
   npcs                 Npc[]
@@ -94,6 +95,13 @@ model UserSettings {
   // WHAT to do, never WHEN (roadmap §5).
   weekdayBudgetMin   Int     @default(240)
   weekendBudgetMin   Int     @default(600)
+
+  // R&R "earn your leisure" budget (Media page). A day-of-week allowance of
+  // free media sessions (JSON of 7 ints, JS getDay() Sun..Sat) — weekends get
+  // more. Spending order: today's budget, then bought/banked rrCredits, then a
+  // SOFT GATE (always allowed) that logs a breach on rrOverrunAntiGoalId if set.
+  rrBudgetByDay      String  @default("[2,1,1,1,1,2,3]")
+  rrOverrunAntiGoalId String? // ICE/anti-goal the soft gate breaches (null = inert)
 
   // Intelligence layer (phase 6): the AI Handler persona. A configurable
   // character that narrates the day (Brent picked "sardonic rogue AI").
@@ -940,9 +948,37 @@ model MediaItem {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  sessions       MediaSession[]
+
   @@index([userId, status])
   @@index([userId, type])
   @@map("media_items")
+}
+
+// One logged consumption session against a media item — written every time
+// you jack in or log time/units. The ledger powers the real PACE rates, the
+// "this week" consumed stat, and the per-title-per-day R&R charge (charged +
+// chargeSource record whether/how an R&R credit was spent).
+model MediaSession {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaItemId  String
+  mediaItem    MediaItem  @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+
+  type         String    // "movie"|"show"|"game"|"book" (denormalized for pace rollups)
+  minutes      Int       @default(0) // minutes consumed in this session
+  units        Int?      // eps/pages delta when applicable (null for movie/game minutes)
+  kind         String    @default("progress") // "start"|"progress"|"finish"
+
+  charged      Boolean   @default(false)      // did this session spend an R&R credit?
+  chargeSource String?   // "budget"|"banked"|"overrun"|null
+
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([mediaItemId, createdAt])
+  @@map("media_sessions")
 }
 
 // --- Daily log / vitals ("Biomonitor") ------------------------------
