@@ -450,15 +450,22 @@ export class QuestEngine {
   }
 
   /**
-   * Anti-goals ("ICE") clean-day credit. For each active avoid-habit that
-   * was NOT breached yesterday, award its clean-day reward (XP + eddies via
-   * the single economy mutation point) and bump the avoidance streak; a
-   * breach yesterday leaves the streak broken. Runs once per local day (same
-   * gate as the economy roll-over), so credits are not duplicated.
+   * Anti-goals ("ICE") clean-day credit, backfilled across every complete day
+   * since the last roll-over. For each active avoid-habit and each gap day with
+   * no logged breach, award its clean-day reward (XP + eddies via the single
+   * economy mutation point) and extend the avoidance streak; a breach on a day
+   * resets that habit's streak. This realizes the honor-system model — "every
+   * day with no logged incident is a clean day" — even after a multi-day gap.
    *
-   * touchStreak:false — a clean day is passive (the user took no action), so
-   * it must not maintain the GLOBAL daily-activity streak; the per-habit
-   * avoidance streak is tracked separately on the habit.
+   * The gap spans [last past DailyQuestRun.runDate .. yesterday] (no schema
+   * change — the most-recent prior run is the anchor); the normal daily cadence
+   * makes that exactly [yesterday]. Runs once per local day (gated by the
+   * DailyQuestRun claim in ensureToday), so credits are never duplicated, and
+   * the window is capped at 60 days so a long-dormant instance can't loop away.
+   *
+   * touchStreak:false — a clean day is passive (the user took no action), so it
+   * must not maintain the GLOBAL daily-activity streak; the per-habit avoidance
+   * streak is tracked separately on the habit.
    */
   private async processAntiGoalsForNewDay(userId: string, today: Date, yesterday: Date): Promise<void> {
     const avoids = await this.prisma.habit.findMany({
@@ -466,52 +473,80 @@ export class QuestEngine {
     });
     if (avoids.length === 0) return;
 
+    // Anchor the backfill on the most-recent past run; clamp to a 60-day window.
+    const lastRun = await this.prisma.dailyQuestRun.findFirst({
+      where: { userId, runDate: { lt: today } },
+      orderBy: { runDate: 'desc' },
+      select: { runDate: true },
+    });
+    const windowStart = daysAgoLocal(60); // never backfill more than 60 days
+    let gapStart = lastRun ? startOfLocalDay(new Date(lastRun.runDate)) : yesterday;
+    if (gapStart.getTime() < windowStart.getTime()) gapStart = windowStart;
+    if (gapStart.getTime() > yesterday.getTime()) return; // no complete day to credit
+
+    // The chronological list of complete days to judge.
+    const gapDays: Date[] = [];
+    for (let d = gapStart; d.getTime() <= yesterday.getTime(); d = daysAgoLocal(-1, d)) {
+      gapDays.push(d);
+    }
+
     const avoidIds = avoids.map(h => h.id);
-    const breached = new Set(
+    // Every breach across the window, keyed by habit + local day.
+    const breachKey = (habitId: string, day: Date) => `${habitId}|${day.getTime()}`;
+    const breaches = new Set(
       (await this.prisma.habitCompletion.findMany({
-        where: { userId, completedOn: yesterday, habitId: { in: avoidIds } },
-        select: { habitId: true },
-      })).map(c => c.habitId),
+        where: { userId, habitId: { in: avoidIds }, completedOn: { gte: gapStart, lte: yesterday } },
+        select: { habitId: true, completedOn: true },
+      })).map(c => breachKey(c.habitId, startOfLocalDay(new Date(c.completedOn)))),
     );
 
     for (const h of avoids) {
-      // Only credit a day the anti-goal existed for in FULL — i.e. it was
-      // created on a strictly earlier calendar day than `yesterday`. (Comparing
-      // the raw createdAt timestamp to `today` would over-credit an anti-goal
-      // made partway through yesterday for that whole day.) And never double-
-      // credit the same day (defensive — the daily gate already ensures once).
-      if (startOfLocalDay(h.createdAt) >= yesterday) continue;
-      if (h.lastCompletedOn && isSameLocalDay(h.lastCompletedOn, yesterday)) continue;
+      const createdDay = startOfLocalDay(new Date(h.createdAt));
+      const lastCredited = h.lastCompletedOn ? startOfLocalDay(new Date(h.lastCompletedOn)) : null;
+      let streak = h.currentStreak;
+      let longest = h.longestStreak;
+      const cleanDays: Date[] = [];
 
-      if (breached.has(h.id)) {
-        // A slip yesterday — make sure the avoidance streak is broken.
-        if (h.currentStreak !== 0) {
-          await this.prisma.habit.update({ where: { id: h.id }, data: { currentStreak: 0 } });
+      for (const day of gapDays) {
+        // Only judge a day the anti-goal existed for in FULL (created strictly
+        // earlier), and never re-judge a day already credited in a prior run.
+        if (createdDay.getTime() >= day.getTime()) continue;
+        if (lastCredited && lastCredited.getTime() >= day.getTime()) continue;
+
+        if (breaches.has(breachKey(h.id, day))) {
+          streak = 0; // a slip resets the avoidance streak as of that day
+          continue;
         }
-        continue;
+        streak += 1;
+        longest = Math.max(longest, streak);
+        cleanDays.push(day);
       }
 
-      // Clean day → reward + extend the avoidance streak, atomically.
+      // Nothing moved for this habit → skip the write entirely.
+      if (cleanDays.length === 0 && streak === h.currentStreak) continue;
+
       const mod = await this.prisma.module.findUnique({
         where: { id: h.moduleId }, select: { key: true },
       });
-      const nextStreak = h.currentStreak + 1;
       await this.prisma.$transaction(async (tx) => {
-        await this.game.awardXp(userId, {
-          amount: h.baseXp,
-          eddies: eddiesForReward(h.baseXp, h.difficulty),
-          reason: 'anti_goal_clean',
-          module: mod?.key,
-          refType: 'habit',
-          refId: h.id,
-          touchStreak: false,
-        }, tx);
+        for (const day of cleanDays) {
+          await this.game.awardXp(userId, {
+            amount: h.baseXp,
+            eddies: eddiesForReward(h.baseXp, h.difficulty),
+            reason: 'anti_goal_clean',
+            module: mod?.key,
+            refType: 'habit',
+            refId: h.id,
+            touchStreak: false,
+            meta: { cleanDay: day.toISOString() },
+          }, tx);
+        }
         await tx.habit.update({
           where: { id: h.id },
           data: {
-            currentStreak: nextStreak,
-            longestStreak: Math.max(h.longestStreak, nextStreak),
-            lastCompletedOn: yesterday,
+            currentStreak: streak,
+            longestStreak: longest,
+            ...(cleanDays.length > 0 ? { lastCompletedOn: cleanDays[cleanDays.length - 1] } : {}),
           },
         });
       });
