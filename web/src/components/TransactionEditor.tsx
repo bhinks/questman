@@ -165,8 +165,17 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>DATE</label>
-              <input type="date" value={t.date.toISOString().split('T')[0]}
-                onChange={(e) => setT(p => ({ ...p, date: new Date(e.target.value) }))}
+              {/* Format/parse on LOCAL calendar fields, not UTC. toISOString()
+                  yields the UTC day (a day ahead for an evening timestamp in a
+                  negative-offset zone), and new Date('YYYY-MM-DD') parses as UTC
+                  midnight — so the old round-trip walked the date a day on each
+                  open/save. Local fields keep it stable. */}
+              <input type="date"
+                value={`${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}-${String(t.date.getDate()).padStart(2, '0')}`}
+                onChange={(e) => {
+                  const [y, m, d] = e.target.value.split('-').map(Number);
+                  setT(p => ({ ...p, date: new Date(y, (m || 1) - 1, d || 1) }));
+                }}
                 style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} />
             </div>
             <div>

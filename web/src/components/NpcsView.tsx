@@ -209,7 +209,7 @@ function ReachOutLane({ npcs, onOpen }: { npcs: Npc[]; onOpen: (id: string) => v
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-primary" style={{ flex: 1, padding: '6px', fontSize: 10 }}
                     disabled={logMut.isPending}
-                    onClick={() => logMut.mutate({ npcId: n.id, channel: 'text', initiatedBy: 'me', note: null })}>
+                    onClick={() => logMut.mutate({ npcId: n.id, channel: null, initiatedBy: 'me', note: null })}>
                     <Icon name="check" size={11} /> REACHED OUT
                   </button>
                   <button className="btn btn-ghost" style={{ padding: '6px 9px', fontSize: 10 }} onClick={() => onOpen(n.id)} title="Log details">{'…'}</button>

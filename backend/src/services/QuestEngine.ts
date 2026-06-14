@@ -127,21 +127,33 @@ export class QuestEngine {
       logger.warn(`[QuestEngine] daily roll-over failed for user ${userId}: ${err?.message ?? err}`);
     }
 
-    // Carry-over + expiry of yesterday's pending quests (roadmap §5).
+    // Carry-over + expiry of ALL stale pending quests (roadmap §5).
     // Quests flagged carryOver (or mustDo, which always carries) roll
     // forward to today by moving their questDate; everything else
     // expires. Carrying happens BEFORE generation so today's fresh
     // candidates that dup a carried source get skipped by the Quest
     // @@unique([userId, questDate, source, sourceId]) guard.
+    //
+    // Key on questDate { lt: today }, NOT just yesterday: if the user skips a
+    // day, "yesterday" has no quests and the prior day's pending quests would
+    // be stranded as 'pending' forever (never carried, never expired). Sweeping
+    // every stale day fixes that. The carry is wrapped defensively (the run row
+    // is already committed) so a rare collision against the
+    // @@unique([userId, questDate, source, sourceId]) constraint can't block
+    // generation — the expiry sweep below still cleans up whatever didn't move.
+    try {
+      await this.prisma.quest.updateMany({
+        where: {
+          userId, questDate: { lt: today }, status: 'pending',
+          OR: [{ carryOver: true }, { mustDo: true }],
+        },
+        data: { questDate: today },
+      });
+    } catch (err: any) {
+      logger.warn(`[QuestEngine] carry-over sweep failed for user ${userId}: ${err?.message ?? err}`);
+    }
     await this.prisma.quest.updateMany({
-      where: {
-        userId, questDate: yesterday, status: 'pending',
-        OR: [{ carryOver: true }, { mustDo: true }],
-      },
-      data: { questDate: today },
-    });
-    await this.prisma.quest.updateMany({
-      where: { userId, questDate: yesterday, status: 'pending' },
+      where: { userId, questDate: { lt: today }, status: 'pending' },
       data: { status: 'expired' },
     });
 
@@ -381,13 +393,20 @@ export class QuestEngine {
     });
     if (!profile) return;
 
-    const yQuests = await this.prisma.quest.findMany({
-      where: { userId, questDate: yesterday },
-      select: { status: true, carryOver: true, mustDo: true },
+    // Judge the chain off ALL stale days, not just exactly-yesterday: a skipped
+    // day leaves "yesterday" empty, so keying on it alone would read a genuine
+    // multi-day lapse as "nothing to clear → unchanged" and never break the
+    // streak (nor let the Streak Shield fire). Pending non-carry quests on ANY
+    // past day are about to expire = misses.
+    const staleQuests = await this.prisma.quest.findMany({
+      where: { userId, questDate: { lt: today } },
+      select: { status: true, carryOver: true, mustDo: true, questDate: true },
     });
     // Quests still pending that WON'T carry are about to expire = misses.
-    const willExpire = yQuests.filter(q => q.status === 'pending' && !q.carryOver && !q.mustDo);
-    const completed = yQuests.filter(q => q.status === 'completed');
+    const willExpire = staleQuests.filter(q => q.status === 'pending' && !q.carryOver && !q.mustDo);
+    // A "+1 full clear" credits only a clean YESTERDAY (quests existed and at
+    // least one was completed) — never an older day or an empty gap.
+    const completed = staleQuests.filter(q => q.status === 'completed' && isSameLocalDay(q.questDate, yesterday));
 
     let overclockStreak = profile.overclockStreak;
     let rrGrant = 0;

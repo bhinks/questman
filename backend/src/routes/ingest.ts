@@ -28,10 +28,18 @@
 import express from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { prisma } from '../server';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { config } from '../config';
 import { startOfLocalDay } from '../utils/dates';
+
+/** Constant-time secret compare — avoids leaking the token via response timing. */
+function tokenMatches(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 import { logger } from '../utils/logger';
 import {
   healthConnectSchema, ingestHealthConnectPayload, resolveHubUserId,
@@ -56,7 +64,7 @@ async function resolveUserId(req: express.Request): Promise<string> {
   const headerToken = req.headers['x-ingest-token'];
   const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
   const token = typeof headerToken === 'string' ? headerToken : queryToken;
-  if (typeof token === 'string' && config.ingestToken && token === config.ingestToken) {
+  if (typeof token === 'string' && config.ingestToken && tokenMatches(token, config.ingestToken)) {
     const userId = await resolveHubUserId(prisma);
     if (!userId) throw new AppError('No hub user to ingest for', 401);
     return userId;

@@ -2,7 +2,7 @@
  * AppShell — the NIGHT CITY deck (design handoff, pixel-faithful).
  *
  * Layout: [ 240px deck | main(topbar / content) ] over a bottom status rail.
- *   - Deck: brand lockup, 5 nav groups (OPS / LIFE / PROGRESSION / VAULT /
+ *   - Deck: brand lockup, 5 nav groups (OPS / LIFE / VAULT / PROGRESSION /
  *     SYSTEM), arrow-wedge items, and the runner ID card pinned bottom
  *     (hex level badge, handle, slim segmented XP bar, LVL/streak/eddies).
  *   - Topbar: 3 hairline-divided cells — screen title + DAY serial, compact
@@ -49,7 +49,7 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     ['media', 'Media', 'play'], ['social', 'Social', 'flag'],
   ]},
   { group: 'VAULT', items: [
-    ['overview', 'Finance', 'wallet'], ['budgets', 'Budgets', 'target'],
+    ['overview', 'Finance', 'wallet'], ['budgets', 'Budgets', 'gauge'],
     ['bills', 'Bills', 'clock'], ['savings', 'Savings', 'trend'],
   ]},
   { group: 'PROGRESSION', items: [
@@ -357,7 +357,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
 
       {/* MOBILE BOTTOM NAV — 4 pinned tabs + MORE (the full deck). */}
       <nav className="bottom-nav">
-        {([['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'], ['overview', 'Vault', 'wallet'], ['progress', 'Cred', 'layers']] as NavItem[]).map(([id, label, icon]) => (
+        {([['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'], ['overview', 'Vault', 'wallet'], ['progress', 'Cred', 'trophy']] as NavItem[]).map(([id, label, icon]) => (
           <button
             key={id}
             onClick={() => { onTabChange(id); setMoreOpen(false); }}

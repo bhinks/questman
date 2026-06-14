@@ -585,7 +585,7 @@ export function OperationsView() {
         <SectionLabel icon="layers" count={looseChores.length}>UNCATEGORIZED — loose tasks &amp; chores</SectionLabel>
         <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: -4 }}>Not tied to a project. Move anything into one, or leave it here.</div>
         {looseChores.length === 0
-          ? <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>Empty — everything&rsquo;s organized. 🎯</div>
+          ? <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>Empty — everything&rsquo;s organized.</div>
           : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 12, alignItems: 'start' }}>
               {looseChores.map(c => (

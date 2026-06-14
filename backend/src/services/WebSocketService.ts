@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import { AuthRequest } from '../middleware/auth';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { prisma } from '../server';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -35,9 +36,17 @@ export class WebSocketService {
 
       // JWT is signed with `{ id, email }` (see routes/auth.ts), so read `id`.
       const decoded = jwt.verify(token, config.jwt.secret) as { id: string };
-      socket.userId = decoded.id;
 
-      logger.info(`Socket authenticated for user: ${decoded.id}`);
+      // Mirror the HTTP auth middleware: a valid signature isn't enough — the
+      // account must still exist, so a deleted user's un-expired token can't
+      // open a live socket.
+      const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true } });
+      if (!user) {
+        return next(new Error('Authentication error: Unknown user'));
+      }
+      socket.userId = user.id;
+
+      logger.info(`Socket authenticated for user: ${user.id}`);
       next();
     } catch (error) {
       logger.error('Socket authentication failed:', error);

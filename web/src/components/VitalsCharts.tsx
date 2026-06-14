@@ -8,7 +8,7 @@
  * Series arrive already windowed (the history endpoint returns exactly the
  * selected window), so these components plot the points as-given.
  */
-import { useRef, useState, useLayoutEffect } from 'react';
+import { useRef, useState, useLayoutEffect, useMemo } from 'react';
 import { Icon } from './Icon';
 
 export interface SeriesPoint { date: Date; value: number }
@@ -204,7 +204,7 @@ export function TrendChart({
 /* ---- combined blood-pressure plot: systolic + diastolic on shared axes,
         with the pulse-pressure gap shaded between them + per-line legend ---- */
 export function BpChart({
-  sys, dia, bands, chartStyle, showBand,
+  sys: sysRaw, dia: diaRaw, bands, chartStyle, showBand,
 }: {
   sys: SeriesPoint[];
   dia: SeriesPoint[];
@@ -215,6 +215,20 @@ export function BpChart({
   const [ref, W] = useWidth();
   const H = 150, PAD_T = 14, PAD_B = 8;
   const [hover, setHover] = useState<number | null>(null);
+
+  // Systolic & diastolic arrive as INDEPENDENT date-ordered series and can have
+  // readings on different days. BP is a paired measurement, so join by date and
+  // keep only days that have BOTH — otherwise index-zipping pairs a systolic
+  // reading with an unrelated day's diastolic (wrong lines, wrong pulse). The
+  // downstream render is unchanged: `sys`/`dia` are now index-aligned by date.
+  const sys = useMemo(() => {
+    const diaByDate = new Map(diaRaw.map(p => [p.date, p.value]));
+    return sysRaw.filter(p => diaByDate.has(p.date));
+  }, [sysRaw, diaRaw]);
+  const dia = useMemo(() => {
+    const diaByDate = new Map(diaRaw.map(p => [p.date, p.value]));
+    return sysRaw.filter(p => diaByDate.has(p.date)).map(p => ({ date: p.date, value: diaByDate.get(p.date)! }));
+  }, [sysRaw, diaRaw]);
 
   const sSt = stats(sys), dSt = stats(dia);
   const n = Math.min(sys.length, dia.length);

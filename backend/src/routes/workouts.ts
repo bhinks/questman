@@ -292,6 +292,9 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
         where: { userId, clientRequestId: data.clientRequestId },
       });
       deduped = true;
+      // Return a fresh snapshot even on dedup so a retry still refreshes the
+      // HUD/wallet — the award path that would have set `player` threw P2002.
+      player = await game().getSnapshot(userId);
     } else {
       throw e;
     }

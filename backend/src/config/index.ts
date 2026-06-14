@@ -10,7 +10,10 @@ const configSchema = z.object({
   
   jwt: z.object({
     secret: z.string().min(32),
-    expiresIn: z.string().default('7d')
+    // Accept ms()-style durations ("30d", "12h", "90m") or a bare seconds count
+    // ("3600"), so an operator typo fails fast at boot instead of throwing
+    // inside jwt.sign() on the first login.
+    expiresIn: z.string().regex(/^\d+(ms|s|m|h|d|w|y)?$/, 'JWT_EXPIRES_IN must look like 30d / 12h / 3600').default('7d')
   }),
   
   upload: z.object({
@@ -154,7 +157,15 @@ const env = {
 
 export const config = configSchema.parse(env);
 
-// Validate critical config on startup
-if (config.nodeEnv === 'production' && config.jwt.secret === 'your-super-secret-jwt-key-min-32-chars') {
-  throw new Error('JWT_SECRET must be set in production');
+// Validate critical config on startup. In production JWT_SECRET must be
+// explicitly provided AND not the bundled default, so a misconfigured deploy
+// fails loudly instead of signing tokens with a public, guessable key. (The
+// zod min(32) above already rejects short secrets in every environment.)
+if (config.nodeEnv === 'production') {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET must be explicitly set in production');
+  }
+  if (config.jwt.secret === 'your-super-secret-jwt-key-min-32-chars') {
+    throw new Error('JWT_SECRET must be changed from the default in production');
+  }
 }

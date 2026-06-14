@@ -151,14 +151,13 @@ router.post('/sessions', asyncHandler(async (req: AuthRequest, res) => {
   });
 
   // Quest focus keeps feeding estimate accuracy, same as the old inline timer.
+  // Atomic increment (scoped by userId) — POST /api/quests/:id/focus writes the
+  // same field, so a read-modify-write would lose updates when both fire.
   if (body.targetType === 'quest' && targetId) {
-    const quest = await prisma.quest.findFirst({ where: { id: targetId, userId } });
-    if (quest) {
-      await prisma.quest.update({
-        where: { id: quest.id },
-        data: { actualMinutes: (quest.actualMinutes ?? 0) + body.minutes },
-      });
-    }
+    await prisma.quest.updateMany({
+      where: { id: targetId, userId },
+      data: { actualMinutes: { increment: body.minutes } },
+    });
   }
 
   res.status(201).json({ session });

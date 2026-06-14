@@ -53,6 +53,7 @@ const ICON_PATHS: Record<string, string> = {
   plus:    'M12 5v14M5 12h14',
   zap:     'M13 2L4 14h7l-1 8 9-12h-7l1-8z',
   clock:   'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M12 7v5l3 2',
+  gauge:   'M4 15a8 8 0 0 1 16 0 M12 15l3.5-3.5',
 };
 
 export function Icon({ name, size = 18, stroke = 1.6, fill = false, style, className }: IconProps) {

@@ -75,6 +75,13 @@ function readActiveRun(): ActiveRun | null {
     if (!raw) return null;
     const j = JSON.parse(raw);
     if (typeof j?.startedAt !== 'number') return null;
+    // Discard a stale run: a tab reloaded days later must not resume a multi-day
+    // "open run". 48h matches the server-side startedAt clamp in POST
+    // /api/focus/sessions, so a discarded run couldn't have logged a real session.
+    if (Date.now() - j.startedAt > 48 * 60 * 60 * 1000) {
+      localStorage.removeItem(LS_KEY);
+      return null;
+    }
     return {
       startedAt: j.startedAt,
       limitMin: typeof j.limitMin === 'number' ? j.limitMin : null,

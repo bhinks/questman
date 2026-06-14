@@ -479,18 +479,18 @@ function generateRandomColor(): string {
 }
 
 async function wouldCreateCircularReference(categoryId: string, parentId: string): Promise<boolean> {
-  let currentId = parentId;
-  
+  let currentId: string | null = parentId;
+
   while (currentId) {
     if (currentId === categoryId) {
       return true;
     }
     
-    const parent = await prisma.category.findUnique({
+    const parent: { parentId: string | null } | null = await prisma.category.findUnique({
       where: { id: currentId },
       select: { parentId: true }
     });
-    
+
     currentId = parent?.parentId || null;
   }
   

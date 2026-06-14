@@ -304,16 +304,22 @@ router.post('/:id/check', asyncHandler(async (req: AuthRequest, res) => {
       player = snap;
       xpAwarded = habit.baseXp;
 
-      // Record the ACTUAL eddies banked (overclock multiplier included) so an
-      // undo reverses exactly this — not a recomputed raw value. Otherwise a
-      // check (multiplied) + undo (raw) cycle would mint eddies while overclocked.
-      const eddiesGranted = Math.round(
-        eddiesForReward(habit.baseXp, habit.difficulty) * (snap.eddieMultiplierApplied ?? 1),
-      );
+      // Record the ACTUAL eddies banked so an undo reverses exactly this — not a
+      // recomputed value. snap.eddiesDelta is the precise wallet write and
+      // already includes BOTH the overclock multiplier AND the Overdrive ×2
+      // booster; the old recompute used eddieMultiplierApplied (overclock only),
+      // so a check+undo cycle under an active booster minted free eddies.
       await tx.habitCompletion.update({
         where: { id: created.id },
-        data: { eddiesAwarded: eddiesGranted },
+        data: { eddiesAwarded: snap.eddiesDelta ?? 0 },
       });
+
+      // A 'once' habit is a one-shot to-do: deactivate it on completion so it
+      // stops surfacing as a live daemon (and stops re-generating a quest). The
+      // row stays for history / the Offline archive.
+      if (habit.cadence === 'once') {
+        await tx.habit.update({ where: { id: habit.id }, data: { isActive: false } });
+      }
 
       // Auto-complete any pending quest tied to this habit today.
       const pending = await tx.quest.findFirst({

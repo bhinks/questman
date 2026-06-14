@@ -94,6 +94,7 @@ export async function narrate(
   system: string,
   brief: string,
   maxTokens = 400,
+  maxChars = 600,
 ): Promise<string | null> {
   try {
     const text = await completeJson({
@@ -107,8 +108,10 @@ export async function narrate(
     const parsed = messageSchema.safeParse(JSON.parse(text));
     if (!parsed.success) return null;
     const msg = parsed.data.message.trim();
-    // Soft cap so a runaway response can't blow up the ticker.
-    return msg.length > 600 ? msg.slice(0, 599) + '…' : msg;
+    // Soft cap so a runaway response can't blow up the ticker. Per-call: the
+    // weekly debrief is a paragraph (70–120 words), not a one-line ticker, so it
+    // passes a larger maxChars to avoid truncating mid-sentence.
+    return msg.length > maxChars ? msg.slice(0, maxChars - 1) + '…' : msg;
   } catch (err: any) {
     logger.warn(`[handler] narration failed: ${err?.message ?? err}`);
     return null;
@@ -194,5 +197,7 @@ export async function narrateWeeklyDebrief(
     ...lines.map(l => `- ${l}`),
   ].join('\n');
 
-  return narrate(db, userId, settings, personaSystem(persona), brief, 500);
+  // 70–120 words ≈ up to ~750 chars; give it headroom so the debrief isn't
+  // clipped mid-sentence by the ticker-sized default cap.
+  return narrate(db, userId, settings, personaSystem(persona), brief, 500, 1000);
 }

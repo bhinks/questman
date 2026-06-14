@@ -68,7 +68,19 @@ router.get('/today', asyncHandler(async (req: AuthRequest, res) => {
       completedCount += 1;
       xpEarned += q.xpReward;
     } else if (q.status === 'pending') {
-      xpAvailable += q.xpReward;
+      // Counter quests drip XP per check-in (floor(xpReward·count/target),
+      // mirrored from /progress). The dripped portion is already banked in the
+      // ledger, so count only the UNEARNED remainder as "on the table", and the
+      // dripped portion as earned — otherwise the HUD over-promises XP and the
+      // BANKED bar reads low for a half-done counter. One-shots are unchanged.
+      const target = Math.max(1, q.targetCount);
+      if (target > 1 && q.currentCount > 0) {
+        const dripped = Math.floor((q.xpReward * q.currentCount) / target);
+        xpEarned += dripped;
+        xpAvailable += q.xpReward - dripped;
+      } else {
+        xpAvailable += q.xpReward;
+      }
     }
   }
 
@@ -436,13 +448,16 @@ router.post('/:id/focus', asyncHandler(async (req: AuthRequest, res) => {
     actualMinutes: z.number().int().min(0).max(1440),
   }).parse(req.body);
 
-  const quest = await prisma.quest.findFirst({ where: { id: req.params.id, userId } });
-  if (!quest) throw new AppError('Quest not found', 404);
-
-  const updated = await prisma.quest.update({
-    where: { id: quest.id },
-    data: { actualMinutes: (quest.actualMinutes ?? 0) + actualMinutes },
+  // Atomic accumulate: actualMinutes is also written by POST /api/focus/:id/stop,
+  // so a read-modify-write here would lose updates when both fire close together.
+  // updateMany with userId in the WHERE is both the ownership check and the
+  // atomic increment in one statement.
+  const upd = await prisma.quest.updateMany({
+    where: { id: req.params.id, userId },
+    data: { actualMinutes: { increment: actualMinutes } },
   });
+  if (upd.count === 0) throw new AppError('Quest not found', 404);
+  const updated = await prisma.quest.findFirst({ where: { id: req.params.id, userId } });
   res.json({ quest: updated });
 }));
 

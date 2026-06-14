@@ -114,6 +114,10 @@ export interface PlayerSnapshot {
   previousLevel?: number;
   /** Set on awardXp when the overclock multiplier boosted this eddie earn. */
   eddieMultiplierApplied?: number;
+  /** The EXACT eddies written to the wallet by this award (overclock multiplier
+   *  AND the Overdrive ×2 booster already applied). Persist + reverse THIS for
+   *  undoable grants — never a recompute. */
+  eddiesDelta?: number;
   /** True when THIS award ticked the daily streak (first activity of the day).
    *  Lets callers fire a one-shot streak-milestone reaction without re-reading. */
   streakAdvanced?: boolean;
@@ -422,6 +426,12 @@ export class GamificationService {
         leveledUp: nextLevel > previousLevel,
         previousLevel,
         eddieMultiplierApplied: earn && mult > 1 ? mult : undefined,
+        // The EXACT eddies written to the wallet this award (already includes
+        // overclock multiplier AND the Overdrive ×2 booster). Callers that need
+        // to reverse a grant later (e.g. habit uncheck) must persist and reverse
+        // THIS, never a recompute — otherwise undo under an active booster
+        // reverses less than was banked and mints free eddies.
+        eddiesDelta,
         streakAdvanced,
       } satisfies PlayerSnapshot;
     };

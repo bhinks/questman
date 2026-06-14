@@ -134,19 +134,24 @@ export function modelFor(s: AiSettings, tier: AiTier): string {
  */
 async function recordUsage(db: Db, userId: string, tokens: number, today: Date): Promise<void> {
   try {
-    const row = await db.userSettings.findUnique({
-      where: { userId },
-      select: { aiTokensUsedOn: true },
+    // Atomic same-day increment: keying the WHERE on aiTokensUsedOn === today
+    // lets concurrent calls on the same local day COMPOSE via { increment }
+    // instead of a read-modify-write where the second call's reset branch
+    // clobbers the first. (today is always startOfLocalDay(), so the stored
+    // value is exactly local-midnight and the equality match is reliable.)
+    const inc = await db.userSettings.updateMany({
+      where: { userId, aiTokensUsedOn: today },
+      data: { aiTokensUsed: { increment: tokens } },
     });
-    const sameDay = row?.aiTokensUsedOn &&
-      startOfLocalDay(new Date(row.aiTokensUsedOn)).getTime() === today.getTime();
-    await db.userSettings.upsert({
+    if (inc.count > 0) return;
+    // No row dated today → first call of the local day: reset the counter.
+    const reset = await db.userSettings.updateMany({
       where: { userId },
-      update: sameDay
-        ? { aiTokensUsed: { increment: tokens } }
-        : { aiTokensUsed: tokens, aiTokensUsedOn: today },
-      create: { userId, aiTokensUsed: tokens, aiTokensUsedOn: today },
+      data: { aiTokensUsed: tokens, aiTokensUsedOn: today },
     });
+    if (reset.count > 0) return;
+    // No settings row yet → create one.
+    await db.userSettings.create({ data: { userId, aiTokensUsed: tokens, aiTokensUsedOn: today } });
   } catch (err: any) {
     logger.warn(`[llm] usage accounting failed: ${err?.message ?? err}`);
   }

@@ -10,6 +10,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
+import { rateLimit } from './middleware/rateLimit';
 import { startHealthPull } from './services/healthSync';
 import { WebSocketService } from './services/WebSocketService';
 
@@ -67,7 +68,18 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+// Redact secret query params before logging. morgan 'combined' logs the full
+// URL incl. the query string, so the long-lived INGEST_TOKEN passed as
+// /api/ingest/health-connect?token=... would otherwise be persisted to
+// logs/combined.log (and the console) in plaintext. Header-based auth is
+// preferred; this protects the documented ?token= fallback.
+morgan.token('safeUrl', (req: any) => {
+  const url: string = req.originalUrl || req.url || '';
+  return url.replace(/([?&](?:token|access_token|api_key)=)[^&]*/gi, '$1[REDACTED]');
+});
+const LOG_FORMAT =
+  ':remote-addr - :remote-user [:date[clf]] ":method :safeUrl HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"';
+app.use(morgan(LOG_FORMAT, { stream: { write: message => logger.info(message.trim()) } }));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -78,8 +90,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Throttle the credential/secret surfaces (login, register, and the
+// token-authenticated ingest endpoints) to blunt brute-forcing. Uses the
+// previously-dead config.rateLimit values; the rest of the API is already
+// gated by a logged-in JWT.
+const sensitiveLimiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.maxRequests,
+  message: 'Too many requests to this endpoint — try again later.',
+});
+
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', sensitiveLimiter, authRoutes);
 app.use('/api/transactions', authMiddleware, transactionRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes);
@@ -94,7 +116,7 @@ app.use('/api/weather', authMiddleware, weatherRoutes);
 app.use('/api/calendar', authMiddleware, calendarRoutes);
 // Ingest does its own auth (JWT OR the INGEST_TOKEN header) so phone-side
 // automations can push health metrics without a short-lived login token.
-app.use('/api/ingest', ingestRoutes);
+app.use('/api/ingest', sensitiveLimiter, ingestRoutes);
 app.use('/api/projects', authMiddleware, projectRoutes);
 app.use('/api/media', authMiddleware, mediaRoutes);
 app.use('/api/metrics', authMiddleware, metricRoutes);
@@ -122,13 +144,16 @@ declare global {
 global.io = io;
 global.wsService = webSocketService;
 
-// Error handling
-app.use(errorHandler);
-
-// 404 handler
+// 404 handler (after all routes, before the error handler)
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
+
+// Error handling — MUST be registered last. Express identifies error
+// middleware by its 4-arg signature and only reaches it after the route
+// handlers, so registering it before the 404 catch-all (as it was) meant
+// errors thrown downstream were never formatted by it.
+app.use(errorHandler);
 
 // Graceful shutdown
 const gracefulShutdown = async () => {
