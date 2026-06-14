@@ -371,6 +371,42 @@ router.delete('/:id', asyncHandler(async (req: AuthRequest, res) => {
 }));
 
 /**
+ * Daily training-minutes series for the Health page's Trends grid: workout
+ * durations summed per LOCAL day across the window, oldest→newest. Surfaced
+ * through GET /api/metrics/history?key=training (metrics.ts branches there) so
+ * Training charts beside the vitals metrics under the same window selector.
+ *
+ * Sparse by design — only days with logged minutes appear, matching how vitals
+ * history returns only days that actually have readings (the chart plots the
+ * points as-given).
+ */
+export async function buildTrainingSeries(
+  prisma: PrismaClient,
+  userId: string,
+  days: number,
+): Promise<Array<{ date: string; value: number }>> {
+  const since = startOfLocalDay();
+  since.setDate(since.getDate() - (days - 1));
+
+  const sessions = await prisma.workoutSession.findMany({
+    where: { userId, performedAt: { gte: since }, durationMin: { gt: 0 } },
+    select: { performedAt: true, durationMin: true },
+  });
+
+  // Bucket by local day (a session's UTC instant → its local calendar day).
+  const byDay = new Map<number, number>();
+  for (const s of sessions) {
+    if (!s.durationMin) continue;
+    const day = startOfLocalDay(s.performedAt).getTime();
+    byDay.set(day, (byDay.get(day) ?? 0) + s.durationMin);
+  }
+
+  return [...byDay.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([ms, value]) => ({ date: new Date(ms).toISOString(), value }));
+}
+
+/**
  * QuestEngine candidate builder for the fitness pool.
  *
  *  - A session already logged today → [] (the day's training is handled).

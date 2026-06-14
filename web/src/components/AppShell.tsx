@@ -45,9 +45,9 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   ]},
   { group: 'LIFE', items: [
     ['habits', 'Habits', 'check'], ['chores', 'Chores', 'list'],
-    ['ice', 'Anti-Goals', 'shield'], ['workouts', 'Workouts', 'spark'],
+    ['ice', 'Anti-Goals', 'shield'], ['health', 'Health', 'heart'],
     ['projects', 'Projects', 'grid'], ['media', 'Media', 'play'],
-    ['vitals', 'Vitals', 'heart'], ['social', 'Social', 'flag'],
+    ['social', 'Social', 'flag'],
   ]},
   { group: 'VAULT', items: [
     ['overview', 'Finance', 'wallet'], ['budgets', 'Budgets', 'target'],
@@ -67,8 +67,8 @@ const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
 const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
   ice: 'LIFE // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
-  workouts: 'LIFE // WORKOUTS', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
-  vitals: 'LIFE // BIOMONITOR', social: 'LIFE // CREW',
+  health: 'LIFE // HEALTH', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
+  social: 'LIFE // CREW',
   progress: 'PROGRESS // STREET CRED',
   shop: 'SHOP // NIGHT MARKET',
   overview: 'VAULT // FINANCE', budgets: 'VAULT // BUDGETS',

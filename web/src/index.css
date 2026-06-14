@@ -377,6 +377,12 @@ input, textarea, select { font-family: inherit; }
   .hpat  { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 }
 
+/* Health page log row (HealthView): the vitals readout beside the workout
+   logger, deliberately balanced so the readout drives the row height. Reuses
+   .hcol for the right stack. Collapses to a single column on narrow viewports. */
+.hgrid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1080px) { .hgrid { grid-template-columns: 1fr; } }
+
 /* Street Cred progression dashboard (StreetCredView): analytics column beside
    the ledger rail, a 2-up row for velocity/modules, and the badge wall grid. */
 .pdash { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: stretch; }

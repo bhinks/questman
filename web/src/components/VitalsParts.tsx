@@ -1,23 +1,24 @@
 /**
- * VitalsView — "Biomonitor". The daily vitals instrument panel.
+ * VitalsParts — the Biomonitor's reusable readout / sync / trend pieces.
  *
- *   1. Command bar — title + logged/streams count + the PHONE UPLINK module.
- *   2. Today's Readout — one instrument tile per enabled metric (blood
- *      pressure combined into a single SYS/DIA tile). Prefills today's
- *      persisted values (synced phone readings land here too); "SUBMIT LOG"
- *      upserts them via PUT /api/metrics and closes the daily-vitals quest
- *      (banks XP/eddies).
- *   3. Trends — every enabled metric charted at once under ONE shared
- *      time-window selector. Blood pressure's two streams share one dual-line
- *      plot. Charts pull GET /api/metrics/history per key (fanned out).
- *   4. Configure — toggle which MetricDefs appear.
+ * These were the internals of the old standalone VitalsView. The Vitals and
+ * Workouts pages merged into one HEALTH page (HealthView), so the vitals half
+ * lives here as shared parts the combined page composes:
+ *
+ *   useVitalsReadout()  — the readout "brain": metric defs + today's log +
+ *                         the editable draft + the SUBMIT mutation + the
+ *                         derived logged/total counts the command bar shows.
+ *   MetricTile / BpTile — one instrument tile per metric (BP is combined).
+ *   UplinkModule        — the PHONE UPLINK sync card.
+ *   MetricTrendCard / BpTrendCard / TrainingTrendCard — trend cards, each
+ *                         fetching its own windowed history.
+ *   ConfigPanel         — toggle which MetricDefs appear.
  *
  * Presentational extras (color/icon/source/good/band) come from lib/vitalsMeta;
  * MetricDef stays data-only.
  */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { api } from '../lib/api';
 import type { MetricDef } from '../lib/api';
 import { Icon } from './Icon';
@@ -26,7 +27,7 @@ import type { MetricMeta, MetricSource } from '../lib/vitalsMeta';
 import { TrendChart, BpChart } from './VitalsCharts';
 import type { SeriesPoint, ChartStyle } from './VitalsCharts';
 
-interface DayLog {
+export interface DayLog {
   date: string;
   submitted: boolean;
   values: Record<string, number>;
@@ -57,7 +58,7 @@ interface SyncResult {
 
 // One shared window selector → label + the days requested from the history
 // endpoint. ALL ≈ 10y (the server caps history there).
-const WINDOWS: Array<[string, number]> = [
+export const WINDOWS: Array<[string, number]> = [
   ['7D', 7], ['30D', 30], ['90D', 90], ['1Y', 365], ['ALL', 3650],
 ];
 
@@ -65,11 +66,11 @@ const WINDOWS: Array<[string, number]> = [
 // chart style = bars, healthy-range bands on, comfortable density.
 const CHART_STYLE: ChartStyle = 'bars';
 const SHOW_BAND = true;
-const CARD_MIN = 320;
+export const CARD_MIN = 320;
 
 const CARD: React.CSSProperties = { padding: 16, display: 'flex', flexDirection: 'column', gap: 12 };
 
-const tileInput: React.CSSProperties = {
+export const tileInput: React.CSSProperties = {
   width: '100%', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0,
   color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 22,
   padding: '6px 12px', outline: 'none', letterSpacing: '0.01em',
@@ -80,11 +81,17 @@ function toSeries(apiSeries?: Array<{ date: string; value: number }>): SeriesPoi
   return apiSeries.map(p => ({ date: new Date(p.date), value: p.value }));
 }
 
-export function VitalsView() {
+/* ---------- readout brain (shared hook) ---------- */
+/**
+ * The vitals readout state the HEALTH page drives: the configurable metric
+ * set, today's persisted log, an editable draft prefilled from it (synced
+ * phone readings included), and the SUBMIT mutation that upserts the day +
+ * closes the daily-vitals quest. Also exposes the BP split, the enabled
+ * metric list (BP streams removed — they render as one combined tile), and
+ * the logged/total counts the command-bar summary uses.
+ */
+export function useVitalsReadout() {
   const qc = useQueryClient();
-  const [configuring, setConfiguring] = useState(false);
-  const [days, setDays] = useState(30);
-  // Local edits to the form, keyed by metric key. '' = blank (not logged).
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const defsQ = useQuery({
@@ -128,9 +135,6 @@ export function VitalsView() {
 
   const setVal = (key: string, value: string) => setDraft(prev => ({ ...prev, [key]: value }));
 
-  if (defsQ.isLoading || logQ.isLoading) return <Empty>LOADING…</Empty>;
-  if (defsQ.isError || logQ.isError) return <Empty color="var(--red)">FAILED TO LOAD</Empty>;
-
   // Blood pressure → one combined card/tile when both streams are enabled.
   const bpSysDef = enabled.find(d => d.key === 'bpSys');
   const bpDiaDef = enabled.find(d => d.key === 'bpDia');
@@ -143,123 +147,14 @@ export function VitalsView() {
   const totalCount = metricDefs.length + (hasBp ? 1 : 0);
   const submitted = logQ.data?.submitted ?? false;
 
-  // Trend cards: BP (wide) first, then every other enabled metric.
-  const trendCards = hasBp ? 1 + metricDefs.length : metricDefs.length;
-
-  return (
-    <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* command bar */}
-      <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', flexWrap: 'wrap' }}>
-        <div className="panel hud" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flex: '1 1 320px', minWidth: 0 }}>
-          <div className="ncx-chip" style={{ color: submitted ? 'var(--lime)' : 'var(--cyan)' }}>
-            <Icon name="heart" size={18} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Biomonitor</h2>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
-              {loggedCount} / {totalCount} LOGGED TODAY · {trendCards} STREAMS TRACKED
-            </div>
-          </div>
-          <button className={configuring ? 'btn btn-primary' : 'btn btn-ghost'} style={{ marginLeft: 'auto', padding: '7px 13px', fontSize: 11, flex: 'none' }}
-            onClick={() => setConfiguring(c => !c)} key={`cfg-${configuring}`}>
-            <Icon name="edit" size={13} /> {configuring ? 'DONE' : 'CONFIGURE'}
-          </button>
-        </div>
-        <UplinkModule />
-      </div>
-
-      {configuring ? (
-        <ConfigPanel defs={defs} />
-      ) : enabled.length === 0 ? (
-        <Empty>
-          No metrics enabled — open <strong style={{ color: 'var(--text)' }}>CONFIGURE</strong> to turn some on.
-        </Empty>
-      ) : (
-        <>
-          {/* readout / quick log */}
-          <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
-              {logQ.data && <span className="ncx-serial">LOG {format(new Date(logQ.data.date), 'yyyy.MM.dd')}</span>}
-              <span className="mono" style={{ marginLeft: 'auto', fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
-                UPLINK PREFILLED · EDIT ANYTIME
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(176px, 1fr))', gap: 12 }}>
-              {hasBp && (
-                <BpTile
-                  sys={draft.bpSys ?? ''} dia={draft.bpDia ?? ''}
-                  onSys={v => setVal('bpSys', v)} onDia={v => setVal('bpDia', v)}
-                />
-              )}
-              {metricDefs.map((def, i) => (
-                <MetricTile
-                  key={def.key}
-                  def={def}
-                  meta={metaFor(def.key, i)}
-                  value={draft[def.key] ?? ''}
-                  onChange={v => setVal(def.key, v)}
-                  logged={isFilled(def.key)}
-                />
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button className="btn btn-primary" disabled={submit.isPending || loggedCount === 0} onClick={() => submit.mutate()}>
-                {submit.isPending ? 'TRANSMITTING…' : submitted ? 'UPDATE LOG' : 'SUBMIT LOG'}
-              </button>
-              {submit.isSuccess && submit.data?.questAutoCompleted && (
-                <span className="mono" style={{ fontSize: 12, color: 'var(--lime)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Icon name="check" size={13} style={{ color: 'var(--lime)' }} /> +{submit.data.questAutoCompleted.xpReward} XP banked · daily vitals contract cleared
-                </span>
-              )}
-              {submitted && !submit.isPending && !(submit.isSuccess && submit.data?.questAutoCompleted) && (
-                <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Icon name="check" size={12} style={{ color: 'var(--lime)' }} /> LOGGED
-                </span>
-              )}
-            </div>
-          </section>
-
-          {/* trends — one window selector governs every chart */}
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <Icon name="trend" size={16} style={{ color: 'var(--violet)' }} />
-              <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TRENDS</span>
-              <span className="ncx-serial">ALL STREAMS · ONE WINDOW</span>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                {WINDOWS.map(([label, d]) => {
-                  const on = days === d;
-                  return (
-                    <button key={label} onClick={() => setDays(d)} className="mono"
-                      style={{
-                        fontSize: 11, padding: '5px 13px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
-                        border: on ? '1px solid var(--violet)' : '1px solid var(--line-2)',
-                        background: on ? 'color-mix(in srgb, var(--violet) 16%, transparent)' : 'var(--panel-2)',
-                        color: on ? 'var(--violet)' : 'var(--text-dim)',
-                        transition: 'background .15s, border-color .15s, color .15s',
-                      }}>
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN}px, 1fr))`, gap: 14, alignItems: 'start' }}>
-              {hasBp && <BpTrendCard key="bp" sysDef={bpSysDef!} diaDef={bpDiaDef!} days={days} />}
-              {metricDefs.map((def, i) => (
-                <MetricTrendCard key={def.key} def={def} meta={metaFor(def.key, i)} days={days} />
-              ))}
-            </div>
-          </section>
-        </>
-      )}
-    </div>
-  );
+  return {
+    defsQ, logQ, defs, enabled, metricDefs, bpSysDef, bpDiaDef, hasBp,
+    draft, setVal, isFilled, loggedCount, totalCount, submitted, submit,
+  };
 }
 
 /* ---------- PHONE UPLINK sync module ---------- */
-function UplinkModule() {
+export function UplinkModule() {
   const qc = useQueryClient();
   const statusQ = useQuery({
     queryKey: ['metrics', 'sync-status'],
@@ -396,7 +291,7 @@ function ScalePicker({ lo, hi, value, onChange, color }: { lo: number; hi: numbe
   );
 }
 
-function MetricTile({ def, meta, value, onChange, logged }: {
+export function MetricTile({ def, meta, value, onChange, logged }: {
   def: MetricDef; meta: MetricMeta; value: string; onChange: (v: string) => void; logged: boolean;
 }) {
   const isScale = def.kind === 'scale';
@@ -425,7 +320,7 @@ function MetricTile({ def, meta, value, onChange, logged }: {
 }
 
 /* combined systolic/diastolic tile (spans 2 columns) */
-function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; onSys: (v: string) => void; onDia: (v: string) => void }) {
+export function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; onSys: (v: string) => void; onDia: (v: string) => void }) {
   const logged = sys !== '' && dia !== '';
   return (
     <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, gridColumn: 'span 2' }}>
@@ -459,7 +354,7 @@ function CardHead({ meta, label }: { meta: MetricMeta; label: string }) {
   );
 }
 
-function MetricTrendCard({ def, meta, days }: { def: MetricDef; meta: MetricMeta; days: number }) {
+export function MetricTrendCard({ def, meta, days }: { def: MetricDef; meta: MetricMeta; days: number }) {
   const q = useQuery({
     queryKey: ['metrics', 'history', def.key, days],
     queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(def.key)}&days=${days}`),
@@ -480,7 +375,7 @@ function MetricTrendCard({ def, meta, days }: { def: MetricDef; meta: MetricMeta
   );
 }
 
-function BpTrendCard({ sysDef, diaDef, days }: { sysDef: MetricDef; diaDef: MetricDef; days: number }) {
+export function BpTrendCard({ sysDef, diaDef, days }: { sysDef: MetricDef; diaDef: MetricDef; days: number }) {
   const sysQ = useQuery({
     queryKey: ['metrics', 'history', sysDef.key, days],
     queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(sysDef.key)}&days=${days}`),
@@ -501,8 +396,34 @@ function BpTrendCard({ sysDef, diaDef, days }: { sysDef: MetricDef; diaDef: Metr
   );
 }
 
+/**
+ * Training trend card — the daily workout-minutes series. Same windowed
+ * history endpoint as the metrics, but 'training' is synthesised server-side
+ * from logged workouts (no MetricDef). It rides the same shared window.
+ */
+export function TrainingTrendCard({ days }: { days: number }) {
+  const meta = metaFor('training');
+  const q = useQuery({
+    queryKey: ['metrics', 'history', 'training', days],
+    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=training&days=${days}`),
+  });
+  return (
+    <div className="panel" style={CARD}>
+      <CardHead meta={meta} label="Training" />
+      <TrendChart
+        series={toSeries(q.data?.series)}
+        color={meta.color}
+        unit="min"
+        good={meta.good}
+        chartStyle={CHART_STYLE}
+        showBand={SHOW_BAND}
+      />
+    </div>
+  );
+}
+
 /* ---------- configure ---------- */
-function ConfigPanel({ defs }: { defs: MetricDef[] }) {
+export function ConfigPanel({ defs }: { defs: MetricDef[] }) {
   const qc = useQueryClient();
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
@@ -549,13 +470,5 @@ function ConfigPanel({ defs }: { defs: MetricDef[] }) {
         })}
       </div>
     </section>
-  );
-}
-
-function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
-  return (
-    <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
-    </div>
   );
 }

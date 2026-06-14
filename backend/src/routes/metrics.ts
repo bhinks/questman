@@ -27,6 +27,7 @@ import { startOfLocalDay } from '../utils/dates';
 import { QuestCandidate } from '../services/anthropic';
 import { config } from '../config';
 import { pullNow, getSyncStatus } from '../services/healthSync';
+import { buildTrainingSeries } from './workouts';
 
 const router = express.Router();
 
@@ -187,6 +188,14 @@ router.get('/history', asyncHandler(async (req: AuthRequest, res) => {
     days: z.string().transform(Number).pipe(z.number().int().positive().max(3650)).default('30'),
   }).parse(req.query);
   const userId = req.user!.id;
+
+  // 'training' is a SYNTHETIC stream: it has no MetricDef / DailyMetric rows.
+  // It's derived from logged workouts (daily minutes summed) so the Health
+  // page's Trends grid can chart training beside the vitals metrics.
+  if (q.key === 'training') {
+    res.json({ key: 'training', series: await buildTrainingSeries(prisma, userId, q.days) });
+    return;
+  }
 
   const since = startOfLocalDay();
   since.setDate(since.getDate() - (q.days - 1));

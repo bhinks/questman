@@ -37,6 +37,9 @@ const META: Record<string, MetricMeta> = {
   // own accents (systolic magenta over diastolic cyan) + healthy bands.
   bpSys:      { color: 'var(--magenta)', icon: 'heart',  source: 'phone',  good: 'down', band: [90, 120] },
   bpDia:      { color: 'var(--cyan)',    icon: 'heart',  source: 'phone',  good: 'down', band: [60, 80] },
+  // Training (daily workout minutes) is a synthetic stream derived from logged
+  // workouts — it only appears in the Health trends grid, never the readout.
+  training:   { color: 'var(--lime)',    icon: 'spark',  source: 'manual', good: 'up' },
 };
 
 const FALLBACK_PALETTE = [

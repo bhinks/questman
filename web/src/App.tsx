@@ -16,11 +16,10 @@ import { Icon } from './components/Icon';
 import { LoginScreen } from './components/LoginScreen';
 import { TodayView } from './components/TodayView';
 import { RecurringList } from './components/RecurringList';
-import { WorkoutLogger } from './components/WorkoutLogger';
 import { StreetCredView } from './components/StreetCredView';
 import { ProjectsView } from './components/ProjectsView';
 import { MediaView } from './components/MediaView';
-import { VitalsView } from './components/VitalsView';
+import { HealthView } from './components/HealthView';
 import { NpcsView } from './components/NpcsView';
 import { ShopView } from './components/ShopView';
 import { BossesView } from './components/BossesView';
@@ -355,17 +354,14 @@ function HubApp() {
       case 'chores':
         return <RecurringList kind="chore" />;
 
-      case 'workouts':
-        return <WorkoutLogger />;
+      case 'health':
+        return <HealthView />;
 
       case 'projects':
         return <ProjectsView />;
 
       case 'media':
         return <MediaView />;
-
-      case 'vitals':
-        return <VitalsView />;
 
       case 'social':
         return <NpcsView />;
