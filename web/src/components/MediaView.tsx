@@ -227,6 +227,17 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
     },
   });
 
+  // R&R redemption: spend a banked credit to pull a backlog title onto the
+  // active shelf. This is the loop a full-clear day's credit pays for.
+  const rrSession = useMutation({
+    mutationFn: (id: string) => api.post(`/api/media/${id}/rr-session`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['media'] });
+      qc.invalidateQueries({ queryKey: ['media', 'pace'] });
+      qc.invalidateQueries({ queryKey: ['player'] });
+    },
+  });
+
   // Status flips (done / re-queue) — quest closed-loop, no R&R charge.
   const statusMut = useMutation({
     mutationFn: (vars: { id: string; status: Status; unitsDone?: number }) =>
@@ -263,6 +274,18 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
     guardedCharge(item, () => session.mutate({ id: item.id, ...payload }));
 
   const jackIn = (item: MediaItem) => {
+    // A backlog title isn't on your plate yet — activate it by spending a
+    // banked R&R credit (the redemption loop) before jacking in.
+    if (item.status === 'backlog') {
+      if ((rr?.banked ?? 0) <= 0) {
+        showFlash('No R&R — earn one by clearing a full day, then activate this title.');
+        return;
+      }
+      rrSession.mutate(item.id, {
+        onSuccess: () => onJackIn?.({ type: 'other', id: null, label: item.title }),
+      });
+      return;
+    }
     guardedCharge(item, () => {
       session.mutate({ id: item.id, kind: 'start', minutes: 0 });
       onJackIn?.({ type: 'other', id: null, label: item.title });
@@ -286,7 +309,8 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
       : i.type === filter && i.status !== 'dropped')
     .sort((a, b) => (STATUS_RANK[a.status] - STATUS_RANK[b.status]));
 
-  const busy = session.isPending || statusMut.isPending || correct.isPending;
+  const busy = session.isPending || statusMut.isPending || correct.isPending || rrSession.isPending;
+  const rrBanked = rr?.banked ?? 0;
 
   return (
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -307,7 +331,7 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
       {creating && <AddForm onClose={() => setCreating(false)} onDone={() => qc.invalidateQueries({ queryKey: ['media'] })} />}
 
       {/* planner */}
-      <WhatNow items={planItems} budget={budget} setBudget={setBudget} pace={pace} onJackIn={jackIn} />
+      <WhatNow items={planItems} budget={budget} setBudget={setBudget} pace={pace} rrBanked={rrBanked} onJackIn={jackIn} />
 
       {/* pace strip + R&R status / soft-gate target picker */}
       <PaceStrip pace={pace} rr={rr} antigoals={antigoalsQ.data ?? []} />
@@ -338,6 +362,7 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
               it={it}
               pace={pace}
               busy={busy}
+              rrBanked={rrBanked}
               onJackIn={() => jackIn(it)}
               onLog={(payload) => logSession(it, payload)}
               onCorrect={(unitsDone) => correct.mutate({ id: it.id, unitsDone })}
@@ -384,8 +409,8 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
 /* ---------- WHAT NOW planner ---------- */
 const CHIPS = [15, 30, 45, 60, 90, 120];
 function WhatNow({
-  items, budget, setBudget, pace, onJackIn,
-}: { items: MediaItem[]; budget: number; setBudget: (n: number) => void; pace: MediaPace; onJackIn: (it: MediaItem) => void }) {
+  items, budget, setBudget, pace, rrBanked, onJackIn,
+}: { items: MediaItem[]; budget: number; setBudget: (n: number) => void; pace: MediaPace; rrBanked: number; onJackIn: (it: MediaItem) => void }) {
   const ranked = useMemo(() => {
     const out: Array<{ it: MediaItem; s: Suggestion }> = [];
     for (const it of items) { const s = suggest(it, budget, pace); if (s) out.push({ it, s }); }
@@ -451,8 +476,14 @@ function WhatNow({
               <div className="ncx-bar slim"><i style={{ width: `${fillPct}%`, background: `linear-gradient(90deg, ${m.color}, var(--cyan))` }} /><span className="seg-mask" /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="mono" style={{ fontSize: 9, color: 'var(--text-faint)' }}>{fillPct}% OF WINDOW{(s.leftover ?? 0) > 4 ? ` · ${fmtMin(s.leftover!)} SPARE` : ''}</span>
-                <button className="btn btn-primary" style={{ marginLeft: 'auto', padding: '5px 11px', fontSize: 10 }} onClick={() => onJackIn(it)}>
-                  <Icon name="zap" size={11} /> JACK IN
+                <button
+                  className="btn btn-primary"
+                  style={{ marginLeft: 'auto', padding: '5px 11px', fontSize: 10 }}
+                  onClick={() => onJackIn(it)}
+                  disabled={it.status === 'backlog' && rrBanked <= 0}
+                  title={it.status === 'backlog' ? (rrBanked > 0 ? 'Spend 1 R&R credit to activate' : 'No R&R credits — clear a full day to bank one') : undefined}
+                >
+                  <Icon name="zap" size={11} /> JACK IN{it.status === 'backlog' ? ' · 1 R&R' : ''}
                 </button>
               </div>
             </div>
@@ -526,9 +557,9 @@ function Pace({ icon, color, label, value }: { icon: string; color: string; labe
 
 /* ---------- library card ---------- */
 function MediaCard({
-  it, pace, busy, onJackIn, onLog, onCorrect, onStatus, onDelete,
+  it, pace, busy, rrBanked, onJackIn, onLog, onCorrect, onStatus, onDelete,
 }: {
-  it: MediaItem; pace: MediaPace; busy: boolean;
+  it: MediaItem; pace: MediaPace; busy: boolean; rrBanked: number;
   onJackIn: () => void;
   onLog: (payload: { kind?: 'start' | 'progress' | 'finish'; minutes?: number; units?: number }) => void;
   onCorrect: (unitsDone: number) => void;
@@ -542,9 +573,11 @@ function MediaCard({
   const pct = Math.round(pctDone(it, pace) * 100);
   const endlessGame = isEndless(it);
 
-  // medium-specific one-tap controls (terminal states show no logging steppers)
+  // medium-specific one-tap controls — only an ACTIVE title can log time
+  // (a backlog title must be activated with an R&R credit first; terminal
+  // states log nothing).
   const controls: React.ReactNode[] = [];
-  if (!done && !dropped) {
+  if (it.status === 'active') {
     if (it.type === 'show') {
       const perEp = perEpMinOf(it);
       controls.push(<Stepper key="s" label="EP"
@@ -607,7 +640,16 @@ function MediaCard({
           {!done && etaText(it, pace) && <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="trend" size={10} style={{ color: 'var(--violet)' }} />{etaText(it, pace)}</span>}
           {endlessGame && !done && <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--text-faint)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="repeat" size={10} style={{ color: 'var(--text-faint)' }} />log a session anytime</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            {it.status === 'backlog' && <button className="btn" style={ctrlBtn} disabled={busy} onClick={onJackIn}><Icon name="zap" size={11} /> JACK IN</button>}
+            {it.status === 'backlog' && (
+              <button
+                className="btn" style={ctrlBtn}
+                disabled={busy || rrBanked <= 0}
+                onClick={onJackIn}
+                title={rrBanked > 0 ? 'Spend 1 R&R credit to activate' : 'No R&R credits — clear a full day to bank one'}
+              >
+                <Icon name="zap" size={11} /> JACK IN · 1 R&R
+              </button>
+            )}
             {controls}
             {done || dropped
               ? <button className="btn btn-ghost" style={ctrlBtn} disabled={busy} onClick={() => onStatus('backlog')}><Icon name="repeat" size={11} /> RE-QUEUE</button>

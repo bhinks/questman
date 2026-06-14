@@ -493,6 +493,11 @@ router.post('/:id/session', asyncHandler(async (req: AuthRequest, res) => {
 
   const existing = await prisma.mediaItem.findFirst({ where: { id: req.params.id, userId } });
   if (!existing) throw new AppError('Media item not found', 404);
+  // Activation is the R&R redemption loop: a backlog title must be pulled onto
+  // the active shelf with a credit (/rr-session) before its time can be logged.
+  if (existing.status === 'backlog') {
+    throw new AppError('Activate this title with an R&R credit before logging time', 400);
+  }
 
   const meta = parseJson<Record<string, unknown>>(existing.metaJson) ?? {};
   const endless = meta.endless === true;
@@ -574,10 +579,7 @@ router.post('/:id/session', asyncHandler(async (req: AuthRequest, res) => {
 
     return tx.mediaItem.update({
       where: { id: existing.id },
-      data: {
-        unitsDone: nextUnitsDone,
-        status: data.kind === 'start' && existing.status === 'backlog' ? 'active' : undefined,
-      },
+      data: { unitsDone: nextUnitsDone },
     });
   });
 
