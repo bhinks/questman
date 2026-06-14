@@ -1,0 +1,10 @@
+{
+  "name": "questman-screenshot-capture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Regenerate Questman README screenshots from the live app via headless Chromium.",
+  "dependencies": {
+    "puppeteer": "^25"
+  }
+}
