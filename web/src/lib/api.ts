@@ -562,6 +562,8 @@ export interface Habit {
   lastCompletedOn: string | null;
   isCompletedToday: boolean;
   isDueToday: boolean;
+  // "Operations": attached project (null = Uncategorized).
+  projectId: string | null;
 }
 // ---- finance: transactions + CSV import ----------------------------
 

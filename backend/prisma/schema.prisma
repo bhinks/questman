@@ -500,6 +500,12 @@ model Habit {
   longestStreak   Int      @default(0)
   lastCompletedOn DateTime?
 
+  // "Operations" consolidation: a chore can attach to a project, showing in
+  // that project's recurring rotation. SetNull loosens its chores back to
+  // Uncategorized when the project is deleted. null = Uncategorized.
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
   completions     HabitCompletion[]
   quests          Quest[]
   choreTransactions Transaction[] @relation("ChoreTransactions") // finance depth: spend linked to this chore
@@ -508,6 +514,7 @@ model Habit {
   updatedAt       DateTime @updatedAt
 
   @@index([userId, kind, isActive])
+  @@index([projectId])
   @@map("habits")
 }
 
@@ -869,6 +876,7 @@ model Project {
   milestones  Milestone[]
   bosses      Boss[]   // bosses whose HP is linked to this project's progress
   transactions Transaction[] // finance depth: spend linked to this project
+  chores      Habit[]  // attached recurring chores ("rotation") — Operations consolidation
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

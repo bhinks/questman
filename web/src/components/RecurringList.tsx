@@ -328,7 +328,7 @@ const XP_DEFAULT_VALUES = new Set(Object.values(XP_DEFAULTS));
  * cadence + day picker, difficulty→XP auto-fill, est-minutes, interval
  * throttle, and weather gating are all available in both.
  */
-function HabitForm({
+export function HabitForm({
   kind, moduleId, habit, onClose,
 }: { kind: 'habit' | 'chore'; moduleId: string; habit?: Habit; onClose: () => void }) {
   const qc = useQueryClient();

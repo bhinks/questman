@@ -17,7 +17,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { TodayView } from './components/TodayView';
 import { RecurringList } from './components/RecurringList';
 import { StreetCredView } from './components/StreetCredView';
-import { ProjectsView } from './components/ProjectsView';
+import { OperationsView } from './components/OperationsView';
 import { MediaView } from './components/MediaView';
 import { HealthView } from './components/HealthView';
 import { NpcsView } from './components/NpcsView';
@@ -351,14 +351,11 @@ function HubApp() {
       case 'habits':
         return <RecurringList kind="habit" />;
 
-      case 'chores':
-        return <RecurringList kind="chore" />;
-
       case 'health':
         return <HealthView />;
 
-      case 'projects':
-        return <ProjectsView />;
+      case 'operations':
+        return <OperationsView />;
 
       case 'media':
         return <MediaView onJackIn={openFocus} />;

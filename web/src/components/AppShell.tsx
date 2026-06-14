@@ -44,10 +44,9 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     ['handler', 'Handler', 'bell'],
   ]},
   { group: 'LIFE', items: [
-    ['habits', 'Habits', 'check'], ['chores', 'Chores', 'list'],
+    ['habits', 'Habits', 'check'], ['operations', 'Operations', 'grid'],
     ['ice', 'Anti-Goals', 'shield'], ['health', 'Health', 'heart'],
-    ['projects', 'Projects', 'grid'], ['media', 'Media', 'play'],
-    ['social', 'Social', 'flag'],
+    ['media', 'Media', 'play'], ['social', 'Social', 'flag'],
   ]},
   { group: 'VAULT', items: [
     ['overview', 'Finance', 'wallet'], ['budgets', 'Budgets', 'target'],
@@ -66,8 +65,8 @@ const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
 
 const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
-  ice: 'LIFE // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
-  health: 'LIFE // HEALTH', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
+  ice: 'LIFE // ICE', habits: 'LIFE // HABITS',
+  health: 'LIFE // HEALTH', operations: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
   social: 'LIFE // CREW',
   progress: 'PROGRESS // STREET CRED',
   shop: 'SHOP // NIGHT MARKET',

@@ -49,7 +49,20 @@ const createSchema = z.object({
   estMinutes:   z.number().int().min(1).max(1440).nullable().optional(),
   minIntervalDays: z.number().int().min(1).max(365).nullable().optional(),
   weatherRule:  WEATHER_RULE.nullable().optional(),
+  // "Operations" consolidation: attach this chore to a project (rotation).
+  // null = Uncategorized. Ownership is verified in the handlers.
+  projectId:    z.string().nullable().optional(),
 });
+
+/** Verify a projectId (if given & non-null) belongs to the user. */
+async function assertProjectOwned(userId: string, projectId: string | null | undefined): Promise<void> {
+  if (!projectId) return;
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId },
+    select: { id: true },
+  });
+  if (!project) throw new AppError('Project not found', 404);
+}
 
 const updateSchema = createSchema.partial().extend({
   isActive: z.boolean().optional(),
@@ -163,6 +176,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
     select: { id: true },
   });
   if (!mod) throw new AppError('Module not found', 404);
+  await assertProjectOwned(userId, data.projectId);
 
   const habit = await prisma.habit.create({
     data: {
@@ -182,6 +196,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
       estMinutes: data.estMinutes ?? null,
       minIntervalDays: data.minIntervalDays ?? null,
       weatherRule: data.weatherRule ? JSON.stringify(data.weatherRule) : null,
+      projectId: data.projectId ?? null,
     },
   });
   res.status(201).json({ habit: serialize(habit) });
@@ -194,6 +209,7 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
     where: { id: req.params.id, userId: req.user!.id },
   });
   if (!existing) throw new AppError('Habit not found', 404);
+  await assertProjectOwned(req.user!.id, data.projectId);
 
   const habit = await prisma.habit.update({
     where: { id: existing.id },
