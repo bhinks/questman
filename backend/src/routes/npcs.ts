@@ -74,15 +74,20 @@ function daysSince(lastContactOn: Date | null, today: Date): number | null {
 }
 
 /** A contact is overdue when it exceeds its cadence (or the default), or
- *  has never been contacted. */
+ *  has never been contacted.
+ *
+ *  Cadenced contacts fire at 75% of the interval so quest generation matches
+ *  the Crew lane's "due" signal (urgency = daysSince / cadence > 0.75).
+ *  Never-contacted is always overdue; no-cadence ("casual") contacts keep the
+ *  flat 21-day default rather than a fraction of it. */
 function isOverdue(
   npc: { lastContactOn: Date | null; cadenceDays: number | null },
   today: Date,
 ): boolean {
   const since = daysSince(npc.lastContactOn, today);
   if (since === null) return true; // never contacted
-  const threshold = npc.cadenceDays ?? DEFAULT_OVERDUE_DAYS;
-  return since > threshold;
+  if (npc.cadenceDays != null) return since > npc.cadenceDays * 0.75;
+  return since > DEFAULT_OVERDUE_DAYS;
 }
 
 /**
@@ -301,7 +306,7 @@ router.post('/:id/interactions', asyncHandler(async (req: AuthRequest, res) => {
 /**
  * buildNpcCandidates — generic "reach out to a neglected contact" quest.
  *
- * Overdue = (cadenceDays set AND daysSince > cadenceDays)
+ * Overdue = (cadenceDays set AND daysSince > 0.75 × cadenceDays)
  *         OR (no cadence AND daysSince > 21)
  *         OR never contacted.
  *

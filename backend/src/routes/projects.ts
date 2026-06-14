@@ -520,10 +520,12 @@ export async function buildProjectCandidates(
   const picked: Picked[] = [];
 
   for (const project of projects) {
-    // Ordered projects ignore priority — the sequence is the law.
+    // Ordered projects ignore priority — the sequence is the law. Tiebreak on
+    // id (not createdAt) so this matches the OperationsView CURRENT badge
+    // exactly: the step the quest advances is the step the UI marks current.
     const task = project.ordered
       ? [...project.tasks].sort(
-          (a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime(),
+          (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
         )[0]
       : project.tasks[0];
     if (!task) continue; // no actionable task in this project

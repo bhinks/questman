@@ -233,6 +233,8 @@ export interface ShopItem {
   payload?: Record<string, unknown>;
   /** Server-computed: cosmetic already owned (so the UI disables "buy"). */
   owned?: boolean;
+  /** Listed for flavor but not purchasable — the UI shows a SOLD OUT banner. */
+  soldOut?: boolean;
 }
 export interface ShopResponse {
   items: ShopItem[];

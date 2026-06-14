@@ -41,6 +41,9 @@ export interface ShopItem {
   priceEddies: number;
   /** Minimum player level to buy (re-validated server-side). */
   levelReq?: number;
+  /** Listed but not purchasable — shown in the grid with a SOLD OUT banner.
+   *  Used for SKUs whose effect isn't wired up yet; the buy route 400s too. */
+  soldOut?: boolean;
   /** Category-specific payload, e.g. { tokens: 1 }, { themeKey: 'synthwave' },
    *  { kind: 'shield' | 'booster' | 'budget' | 'focus' | 'overclock' } for
    *  consumables, or { fontKey } / { fxKey } / { personaKey } / { timerKey }
@@ -589,6 +592,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: 'Next jack-in session pays +50% XP.',
     category: 'consumable',
     priceEddies: 250,
+    soldOut: true, // effect not wired up yet — listed as flavor, not buyable
     payload: { kind: 'focus' },
   },
   {
@@ -597,6 +601,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: 'Unlocks a fourth side-job slot tomorrow.',
     category: 'consumable',
     priceEddies: 350,
+    soldOut: true, // effect not wired up yet — listed as flavor, not buyable
     payload: { kind: 'overclock' },
   },
   {

@@ -62,16 +62,24 @@ const updateDefSchema = z.object({
 
 const upsertSchema = z.object({
   date:   z.string().datetime().optional(),
-  // Reject non-finite (Infinity/NaN) and absurd magnitudes — these land
-  // straight in a Float column and would poison trend charts.
-  values: z.record(z.number().finite().min(-1e9).max(1e9)),
+  // A finite number sets the value; an explicit null clears (deletes) the
+  // day's row for that key. Reject non-finite (Infinity/NaN) and absurd
+  // magnitudes — these land straight in a Float column and would poison
+  // trend charts.
+  values: z.record(z.number().finite().min(-1e9).max(1e9).nullable()),
 });
 
-/** Parse a YYYY-MM-DD or ISO string into a local-midnight day key. */
+/** Clamp a day key to today — vitals can't be logged or read for the future. */
+function clampToToday(day: Date): Date {
+  const today = startOfLocalDay();
+  return day.getTime() > today.getTime() ? today : day;
+}
+
+/** Parse a YYYY-MM-DD or ISO string into a local-midnight day key (≤ today). */
 function dayFromQuery(raw: unknown): Date {
   if (typeof raw === 'string' && raw.length > 0) {
     const parsed = new Date(raw);
-    if (!isNaN(parsed.getTime())) return startOfLocalDay(parsed);
+    if (!isNaN(parsed.getTime())) return clampToToday(startOfLocalDay(parsed));
   }
   return startOfLocalDay();
 }
@@ -225,7 +233,7 @@ router.get('/history', asyncHandler(async (req: AuthRequest, res) => {
 router.put('/', asyncHandler(async (req: AuthRequest, res) => {
   const data = upsertSchema.parse(req.body);
   const userId = req.user!.id;
-  const day = data.date ? startOfLocalDay(new Date(data.date)) : startOfLocalDay();
+  const day = clampToToday(data.date ? startOfLocalDay(new Date(data.date)) : startOfLocalDay());
 
   // Only accept values for metrics this user actually owns (ignore unknown
   // keys rather than failing the whole submit).
@@ -241,6 +249,12 @@ router.put('/', asyncHandler(async (req: AuthRequest, res) => {
 
   await prisma.$transaction(async (tx) => {
     for (const [key, value] of entries) {
+      if (value === null) {
+        // Un-log: a cleared field deletes the day's row rather than leaving
+        // the stale value behind.
+        await tx.dailyMetric.deleteMany({ where: { userId, date: day, key } });
+        continue;
+      }
       await tx.dailyMetric.upsert({
         where: { userId_date_key: { userId, date: day, key } },
         update: { value },

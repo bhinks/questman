@@ -22,6 +22,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { AiSettings, AppSettings, SettingsResponse } from '../lib/api';
+import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
 
 const SECTION_HEADER: CSSProperties = {
@@ -84,6 +85,18 @@ export function AiCalibrationPanel() {
     }
   }, [settingsQ.data]);
 
+  // Generating a rundown / debrief / handler line can burn AI tokens, so
+  // refetch settings on those socket events to keep the BURNED TODAY meter
+  // (read live from settingsQ.data below) honest.
+  useEffect(() => {
+    const s = getSocket();
+    if (!s) return;
+    const refresh = () => qc.invalidateQueries({ queryKey: ['settings'] });
+    const evts = ['handler-message', 'daily-generated', 'weekly-debrief'];
+    evts.forEach(e => s.on(e, refresh));
+    return () => evts.forEach(e => s.off(e, refresh));
+  }, [qc]);
+
   const save = useMutation({
     mutationFn: (patch: AiPatch) => api.put('/api/settings', patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
@@ -109,7 +122,9 @@ export function AiCalibrationPanel() {
   if (settingsQ.isError || !local) return null; // CalibrationView renders the bus-offline / loading states
 
   const cap = local.aiDailyTokenCap;
-  const used = local.aiTokensUsedToday;
+  // Read-only counter — take it live from the query (refreshed on AI socket
+  // events) rather than the seeded-once local copy so the meter isn't stale.
+  const used = settingsQ.data?.aiTokensUsedToday ?? local.aiTokensUsedToday;
   const usedPct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
   const cloud = local.aiProvider === 'anthropic';
   const cloudOffline = cloud && !local.aiCloudKey;

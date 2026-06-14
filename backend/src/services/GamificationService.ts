@@ -29,10 +29,11 @@ import {
 import { emitHandlerEvent, STREAK_MILESTONES } from './handlerEvents';
 
 /** Reasons that are NOT subject to the overclock multiplier: spends and
- *  corrections (must pass through raw), plus achievement payouts (one-time
- *  fixed rewards — the amount in the catalog is exactly what you get,
- *  regardless of your current overclock streak). */
-const NON_EARN_REASONS = new Set(['shop_purchase', 'rr_redeem', 'achievement']);
+ *  corrections (must pass through raw), plus fixed one-time payouts —
+ *  achievements and boss defeats. For those the reward in the catalog/boss is
+ *  exactly what you get, regardless of your current overclock streak, so the
+ *  kill-overlay number and the ledger always match. */
+const NON_EARN_REASONS = new Set(['shop_purchase', 'rr_redeem', 'achievement', 'boss_defeat']);
 function isEddieEarn(reason: string, eddies: number): boolean {
   return eddies > 0 && !reason.endsWith('_undo') && !NON_EARN_REASONS.has(reason);
 }

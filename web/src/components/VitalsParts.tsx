@@ -17,7 +17,7 @@
  * Presentational extras (color/icon/source/good/band) come from lib/vitalsMeta;
  * MetricDef stays data-only.
  */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { MetricDef } from '../lib/api';
@@ -93,6 +93,10 @@ function toSeries(apiSeries?: Array<{ date: string; value: number }>): SeriesPoi
 export function useVitalsReadout() {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // Keys the user has edited this session. A mid-session refetch/SYNC must not
+  // clobber an in-flight edit, so these are preserved during re-prefill and
+  // cleared once a submit persists them.
+  const dirtyRef = useRef<Set<string>>(new Set());
 
   const defsQ = useQuery({
     queryKey: ['metrics', 'defs'],
@@ -104,12 +108,23 @@ export function useVitalsReadout() {
   });
 
   // Prefill the draft from today's persisted values whenever they load (this
-  // includes any readings the phone uplink already synced for today).
+  // includes any readings the phone uplink already synced for today) — but
+  // keep any field the user has touched so a SYNC mid-edit can't overwrite it.
   useEffect(() => {
     if (!logQ.data) return;
-    const next: Record<string, string> = {};
-    for (const [k, v] of Object.entries(logQ.data.values)) next[k] = String(v);
-    setDraft(next);
+    const serverVals = logQ.data.values;
+    setDraft(prev => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(serverVals)) {
+        next[k] = dirtyRef.current.has(k) && prev[k] !== undefined ? prev[k] : String(v);
+      }
+      // Preserve dirtied keys the server doesn't carry yet (newly typed values
+      // and just-cleared fields the user means to un-log).
+      for (const k of dirtyRef.current) {
+        if (!(k in next) && prev[k] !== undefined) next[k] = prev[k];
+      }
+      return next;
+    });
   }, [logQ.data]);
 
   const defs = useMemo(() => defsQ.data ?? [], [defsQ.data]);
@@ -117,15 +132,25 @@ export function useVitalsReadout() {
 
   const submit = useMutation({
     mutationFn: () => {
-      const values: Record<string, number> = {};
+      const values: Record<string, number | null> = {};
+      const prevValues = logQ.data?.values ?? {};
       for (const [k, raw] of Object.entries(draft)) {
-        if (raw === '' || raw == null) continue;
+        if (raw === '' || raw == null) {
+          // A cleared field that was previously logged → send an explicit null
+          // so the server deletes the row (un-log) instead of keeping the old
+          // value.
+          if (k in prevValues) values[k] = null;
+          continue;
+        }
         const num = Number(raw);
         if (!Number.isNaN(num)) values[k] = num;
       }
       return api.put<SubmitResponse>('/api/metrics', { values });
     },
     onSuccess: () => {
+      // The draft is now persisted — drop the dirty marks so the refetched log
+      // re-prefills cleanly.
+      dirtyRef.current.clear();
       qc.invalidateQueries({ queryKey: ['metrics'] });
       qc.invalidateQueries({ queryKey: ['player'] });
       qc.invalidateQueries({ queryKey: ['player', 'stats'] });
@@ -133,7 +158,10 @@ export function useVitalsReadout() {
     },
   });
 
-  const setVal = (key: string, value: string) => setDraft(prev => ({ ...prev, [key]: value }));
+  const setVal = (key: string, value: string) => {
+    dirtyRef.current.add(key);
+    setDraft(prev => ({ ...prev, [key]: value }));
+  };
 
   // Blood pressure → one combined card/tile when both streams are enabled.
   const bpSysDef = enabled.find(d => d.key === 'bpSys');
@@ -167,6 +195,8 @@ export function UplinkModule() {
       if (r.ok && r.written > 0) {
         qc.invalidateQueries({ queryKey: ['metrics'] });
         qc.invalidateQueries({ queryKey: ['quests', 'today'] });
+        // Synced sleep can move the energy/battery tier — refresh the HUD.
+        qc.invalidateQueries({ queryKey: ['player'] });
       } else {
         qc.invalidateQueries({ queryKey: ['metrics', 'sync-status'] });
       }

@@ -86,25 +86,39 @@ async function applyBossHit(
   player: Awaited<ReturnType<GamificationService['awardXp']>> | null;
 }> {
   const target = boss.targetValue;
-  // Negative amounts are legal in BOTH directions (a newBalance log that
-  // moved the wrong way): grind_down HP can rise past target (debt grew);
-  // charge_up floors at 0 and caps at target.
-  const nextValue = boss.direction === 'grind_down'
-    ? Math.max(0, boss.currentValue - amount)
-    : Math.min(target, Math.max(0, boss.currentValue + amount));
-
-  const reachedThreshold = boss.direction === 'grind_down'
-    ? nextValue <= 0
-    : nextValue >= target;
-
-  // Always move the gauge + log the contribution.
+  // Atomic, composable gauge move: a payment/contribution of `amount` becomes
+  // a signed delta the DB applies to the LIVE value (`{ increment }`), so two
+  // simultaneous hits accumulate instead of one clobbering the other (each
+  // reads-then-writes the current value under SQLite's single-writer lock).
+  // Negative amounts are legal in BOTH directions (a wrong-way newBalance log)
+  // and just flip the sign.
+  const delta = boss.direction === 'grind_down' ? -amount : amount;
   await tx.boss.update({
     where: { id: boss.id },
-    data: { currentValue: nextValue },
+    data: { currentValue: { increment: delta } },
   });
   await tx.bossLog.create({
     data: { bossId: boss.id, userId, amount, source, note },
   });
+
+  // Re-read the composed value and clamp to the gauge's legal range:
+  // grind_down HP floors at 0 but may rise past target (debt grew); charge_up
+  // stays within [0, target]. The clamp write is safe — this tx already holds
+  // the write lock, so no concurrent hit can interleave before commit.
+  let nextValue = (await tx.boss.findUniqueOrThrow({
+    where: { id: boss.id }, select: { currentValue: true },
+  })).currentValue;
+  const clampedValue = boss.direction === 'grind_down'
+    ? Math.max(0, nextValue)
+    : Math.min(target, Math.max(0, nextValue));
+  if (clampedValue !== nextValue) {
+    await tx.boss.update({ where: { id: boss.id }, data: { currentValue: clampedValue } });
+    nextValue = clampedValue;
+  }
+
+  const reachedThreshold = boss.direction === 'grind_down'
+    ? nextValue <= 0
+    : nextValue >= target;
 
   let defeated = false;
   let player: Awaited<ReturnType<GamificationService['awardXp']>> | null = null;

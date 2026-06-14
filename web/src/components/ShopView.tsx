@@ -183,7 +183,6 @@ export function ShopView() {
   if (shopQ.isError || !shopQ.data) return <Empty color="var(--red)">FAILED TO REACH THE MARKET</Empty>;
 
   const { items, player } = shopQ.data;
-  const pendingKey = buy.isPending ? buy.variables : null;
   const busy = buy.isPending || equip.isPending || fxToggle.isPending || equipPersona.isPending;
   const fb = (key: string) => (feedback?.key === key ? feedback : null);
   const doBuy = (key: string) => { setFeedback(null); buy.mutate(key); };
@@ -566,15 +565,25 @@ export function ShopView() {
                 ) : null}
               </div>
               <DescLine text={item.description} />
-              <button
-                className="btn"
-                style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
-                disabled={!affordable || pendingKey === item.key}
-                onClick={() => doBuy(item.key)}
-                title={affordable ? undefined : 'Not enough eddies'}
-              >
-                <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· BUY
-              </button>
+              {item.soldOut ? (
+                <div
+                  className="btn"
+                  style={{ fontSize: 11, padding: 8, opacity: 0.5, cursor: 'default', color: 'var(--text-faint)', letterSpacing: '0.18em', textAlign: 'center', pointerEvents: 'none' }}
+                  aria-disabled="true"
+                >
+                  SOLD OUT
+                </div>
+              ) : (
+                <button
+                  className="btn"
+                  style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
+                  disabled={!affordable || busy}
+                  onClick={() => doBuy(item.key)}
+                  title={affordable ? undefined : 'Not enough eddies'}
+                >
+                  <span style={{ color: 'var(--amber)' }}>€${item.priceEddies.toLocaleString()}</span>· BUY
+                </button>
+              )}
               {fb(item.key) && <FeedbackLine feedback={fb(item.key)!} />}
             </div>
           );

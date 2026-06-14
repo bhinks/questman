@@ -618,6 +618,25 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                   >
                     {q.targetCount > 1 ? `+1 · ${q.currentCount}/${q.targetCount}` : <Icon name="check" size={11} />}
                   </button>
+                  {/* Same token-gated relief the in-plan contracts get. */}
+                  <button
+                    className="btn btn-ghost"
+                    style={{ padding: '3px 6px', fontSize: 9.5, flex: 'none' }}
+                    disabled={(player.skipTokens ?? 0) <= 0 || skipQuest.isPending}
+                    title={player.skipTokens > 0 ? `Skip (${player.skipTokens} tokens)` : 'No skip tokens — buy more in the Shop'}
+                    onClick={() => skipQuest.mutate(q.id)}
+                  >
+                    SKIP
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ padding: '3px 6px', fontSize: 9.5, flex: 'none' }}
+                    disabled={(player.rerollTokens ?? 0) <= 0 || rerollQuest.isPending}
+                    title={player.rerollTokens > 0 ? `Reroll (${player.rerollTokens} tokens)` : 'No reroll tokens — buy more in the Shop'}
+                    onClick={() => rerollQuest.mutate(q.id)}
+                  >
+                    RR
+                  </button>
                 </div>
               ))}
             </div>

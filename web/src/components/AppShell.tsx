@@ -61,7 +61,7 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
 ];
 
 /** The four tabs pinned to the mobile bottom nav (everything else → MORE). */
-const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
+const PINNED_TABS: string[] = ['today', 'habits', 'operations', 'health'];
 
 const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
@@ -296,7 +296,14 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
               <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
                 <Icon name="upload" size={15} />
               </button>
-              <Icon name="bell" size={15} style={{ color: 'var(--text-dim)' }} />
+              <button
+                className={'btn btn-ghost icon-btn' + (activeTab === 'handler' ? ' active' : '')}
+                onClick={() => onTabChange('handler')}
+                title="Open the Handler feed"
+                aria-label="Open the Handler feed"
+              >
+                <Icon name="bell" size={15} />
+              </button>
             </div>
           </header>
           <div className="content">
@@ -357,7 +364,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
 
       {/* MOBILE BOTTOM NAV — 4 pinned tabs + MORE (the full deck). */}
       <nav className="bottom-nav">
-        {([['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'], ['overview', 'Vault', 'wallet'], ['progress', 'Cred', 'trophy']] as NavItem[]).map(([id, label, icon]) => (
+        {([['today', 'Today', 'target'], ['habits', 'Habits', 'check'], ['operations', 'Ops', 'grid'], ['health', 'Health', 'heart']] as NavItem[]).map(([id, label, icon]) => (
           <button
             key={id}
             onClick={() => { onTabChange(id); setMoreOpen(false); }}
@@ -371,7 +378,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
           onClick={() => setMoreOpen(o => !o)}
           className={`bn-item${moreOpen || !PINNED_TABS.includes(activeTab) ? ' active' : ''}`}
         >
-          <Icon name="grid" size={20} />
+          <Icon name="list" size={20} />
           <span>More</span>
         </button>
       </nav>

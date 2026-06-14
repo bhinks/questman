@@ -140,6 +140,8 @@ router.post('/buy', asyncHandler(async (req: AuthRequest, res) => {
 
   const item = SHOP_ITEMS.find(i => i.key === itemKey);
   if (!item) throw new AppError('Unknown shop item', 400);
+  // Sold-out SKUs are listed as flavor only — refuse a crafted buy request.
+  if (item.soldOut) throw new AppError('Sold out', 400);
 
   const { purchase, granted, message } = await prisma.$transaction(async (tx) => {
     // 1) Balance gate (ledger is authoritative).

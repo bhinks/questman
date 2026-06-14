@@ -41,7 +41,7 @@ const createSchema = z.object({
   icon:         z.string().nullable().optional(),
   color:        z.string().nullable().optional(),
   cadence:      CADENCE.default('daily'),
-  schedule:     z.record(z.unknown()).nullable().optional(), // {daysOfWeek:[1,3,5]} | {everyN:2}
+  schedule:     z.record(z.unknown()).nullable().optional(), // {daysOfWeek:[1,3,5]}; throttle via minIntervalDays
   dueDate:      z.string().datetime().nullable().optional(),
   targetPerDay: z.number().int().min(1).max(20).default(1),
   baseXp:       z.number().int().min(0).max(500).default(10),
@@ -84,7 +84,9 @@ export function isHabitDueToday(
       return days.includes(today.getDay());
     }
     case 'custom': {
-      const sched = parseJson<{ daysOfWeek?: number[]; everyN?: number }>(habit.schedule);
+      // Custom = an explicit weekday set; recurrence throttling is handled
+      // separately by minIntervalDays at quest-generation time.
+      const sched = parseJson<{ daysOfWeek?: number[] }>(habit.schedule);
       if (sched?.daysOfWeek?.includes(today.getDay())) return true;
       return false;
     }

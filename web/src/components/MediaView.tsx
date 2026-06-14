@@ -169,7 +169,7 @@ function fullUnits(it: MediaItem): number {
 /* page                                                                */
 /* ------------------------------------------------------------------ */
 const FILTERS: Array<[string, string]> = [
-  ['all', 'ALL'], ['active', 'IN PROGRESS'], ['backlog', 'QUEUED'], ['done', 'DONE'],
+  ['all', 'ALL'], ['active', 'IN PROGRESS'], ['backlog', 'QUEUED'], ['done', 'DONE'], ['dropped', 'DROPPED'],
   ['movie', 'MOVIES'], ['show', 'SHOWS'], ['game', 'GAMES'], ['book', 'BOOKS'],
 ];
 const STATUS_RANK: Record<string, number> = { active: 0, backlog: 1, done: 2, dropped: 3 };
@@ -282,7 +282,7 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
 
   const shown = items
     .filter(i => filter === 'all' ? i.status !== 'dropped'
-      : (['active', 'backlog', 'done'] as string[]).includes(filter) ? i.status === filter
+      : (['active', 'backlog', 'done', 'dropped'] as string[]).includes(filter) ? i.status === filter
       : i.type === filter && i.status !== 'dropped')
     .sort((a, b) => (STATUS_RANK[a.status] - STATUS_RANK[b.status]));
 
@@ -537,13 +537,14 @@ function MediaCard({
 }) {
   const m = TYPE_META[it.type];
   const done = it.status === 'done';
+  const dropped = it.status === 'dropped';
   const rem = remainMin(it, pace);
   const pct = Math.round(pctDone(it, pace) * 100);
   const endlessGame = isEndless(it);
 
-  // medium-specific one-tap controls
+  // medium-specific one-tap controls (terminal states show no logging steppers)
   const controls: React.ReactNode[] = [];
-  if (!done) {
+  if (!done && !dropped) {
     if (it.type === 'show') {
       const perEp = perEpMinOf(it);
       controls.push(<Stepper key="s" label="EP"
@@ -568,14 +569,15 @@ function MediaCard({
       padding: 14, display: 'flex', gap: 13, alignItems: 'stretch',
       border: done ? '1px solid color-mix(in srgb, var(--lime) 45%, transparent)' : '1px solid var(--line)',
       background: done ? 'linear-gradient(180deg, rgba(67,255,166,0.05), transparent)' : undefined,
-      opacity: busy ? 0.92 : 1,
+      opacity: busy ? 0.92 : dropped ? 0.66 : 1,
     }}>
       <Cover it={it} />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: done ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: done ? 'line-through' : 'none' }}>{it.title}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: done ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: done || dropped ? 'line-through' : 'none' }}>{it.title}</div>
           </div>
+          {dropped && <span className="mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-faint)', border: '1px solid var(--line-2)', padding: '2px 6px', flex: 'none' }}>DROPPED</span>}
           <TypeBadge type={it.type} />
         </div>
 
@@ -607,7 +609,7 @@ function MediaCard({
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {it.status === 'backlog' && <button className="btn" style={ctrlBtn} disabled={busy} onClick={onJackIn}><Icon name="zap" size={11} /> JACK IN</button>}
             {controls}
-            {done
+            {done || dropped
               ? <button className="btn btn-ghost" style={ctrlBtn} disabled={busy} onClick={() => onStatus('backlog')}><Icon name="repeat" size={11} /> RE-QUEUE</button>
               : (!endlessGame && <button className="btn" style={ctrlBtn} disabled={busy} onClick={() => onStatus('done')}><Icon name="check" size={12} /> DONE</button>)}
             <button className="btn btn-ghost" style={{ ...ctrlBtn, padding: '5px 7px' }} onClick={onDelete} aria-label={`Delete ${it.title}`}><Icon name="close" size={13} /></button>

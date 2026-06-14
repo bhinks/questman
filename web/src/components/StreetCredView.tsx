@@ -379,12 +379,16 @@ function ActivityPanel({ cells, streak }: { cells: number[]; streak: number }) {
 
 const REASON_LABELS: Record<string, string> = {
   quest_complete: 'Quest cleared',
+  quest_progress: 'Quest progress',
   habit_log: 'Habit logged',
   habit_log_undo: 'Habit undone',
   workout_log: 'Workout logged',
   streak_bonus: 'Streak bonus',
   level_up: 'Level up',
   shop_purchase: 'Shop purchase',
+  boss_defeat: 'Target flatlined',
+  achievement: 'Badge unlocked',
+  anti_goal_clean: 'Clean day',
 };
 
 /** Habits and chores share the 'habit_log' reason — the module column tells
