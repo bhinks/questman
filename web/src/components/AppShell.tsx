@@ -41,6 +41,7 @@ type NavItem = [id: string, label: string, icon: string];
 const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   { group: 'OPS', items: [
     ['today', 'Today', 'target'], ['bosses', 'Bosses', 'flame'],
+    ['handler', 'Handler', 'bell'],
   ]},
   { group: 'LIFE', items: [
     ['habits', 'Habits', 'check'], ['chores', 'Chores', 'list'],
@@ -54,7 +55,7 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   ]},
   { group: 'PROGRESSION', items: [
     ['progress', 'Progress', 'layers'], ['achievements', 'Street Cred', 'trophy'],
-    ['shop', 'Shop', 'bag'], ['intel', 'Net', 'eye'], ['debrief', 'Debrief', 'file'],
+    ['shop', 'Shop', 'bag'],
   ]},
   { group: 'SYSTEM', items: [
     ['calibration', 'Calibration', 'bolt'],
@@ -65,12 +66,12 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
 const PINNED_TABS: string[] = ['today', 'bosses', 'overview', 'progress'];
 
 const SCREEN_TITLES: Record<string, string> = {
-  today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS',
+  today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
   ice: 'LIFE // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
   workouts: 'LIFE // WORKOUTS', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
   vitals: 'LIFE // BIOMONITOR', social: 'LIFE // CREW',
   progress: 'PROGRESS // STREET CRED', achievements: 'PROGRESS // BADGE WALL',
-  shop: 'SHOP // NIGHT MARKET', intel: 'NET // DATA-SHADOW', debrief: 'PROGRESS // DEBRIEF',
+  shop: 'SHOP // NIGHT MARKET',
   overview: 'VAULT // FINANCE', budgets: 'VAULT // BUDGETS',
   bills: 'VAULT // BILLS', savings: 'VAULT // SAVINGS',
   calibration: 'SYS // CALIBRATION',

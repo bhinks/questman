@@ -366,6 +366,17 @@ input, textarea, select { font-family: inherit; }
 .noscroll::-webkit-scrollbar { display: none; }
 .noscroll { scrollbar-width: none; }
 
+/* Handler comms-dashboard grid (HandlerView): a feed column beside an
+   analysis rail, with a row of slim pattern cards above. Collapses to a
+   single column on narrow viewports. */
+.hdash { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: start; }
+.hcol  { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.hpat  { display: grid; grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)); gap: 12px; }
+@media (max-width: 1180px) {
+  .hdash { grid-template-columns: 1fr; }
+  .hpat  { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}
+
 /* ============================================================
    App shell layout + responsive
    ============================================================ */

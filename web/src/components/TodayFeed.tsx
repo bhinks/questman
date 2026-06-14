@@ -162,7 +162,7 @@ function BossOpsPanel({ bosses }: { bosses: Boss[] }) {
   );
 }
 
-/** PATTERN WATCH — new insights with inline ACCEPT/DISMISS (mirrors NetView). */
+/** PATTERN WATCH — new insights with inline ACCEPT/DISMISS (mirrors HandlerView). */
 function PatternWatchPanel({ patterns }: { patterns: Insight[] }) {
   const qc = useQueryClient();
   const act = useMutation({

@@ -26,8 +26,7 @@ import { ShopView } from './components/ShopView';
 import { AchievementsView } from './components/AchievementsView';
 import { BossesView } from './components/BossesView';
 import { IceView } from './components/IceView';
-import { NetView } from './components/NetView';
-import { DebriefView } from './components/DebriefView';
+import { HandlerView } from './components/HandlerView';
 import { BudgetsView } from './components/BudgetsView';
 import { BillsView } from './components/BillsView';
 import { TransactionsView } from './components/TransactionsView';
@@ -387,11 +386,8 @@ function HubApp() {
       case 'ice':
         return <IceView />;
 
-      case 'intel':
-        return <NetView />;
-
-      case 'debrief':
-        return <DebriefView />;
+      case 'handler':
+        return <HandlerView />;
 
       case 'budgets':
         return <BudgetsView />;
