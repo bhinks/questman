@@ -21,6 +21,7 @@ import express from 'express';
 import { z } from 'zod';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { prisma } from '../server';
+import { emitHandlerEvent } from '../services/handlerEvents';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
@@ -416,6 +417,10 @@ router.put('/milestones/:mId', asyncHandler(async (req: AuthRequest, res) => {
     ws.broadcastGameEvent(userId, 'milestone-cleared', {
       milestoneId: existing.id, xpAwarded,
     });
+  }
+
+  if (xpAwarded > 0) {
+    void emitHandlerEvent(prisma, userId, { type: 'milestone_cleared', title: existing.title, projectId: existing.projectId });
   }
 
   res.json({ milestone, player, xpAwarded });

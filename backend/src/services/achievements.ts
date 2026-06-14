@@ -19,6 +19,7 @@
  */
 import { Prisma, PrismaClient } from '@prisma/client';
 import { GamificationService } from './GamificationService';
+import { emitHandlerEvent } from './handlerEvents';
 import { overclockMultiplier } from '../utils/economy';
 
 export interface UnlockedAchievement {
@@ -371,6 +372,11 @@ export async function evaluateAchievements(
         eddieReward: def.eddieReward,
       });
     }
+  }
+
+  // Handler reacts to each fresh badge (after-commit, fire-and-forget).
+  for (const a of newlyUnlocked) {
+    void emitHandlerEvent(prisma, userId, { type: 'achievement_unlocked', name: a.name, key: a.key });
   }
 
   return newlyUnlocked;

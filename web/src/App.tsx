@@ -17,13 +17,12 @@ import { LoginScreen } from './components/LoginScreen';
 import { TodayView } from './components/TodayView';
 import { RecurringList } from './components/RecurringList';
 import { WorkoutLogger } from './components/WorkoutLogger';
-import { ProgressView } from './components/ProgressView';
+import { StreetCredView } from './components/StreetCredView';
 import { ProjectsView } from './components/ProjectsView';
 import { MediaView } from './components/MediaView';
 import { VitalsView } from './components/VitalsView';
 import { NpcsView } from './components/NpcsView';
 import { ShopView } from './components/ShopView';
-import { AchievementsView } from './components/AchievementsView';
 import { BossesView } from './components/BossesView';
 import { IceView } from './components/IceView';
 import { HandlerView } from './components/HandlerView';
@@ -372,13 +371,10 @@ function HubApp() {
         return <NpcsView />;
 
       case 'progress':
-        return <ProgressView />;
+        return <StreetCredView />;
 
       case 'shop':
         return <ShopView />;
-
-      case 'achievements':
-        return <AchievementsView />;
 
       case 'bosses':
         return <BossesView />;

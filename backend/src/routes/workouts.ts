@@ -1,6 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../server';
+import { emitHandlerEvent } from '../services/handlerEvents';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
@@ -301,6 +302,10 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
     ws.broadcastGameEvent(userId, 'workout-logged', {
       workoutId: workout.id, xpAwarded: xp, questAutoCompleted,
     });
+  }
+
+  if (workout && !deduped) {
+    void emitHandlerEvent(prisma, userId, { type: 'workout_logged', label: workout.title || workout.type, workoutId: workout.id });
   }
 
   res.status(deduped ? 200 : 201).json({

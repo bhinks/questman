@@ -22,6 +22,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
+import { emitHandlerEvent } from '../services/handlerEvents';
 
 const router = express.Router();
 
@@ -318,6 +319,7 @@ router.post('/:id/hit', asyncHandler(async (req: AuthRequest, res) => {
   const result = await prisma.$transaction((tx) =>
     applyBossHit(tx, userId, existing, amount, 'manual', data.note ?? null),
   );
+  const serialized = serialize(result.boss);
 
   const ws = (global as any).wsService;
   if (ws?.broadcastGameEvent && result.defeated) {
@@ -327,8 +329,18 @@ router.post('/:id/hit', asyncHandler(async (req: AuthRequest, res) => {
     });
   }
 
+  // Handler reacts to the hit (after-commit, fire-and-forget): a kill gets a
+  // defeat line, a non-fatal hit gets a "phase advanced" line.
+  void emitHandlerEvent(
+    prisma,
+    userId,
+    result.defeated
+      ? { type: 'boss_defeated', name: existing.name, bossId: existing.id }
+      : { type: 'boss_phase', name: existing.name, pct: serialized.pct, bossId: existing.id },
+  );
+
   res.json({
-    boss: serialize(result.boss),
+    boss: serialized,
     defeated: result.defeated,
     ...(result.player ? { player: result.player } : {}),
   });

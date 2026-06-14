@@ -23,6 +23,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
+import { emitHandlerEvent } from '../services/handlerEvents';
 import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
@@ -230,6 +231,8 @@ router.post('/:id/breach', asyncHandler(async (req: AuthRequest, res) => {
   if (ws?.broadcastGameEvent) {
     ws.broadcastGameEvent(userId, 'antigoal-breached', { antigoalId: habit.id });
   }
+
+  void emitHandlerEvent(prisma, userId, { type: 'antigoal_breached', name: antigoal.title, antigoalId: habit.id });
 
   res.json({ antigoal });
 }));

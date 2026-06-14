@@ -15,6 +15,7 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../server';
+import { emitHandlerEvent } from '../services/handlerEvents';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
@@ -286,6 +287,8 @@ router.post('/:id/interactions', asyncHandler(async (req: AuthRequest, res) => {
       npcId: npc.id, questAutoCompleted,
     });
   }
+
+  void emitHandlerEvent(prisma, userId, { type: 'npc_interaction', name: npc.name, npcId: npc.id });
 
   res.status(201).json({ interaction, player, questAutoCompleted });
 }));

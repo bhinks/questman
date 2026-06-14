@@ -26,6 +26,7 @@ import {
   overclockMultiplier, xpStreakBonus,
   energyTierFromSleep, energyPctForTier, energyPctFromSleep, EnergyTier,
 } from '../utils/economy';
+import { emitHandlerEvent, STREAK_MILESTONES } from './handlerEvents';
 
 /** Reasons that are NOT subject to the overclock multiplier: spends and
  *  corrections (must pass through raw), plus achievement payouts (one-time
@@ -113,6 +114,9 @@ export interface PlayerSnapshot {
   previousLevel?: number;
   /** Set on awardXp when the overclock multiplier boosted this eddie earn. */
   eddieMultiplierApplied?: number;
+  /** True when THIS award ticked the daily streak (first activity of the day).
+   *  Lets callers fire a one-shot streak-milestone reaction without re-reading. */
+  streakAdvanced?: boolean;
 }
 
 export class GamificationService {
@@ -317,6 +321,8 @@ export class GamificationService {
         if (currentStreak > longestStreak) longestStreak = currentStreak;
       }
       const nextLastActiveOn = touchStreak ? today : before.lastActiveOn;
+      // First activity-bearing award of the local day → the streak ticked.
+      const streakAdvanced = touchStreak && (!last || !isSameLocalDay(last, today));
 
       // Append the XP ledger entry FIRST so a partial write at least
       // leaves an audit trail that can be replayed.
@@ -416,11 +422,22 @@ export class GamificationService {
         leveledUp: nextLevel > previousLevel,
         previousLevel,
         eddieMultiplierApplied: earn && mult > 1 ? mult : undefined,
+        streakAdvanced,
       } satisfies PlayerSnapshot;
     };
 
     const snapshot = tx ? await run(tx) : await this.prisma.$transaction(run);
     this.broadcastPlayer(userId, snapshot);
+
+    // Handler reacts to progression milestones (after-commit, fire-and-forget;
+    // gated/redacted inside emitHandlerEvent). One-shot per real transition.
+    if (snapshot.leveledUp && snapshot.previousLevel != null) {
+      void emitHandlerEvent(this.prisma, userId, { type: 'level_up', from: snapshot.previousLevel, to: snapshot.level });
+    }
+    if (snapshot.streakAdvanced && STREAK_MILESTONES.has(snapshot.currentStreak)) {
+      void emitHandlerEvent(this.prisma, userId, { type: 'streak_milestone', days: snapshot.currentStreak });
+    }
+
     return snapshot;
   }
 

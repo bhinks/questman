@@ -54,8 +54,7 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     ['bills', 'Bills', 'clock'], ['savings', 'Savings', 'trend'],
   ]},
   { group: 'PROGRESSION', items: [
-    ['progress', 'Progress', 'layers'], ['achievements', 'Street Cred', 'trophy'],
-    ['shop', 'Shop', 'bag'],
+    ['progress', 'Street Cred', 'trophy'], ['shop', 'Shop', 'bag'],
   ]},
   { group: 'SYSTEM', items: [
     ['calibration', 'Calibration', 'bolt'],
@@ -70,7 +69,7 @@ const SCREEN_TITLES: Record<string, string> = {
   ice: 'LIFE // ICE', habits: 'LIFE // HABITS', chores: 'LIFE // CHORES',
   workouts: 'LIFE // WORKOUTS', projects: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
   vitals: 'LIFE // BIOMONITOR', social: 'LIFE // CREW',
-  progress: 'PROGRESS // STREET CRED', achievements: 'PROGRESS // BADGE WALL',
+  progress: 'PROGRESS // STREET CRED',
   shop: 'SHOP // NIGHT MARKET',
   overview: 'VAULT // FINANCE', budgets: 'VAULT // BUDGETS',
   bills: 'VAULT // BILLS', savings: 'VAULT // SAVINGS',

@@ -18,6 +18,7 @@ import express from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../server';
+import { emitHandlerEvent } from '../services/handlerEvents';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
@@ -324,6 +325,10 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
     ws.broadcastGameEvent(userId, 'media-progress', {
       mediaId: existing.id, questAutoCompleted,
     });
+  }
+
+  if (questAutoCompleted) {
+    void emitHandlerEvent(prisma, userId, { type: 'media_completed', title: existing.title, mediaId: existing.id });
   }
 
   res.json({ item: serialize(item), player, questAutoCompleted });

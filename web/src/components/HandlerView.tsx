@@ -175,6 +175,7 @@ export function HandlerView() {
         enabled={enabled}
         options={options}
         transmission={transmission}
+        transmissionPersona={enabled && latestMsg ? latestMsg.persona : null}
         freshSignal={freshSignal}
         weekStatus={weekStatus}
         loading={personaQ.isLoading}
@@ -249,7 +250,7 @@ export function HandlerView() {
 
 function PersonaMasthead({
   persona, personaLabel, personaBlurb, accent, tag, enabled, options,
-  transmission, freshSignal, weekStatus, loading, error,
+  transmission, transmissionPersona, freshSignal, weekStatus, loading, error,
 }: {
   persona: HandlerPersona;
   personaLabel: string;
@@ -259,11 +260,18 @@ function PersonaMasthead({
   enabled: boolean;
   options: PersonaOptionEx[];
   transmission: string;
+  /** The voice that actually produced the freshest line (may differ from the
+   *  currently-selected persona if the user switched). null → attribute to the
+   *  current persona. */
+  transmissionPersona: HandlerPersona | null;
   freshSignal: number;
   weekStatus: 'filed' | 'awaiting';
   loading: boolean;
   error: boolean;
 }) {
+  // Attribute the line to whoever actually spoke it.
+  const voiceName = transmissionPersona ? personaMeta(transmissionPersona).name : personaLabel;
+  const voiceColor = transmissionPersona ? personaMeta(transmissionPersona).accent : accent;
   const qc = useQueryClient();
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['handler', 'persona'] });
@@ -313,7 +321,7 @@ function PersonaMasthead({
             className="ncx-term"
             style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 10, color: enabled ? 'var(--text)' : 'var(--text-faint)' }}
           >
-            <span style={{ color: accent }}>{personaLabel}&gt;</span> {transmission}
+            <span style={{ color: voiceColor }}>{voiceName}&gt;</span> {transmission}
             {enabled && <span className="cursor-blink" style={{ color: accent }}>_</span>}
           </div>
         </div>
@@ -635,6 +643,9 @@ function TransmissionsPanel({
                   </div>
                   <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 4 }}>
                     {!m.seen && <span style={{ color: accent, marginRight: 8 }}>● NEW</span>}{timeAgo(m.createdAt)}
+                    {m.persona && (
+                      <> · <span style={{ color: personaMeta(m.persona).accent }}>{personaMeta(m.persona).name}</span></>
+                    )}
                   </div>
                 </div>
               </div>
