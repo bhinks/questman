@@ -10,8 +10,9 @@
  * metric, fed by GET /api/metrics/history. A "configure" affordance toggles
  * each MetricDef.enabled.
  */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { api } from '../lib/api';
 import type { MetricDef } from '../lib/api';
 import { Icon } from './Icon';
@@ -46,7 +47,6 @@ export function VitalsView() {
   const [configuring, setConfiguring] = useState(false);
   // Local edits to the form, keyed by metric key. '' = blank (not logged).
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [trendKey, setTrendKey] = useState<string | null>(null);
 
   const defsQ = useQuery({
     queryKey: ['metrics', 'defs'],
@@ -67,11 +67,6 @@ export function VitalsView() {
 
   const defs = useMemo(() => defsQ.data ?? [], [defsQ.data]);
   const enabled = useMemo(() => defs.filter(d => d.enabled), [defs]);
-
-  // Default the trend selector to the first enabled metric once we have one.
-  useEffect(() => {
-    if (trendKey === null && enabled.length > 0) setTrendKey(enabled[0].key);
-  }, [enabled, trendKey]);
 
   const submit = useMutation({
     mutationFn: () => {
@@ -118,8 +113,15 @@ export function VitalsView() {
         </Empty>
       ) : (
         <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="edit" size={13} style={{ color: 'var(--cyan)' }} />
+            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
+            <span style={{ flex: 1 }} />
+            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
+              {logQ.data ? format(new Date(logQ.data.date), 'EEE · MMM d') : ''}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(188px, 1fr))', gap: 12 }}>
             {enabled.map(def => (
               <MetricField
                 key={def.id}
@@ -152,8 +154,8 @@ export function VitalsView() {
         </section>
       )}
 
-      {!configuring && enabled.length > 0 && trendKey && (
-        <Trends defs={enabled} metricKey={trendKey} onPick={setTrendKey} />
+      {!configuring && enabled.length > 0 && (
+        <TrendsSection defs={enabled} />
       )}
     </div>
   );
@@ -256,13 +258,22 @@ function PhoneSyncButton() {
 function MetricField({
   def, value, onChange,
 }: { def: MetricDef; value: string; onChange: (v: string) => void }) {
+  const [focused, setFocused] = useState(false);
   const isScale = def.kind === 'scale';
   const lo = def.min ?? 1;
   const hi = def.max ?? 5;
+  const filled = value !== '' && value != null;
 
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span className="kicker" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+    <label
+      className="panel-inset"
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 8, padding: '11px 13px',
+        borderColor: filled ? 'color-mix(in srgb, var(--cyan) 34%, var(--line))' : undefined,
+        transition: 'border-color .15s',
+      }}
+    >
+      <span className="kicker" style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 9.5 }}>
         {def.label}
         {def.unit && <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>{def.unit}</span>}
       </span>
@@ -279,7 +290,15 @@ function MetricField({
           placeholder="—"
           value={value}
           onChange={e => onChange(e.target.value)}
-          style={inputStyle}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            ...inputStyle,
+            background: 'var(--panel-2)',
+            borderColor: focused ? 'var(--cyan)' : 'var(--line-2)',
+            boxShadow: focused ? 'var(--glow-cyan)' : 'none',
+            transition: 'border-color .15s, box-shadow .15s',
+          }}
         />
       )}
     </label>
@@ -328,141 +347,302 @@ function ScalePicker({
   );
 }
 
-/** Trends strip: metric selector + inline SVG sparkline from GET /history. */
-function Trends({
-  defs, metricKey, onPick,
-}: { defs: MetricDef[]; metricKey: string; onPick: (k: string) => void }) {
-  const [days, setDays] = useState(30);
-  const historyQ = useQuery({
-    queryKey: ['metrics', 'history', metricKey, days],
-    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(metricKey)}&days=${days}`),
-  });
+/**
+ * Trends section: a single shared time-window selector over a responsive
+ * grid of per-metric charts (one card per enabled metric; the two BP
+ * metrics share one plot). Replaces the old pick-one-metric strip.
+ */
+const WINDOWS = [7, 30, 90, 365];
 
-  const def = defs.find(d => d.key === metricKey);
-  const series = historyQ.data?.series ?? [];
+type ChartSpec =
+  | { type: 'single'; def: MetricDef }
+  | { type: 'bp'; sys: MetricDef; dia: MetricDef };
+
+/** Build the card list: collapse bpSys + bpDia into one combined plot. */
+function buildChartSpecs(defs: MetricDef[]): ChartSpec[] {
+  const sys = defs.find(d => d.key === 'bpSys');
+  const dia = defs.find(d => d.key === 'bpDia');
+  const pairBp = !!(sys && dia);
+  const specs: ChartSpec[] = [];
+  let bpDone = false;
+  for (const def of defs) {
+    if (pairBp && (def.key === 'bpSys' || def.key === 'bpDia')) {
+      if (!bpDone) { specs.push({ type: 'bp', sys: sys!, dia: dia! }); bpDone = true; }
+      continue;
+    }
+    specs.push({ type: 'single', def });
+  }
+  return specs;
+}
+
+/** Stable per-metric line colors; unknown keys cycle a palette by position. */
+const METRIC_COLORS: Record<string, string> = {
+  weight: 'var(--cyan)',
+  sleepHours: 'var(--violet)',
+  mood: 'var(--lime)',
+  water: 'var(--blue)',
+  workHours: 'var(--amber)',
+  steps: 'var(--magenta)',
+  restingHr: 'var(--red)',
+};
+const PALETTE = ['var(--cyan)', 'var(--violet)', 'var(--lime)', 'var(--amber)', 'var(--blue)', 'var(--pink)', 'var(--magenta)', 'var(--red)'];
+function colorFor(key: string, idx: number): string {
+  return METRIC_COLORS[key] ?? PALETTE[idx % PALETTE.length];
+}
+
+const DAY_MS = 86_400_000;
+function localMidnightMs(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+const fmtNum = (v: number) => (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1));
+const fmtValue = (v: number, unit: string | null) => (unit ? `${fmtNum(v)} ${unit}` : fmtNum(v));
+const fmtDelta = (v: number) => `${v >= 0 ? '+' : '−'}${fmtNum(Math.abs(v))}`;
+
+const cardStyle: React.CSSProperties = { padding: 14, display: 'flex', flexDirection: 'column', gap: 10 };
+
+function TrendsSection({ defs }: { defs: MetricDef[] }) {
+  const [days, setDays] = useState(30);
+  const specs = useMemo(() => buildChartSpecs(defs), [defs]);
 
   return (
-    <section className="panel hud" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="panel hud" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <Icon name="trend" size={16} style={{ color: 'var(--violet)' }} />
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TRENDS</span>
-
-        <select
-          value={metricKey}
-          onChange={e => onPick(e.target.value)}
-          style={{ ...inputStyle, marginLeft: 4 }}
-        >
-          {defs.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
-        </select>
-
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          {[7, 30, 90].map(d => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              className="mono"
-              style={{
-                fontSize: 11, padding: '4px 10px', cursor: 'pointer',
-                letterSpacing: '0.06em',
-                border: days === d ? '1px solid var(--violet)' : '1px solid var(--line-2)',
-                background: days === d ? 'color-mix(in srgb, var(--violet) 14%, transparent)' : 'var(--panel-2)',
-                color: days === d ? 'var(--violet)' : 'var(--text-dim)',
-                transition: 'background .15s, border-color .15s, color .15s',
-              }}
-            >
-              {d}D
-            </button>
-          ))}
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Trends</span>
+        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-faint)' }}>
+          {specs.length} {specs.length === 1 ? 'CHART' : 'CHARTS'}
+        </span>
+        <span style={{ flex: 1 }} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          {WINDOWS.map(d => {
+            const on = days === d;
+            return (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className="mono"
+                style={{
+                  fontSize: 11, padding: '4px 10px', cursor: 'pointer', letterSpacing: '0.06em',
+                  border: on ? '1px solid var(--violet)' : '1px solid var(--line-2)',
+                  background: on ? 'color-mix(in srgb, var(--violet) 14%, transparent)' : 'var(--panel-2)',
+                  color: on ? 'var(--violet)' : 'var(--text-dim)',
+                  transition: 'background .15s, border-color .15s, color .15s',
+                }}
+              >
+                {d === 365 ? '1Y' : `${d}D`}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {historyQ.isLoading ? (
-        <Empty>LOADING SERIES…</Empty>
-      ) : series.length === 0 ? (
-        <Empty>No data points yet — submit a few daily logs to see the trend.</Empty>
-      ) : (
-        <Sparkline
-          series={series}
-          unit={def?.unit ?? null}
-        />
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+        {specs.map((spec, i) =>
+          spec.type === 'bp'
+            ? <BpTrendCard key="bp" sys={spec.sys} dia={spec.dia} days={days} />
+            : <TrendCard key={spec.def.key} def={spec.def} days={days} color={colorFor(spec.def.key, i)} />
+        )}
+      </div>
     </section>
   );
 }
 
-/**
- * Pure inline SVG sparkline — no chart lib. Plots the value series as a
- * cyan area + line with min/max/latest callouts. Single point degrades to
- * a flat midline marker.
- */
-function Sparkline({
-  series, unit,
-}: { series: Array<{ date: string; value: number }>; unit: string | null }) {
-  const W = 640;
-  const H = 120;
-  const PAD = 8;
-
-  const values = series.map(s => s.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const n = series.length;
-
-  const x = (i: number) => n <= 1 ? W / 2 : PAD + (i / (n - 1)) * (W - PAD * 2);
-  const y = (v: number) => H - PAD - ((v - min) / span) * (H - PAD * 2);
-
-  const linePts = series.map((s, i) => `${x(i)},${y(s.value)}`).join(' ');
-  const areaPts = `${PAD},${H - PAD} ${linePts} ${W - PAD},${H - PAD}`;
-  const latest = series[n - 1];
-
-  const fmt = (v: number) =>
-    `${Number.isInteger(v) ? v : v.toFixed(1)}${unit ? ` ${unit}` : ''}`;
+/** One metric's history card: header value + sparkline + min/max/Δ stats. */
+function TrendCard({ def, days, color }: { def: MetricDef; days: number; color: string }) {
+  const q = useQuery({
+    queryKey: ['metrics', 'history', def.key, days],
+    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(def.key)}&days=${days}`),
+  });
+  const points = q.data?.series ?? [];
+  const values = points.map(p => p.value);
+  const latest = values.length ? values[values.length - 1] : null;
+  const first = values.length ? values[0] : null;
+  const min = values.length ? Math.min(...values) : null;
+  const max = values.length ? Math.max(...values) : null;
+  const delta = latest != null && first != null ? latest - first : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <Stat label="LATEST" value={fmt(latest.value)} color="var(--cyan)" />
-        <Stat label="MIN" value={fmt(min)} color="var(--text-dim)" />
-        <Stat label="MAX" value={fmt(max)} color="var(--text-dim)" />
-        <Stat label="POINTS" value={String(n)} color="var(--text-faint)" />
-      </div>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="none"
-        style={{ width: '100%', height: 120, display: 'block' }}
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id="vitals-spark" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.28} />
-            <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        {n > 1 && <polygon points={areaPts} fill="url(#vitals-spark)" stroke="none" />}
-        {n > 1 && (
-          <polyline
-            points={linePts}
-            fill="none"
-            stroke="var(--cyan)"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ filter: 'drop-shadow(0 0 4px var(--cyan))' }}
+    <div className="panel" style={cardStyle}>
+      <CardHeader color={color} label={def.label} value={latest != null ? fmtValue(latest, def.unit) : '—'} />
+      <MiniChart days={days} loading={q.isLoading} series={[{ label: def.label, color, points }]} />
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline' }}>
+        {delta != null && delta !== 0 && (
+          <MiniStat
+            label={`Δ ${days === 365 ? '1Y' : `${days}D`}`}
+            value={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <Icon name={delta >= 0 ? 'arrowUp' : 'arrowDn'} size={10} />
+                {fmtDelta(delta)}
+              </span>
+            }
           />
         )}
-        {series.map((s, i) => (
-          <circle key={i} cx={x(i)} cy={y(s.value)} r={i === n - 1 ? 4 : 2.5} fill="var(--cyan)" />
-        ))}
-      </svg>
+        {min != null && <MiniStat label="MIN" value={fmtNum(min)} />}
+        {max != null && <MiniStat label="MAX" value={fmtNum(max)} />}
+        <span style={{ flex: 1 }} />
+        <MiniStat label="PTS" value={String(points.length)} color="var(--text-faint)" />
+      </div>
     </div>
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: string; color: string }) {
+/** Combined blood-pressure card: systolic + diastolic on one shared plot. */
+function BpTrendCard({ sys, dia, days }: { sys: MetricDef; dia: MetricDef; days: number }) {
+  const sysQ = useQuery({
+    queryKey: ['metrics', 'history', sys.key, days],
+    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(sys.key)}&days=${days}`),
+  });
+  const diaQ = useQuery({
+    queryKey: ['metrics', 'history', dia.key, days],
+    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(dia.key)}&days=${days}`),
+  });
+  const sysPts = sysQ.data?.series ?? [];
+  const diaPts = diaQ.data?.series ?? [];
+  const sColor = 'var(--cyan)', dColor = 'var(--violet)';
+  const sysLast = sysPts.length ? sysPts[sysPts.length - 1].value : null;
+  const diaLast = diaPts.length ? diaPts[diaPts.length - 1].value : null;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span className="kicker" style={{ fontSize: 9 }}>{label}</span>
-      <span className="mono" style={{ fontSize: 15, fontWeight: 700, color }}>{value}</span>
+    <div className="panel" style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: `linear-gradient(135deg, ${sColor}, ${dColor})`, boxShadow: `0 0 6px ${sColor}`, flexShrink: 0, alignSelf: 'center' }} />
+        <span className="kicker" style={{ fontSize: 9.5 }}>Blood pressure</span>
+        <span style={{ flex: 1 }} />
+        <span className="mono" style={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>
+          <span style={{ color: sColor }}>{sysLast ?? '—'}</span>
+          <span style={{ color: 'var(--text-faint)' }}>/</span>
+          <span style={{ color: dColor }}>{diaLast ?? '—'}</span>
+          {sys.unit && <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 400, marginLeft: 4 }}>{sys.unit}</span>}
+        </span>
+      </div>
+      <MiniChart
+        days={days}
+        fill={false}
+        loading={sysQ.isLoading || diaQ.isLoading}
+        series={[
+          { label: 'SYS', color: sColor, points: sysPts },
+          { label: 'DIA', color: dColor, points: diaPts },
+        ]}
+      />
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline' }}>
+        <LegendDot color={sColor} label="SYS" />
+        <LegendDot color={dColor} label="DIA" />
+        <span style={{ flex: 1 }} />
+        <MiniStat label="PTS" value={String(Math.max(sysPts.length, diaPts.length))} color="var(--text-faint)" />
+      </div>
+    </div>
+  );
+}
+
+function CardHeader({ color, label, value }: { color: string; label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0, alignSelf: 'center' }} />
+      <span className="kicker" style={{ fontSize: 9.5 }}>{label}</span>
+      <span style={{ flex: 1 }} />
+      <span className="mono" style={{ fontSize: 18, fontWeight: 700, color, lineHeight: 1 }}>{value}</span>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <span className="kicker" style={{ fontSize: 8.5 }}>{label}</span>
+      <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: color ?? 'var(--text-dim)' }}>{value}</span>
+    </div>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ width: 9, height: 2, background: color, boxShadow: `0 0 4px ${color}`, display: 'inline-block' }} />
+      <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>{label}</span>
+    </span>
+  );
+}
+
+/**
+ * Multi-series inline SVG chart — no chart lib. All series share one y-axis
+ * and a fixed x-axis spanning the selected window (so sparse data sits where
+ * it actually fell in time, and every card lines up). `fill` adds the area
+ * gradient (on for single-metric cards, off for the two-line BP card).
+ */
+function MiniChart({
+  series, days, fill = true, loading,
+}: {
+  series: Array<{ label: string; color: string; points: Array<{ date: string; value: number }> }>;
+  days: number; fill?: boolean; loading?: boolean;
+}) {
+  const gid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const W = 320, H = 76, PAD = 6;
+
+  const maxMs = localMidnightMs();
+  const minMs = maxMs - (days - 1) * DAY_MS;
+  const xSpan = maxMs - minMs || 1;
+  const x = (ms: number) => PAD + clamp((ms - minMs) / xSpan, 0, 1) * (W - PAD * 2);
+
+  const all = series.flatMap(s => s.points.map(p => p.value));
+  if (loading) return <ChartEmpty height={H} text="loading…" />;
+  if (all.length === 0) return <ChartEmpty height={H} text="no readings in window" />;
+
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (hi === lo) { lo -= 1; hi += 1; }
+  const padY = (hi - lo) * 0.14;
+  const yLo = lo - padY, yHi = hi + padY;
+  const y = (v: number) => H - PAD - ((v - yLo) / (yHi - yLo)) * (H - PAD * 2);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }} aria-hidden="true">
+      <defs>
+        {fill && series.map((s, i) => (
+          <linearGradient key={i} id={`spark-${gid}-${i}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={s.color} stopOpacity={0.22} />
+            <stop offset="100%" stopColor={s.color} stopOpacity={0} />
+          </linearGradient>
+        ))}
+      </defs>
+      {series.map((s, i) => {
+        const pts = [...s.points].sort((a, b) => +new Date(a.date) - +new Date(b.date));
+        const n = pts.length;
+        if (n === 0) return null;
+        const line = pts.map(p => `${x(+new Date(p.date)).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+        const x0 = x(+new Date(pts[0].date)).toFixed(1);
+        const xN = x(+new Date(pts[n - 1].date)).toFixed(1);
+        return (
+          <g key={i}>
+            {fill && n > 1 && (
+              <polygon points={`${x0},${H - PAD} ${line} ${xN},${H - PAD}`} fill={`url(#spark-${gid}-${i})`} stroke="none" />
+            )}
+            {n > 1 && (
+              <polyline
+                points={line}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ filter: `drop-shadow(0 0 3px ${s.color})` }}
+              />
+            )}
+            {pts.map((p, j) => (
+              <circle key={j} cx={x(+new Date(p.date))} cy={y(p.value)} r={j === n - 1 ? 3 : 1.5} fill={s.color} />
+            ))}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function ChartEmpty({ height, text }: { height: number; text: string }) {
+  return (
+    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+      {text}
     </div>
   );
 }

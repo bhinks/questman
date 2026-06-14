@@ -153,6 +153,11 @@ const FETCH_TIMEOUT_MS = 10_000;
 /** In-memory poll state for catch-up sizing + transition-based logging. */
 let lastOkAt: number | null = null;
 let lastFailLogged = false;
+// Whether a deep historic pull has succeeded this process. The first
+// successful pull after boot backfills a wide window to fill trend charts;
+// every poll after that stays incremental. Resets on restart, so a reboot
+// re-backfills once (idempotent upserts — it just refills any downtime gap).
+let hasBackfilled = false;
 
 export interface PullResult {
   configured: boolean;
@@ -166,20 +171,32 @@ export interface PullResult {
  * One pull from the phone, shared by the interval poller and the Vitals
  * page's on-demand SYNC button (POST /api/metrics/pull). Never throws.
  */
-export async function pullNow(prisma: PrismaClient): Promise<PullResult> {
+export async function pullNow(
+  prisma: PrismaClient,
+  opts: { backfill?: boolean } = {},
+): Promise<PullResult> {
   const baseUrl = config.health.pullUrl;
   if (!baseUrl) return { configured: false, ok: false, written: 0, days: 0 };
 
-  // Catch-up window: if the phone has been unreachable (away from home),
-  // widen the requested window so the gap backfills on return. The app's
-  // `/` endpoint reads on demand; ?days=N asks for N full days (cap 14).
+  // Two request shapes:
+  //  - Backfill: the first successful pull of the process (or an explicit
+  //    request) grabs a deep historic window so the trend charts fill with
+  //    as much past data as the phone holds.
+  //  - Incremental: steady-state polls request only a small catch-up window,
+  //    floored at 2 days so yesterday's finalised step/HR totals always land,
+  //    and widened if the phone has been away so the gap backfills on return.
+  // The app's `/` endpoint reads Health Connect on demand; ?days=N asks for
+  // N full days. A deep scan can be slow, so backfills get a longer timeout.
+  const wantBackfill = opts.backfill || !hasBackfilled;
   const hoursSinceOk = lastOkAt ? (Date.now() - lastOkAt) / 3_600_000 : 48;
-  const days = Math.min(14, Math.max(2, Math.ceil(hoursSinceOk / 24) + 1));
+  const incrementalDays = Math.min(14, Math.max(2, Math.ceil(hoursSinceOk / 24) + 1));
+  const days = wantBackfill ? config.health.backfillDays : incrementalDays;
   const url = `${baseUrl.replace(/\/+$/, '')}/?days=${days}`;
+  const timeout = wantBackfill ? 30_000 : FETCH_TIMEOUT_MS;
 
   try {
     const res = await fetch(url, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeout),
       // The app's "Local HTTP auth" toggle: Authorization: Bearer <token>,
       // 401 without it. Optional — omitted when no token is configured.
       headers: config.health.pullToken
@@ -199,7 +216,12 @@ export async function pullNow(prisma: PrismaClient): Promise<PullResult> {
     }
     lastOkAt = Date.now();
     lastFailLogged = false;
-    if (written > 0) logger.info(`[healthSync] pulled ${written} value(s) across ${dayCount} day(s)`);
+    if (wantBackfill) {
+      hasBackfilled = true;
+      logger.info(`[healthSync] historic backfill: requested ${days}d, wrote ${written} value(s) across ${dayCount} day(s)`);
+    } else if (written > 0) {
+      logger.info(`[healthSync] pulled ${written} value(s) across ${dayCount} day(s)`);
+    }
     return { configured: true, ok: true, written, days: dayCount };
   } catch (err: any) {
     const msg = String(err?.message ?? err);

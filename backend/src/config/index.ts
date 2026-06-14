@@ -77,7 +77,11 @@ const configSchema = z.object({
     pullMinutes: z.number().int().min(5).default(30),
     // The app's "Local HTTP auth" bearer token (optional but recommended —
     // without it the phone's server answers anyone on the LAN).
-    pullToken: z.string().optional()
+    pullToken: z.string().optional(),
+    // Historic backfill window (days) requested on the first successful pull
+    // after boot, to fill the trend charts with as much past data as the
+    // phone holds. Steady-state polls stay incremental (a few days).
+    backfillDays: z.number().int().min(2).max(365).default(365)
   })
 });
 
@@ -143,7 +147,8 @@ const env = {
   health: {
     pullUrl: process.env.HEALTH_PULL_URL || undefined,
     pullMinutes: Number(process.env.HEALTH_PULL_MINUTES) || 30,
-    pullToken: process.env.HEALTH_PULL_TOKEN || undefined
+    pullToken: process.env.HEALTH_PULL_TOKEN || undefined,
+    backfillDays: Number(process.env.HEALTH_BACKFILL_DAYS) || 365
   }
 };
 

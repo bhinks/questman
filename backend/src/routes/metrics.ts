@@ -326,10 +326,12 @@ router.get('/pull', asyncHandler(async (_req: AuthRequest, res) => {
   res.json({ configured: !!config.health.pullUrl });
 }));
 
-/** POST /api/metrics/pull — pull from the phone right now. Never throws:
- *  an unreachable phone reports { ok:false } rather than a 5xx. */
-router.post('/pull', asyncHandler(async (_req: AuthRequest, res) => {
-  res.json(await pullNow(prisma));
+/** POST /api/metrics/pull[?full=1] — pull from the phone right now. Never
+ *  throws: an unreachable phone reports { ok:false } rather than a 5xx.
+ *  `full=1` forces a deep historic backfill instead of the incremental window. */
+router.post('/pull', asyncHandler(async (req: AuthRequest, res) => {
+  const backfill = req.query.full === '1' || req.query.full === 'true';
+  res.json(await pullNow(prisma, { backfill }));
 }));
 
 export default router;
