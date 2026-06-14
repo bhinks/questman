@@ -15,7 +15,7 @@ import { TransactionEditor } from './components/TransactionEditor';
 import { Icon } from './components/Icon';
 import { LoginScreen } from './components/LoginScreen';
 import { TodayView } from './components/TodayView';
-import { RecurringList } from './components/RecurringList';
+import { HabitsView } from './components/HabitsView';
 import { StreetCredView } from './components/StreetCredView';
 import { OperationsView } from './components/OperationsView';
 import { MediaView } from './components/MediaView';
@@ -23,7 +23,6 @@ import { HealthView } from './components/HealthView';
 import { NpcsView } from './components/NpcsView';
 import { ShopView } from './components/ShopView';
 import { BossesView } from './components/BossesView';
-import { IceView } from './components/IceView';
 import { HandlerView } from './components/HandlerView';
 import { BudgetsView } from './components/BudgetsView';
 import { BillsView } from './components/BillsView';
@@ -349,7 +348,7 @@ function HubApp() {
         return <TodayView onJackIn={openFocus} />;
 
       case 'habits':
-        return <RecurringList kind="habit" />;
+        return <HabitsView />;
 
       case 'health':
         return <HealthView />;
@@ -371,9 +370,6 @@ function HubApp() {
 
       case 'bosses':
         return <BossesView />;
-
-      case 'ice':
-        return <IceView />;
 
       case 'handler':
         return <HandlerView />;
