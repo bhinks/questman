@@ -235,6 +235,65 @@ export async function pullNow(
   }
 }
 
+// ---------------------------------------------------------------------
+// Uplink telemetry — backs the Biomonitor's PHONE UPLINK module
+// (GET /api/metrics/sync-status). Reports how far back the stored history
+// reaches per stream, so the UI can show the "backfill reach" readout.
+// ---------------------------------------------------------------------
+
+/** Short display labels for the uplink stream readout (bp* collapse to BP). */
+const STREAM_LABELS: Record<string, string> = {
+  steps: 'STEPS', restingHr: 'HEART', bpSys: 'BP', bpDia: 'BP',
+  sleepHours: 'SLEEP', weight: 'WEIGHT', water: 'WATER', workHours: 'FOCUS', mood: 'MOOD',
+};
+
+export interface SyncStatus {
+  configured: boolean;
+  lastSyncedAt: string | null;
+  lastSyncMins: number | null;
+  backfillDays: number;
+  readings: number;
+  streams: Array<{ label: string; days: number }>;
+}
+
+/** Reach of the stored daily history for the hub user: total rows, the
+ *  oldest-to-today span, and per-stream day counts. Cheap groupBy. */
+export async function getSyncStatus(prisma: PrismaClient): Promise<SyncStatus> {
+  const configured = !!config.health.pullUrl;
+  const lastSyncedAt = lastOkAt ? new Date(lastOkAt).toISOString() : null;
+  const lastSyncMins = lastOkAt ? Math.max(0, Math.round((Date.now() - lastOkAt) / 60_000)) : null;
+
+  const userId = await resolveHubUserId(prisma);
+  if (!userId) return { configured, lastSyncedAt, lastSyncMins, backfillDays: 0, readings: 0, streams: [] };
+
+  const grouped = await prisma.dailyMetric.groupBy({
+    by: ['key'],
+    where: { userId },
+    _count: { _all: true },
+    _min: { date: true },
+  });
+
+  const todayMs = startOfLocalDay().getTime();
+  const daysSince = (d: Date) =>
+    Math.max(1, Math.round((todayMs - startOfLocalDay(d).getTime()) / 86_400_000) + 1);
+
+  let readings = 0, backfillDays = 0;
+  const byLabel = new Map<string, number>();
+  for (const g of grouped) {
+    readings += g._count._all;
+    const days = g._min.date ? daysSince(g._min.date) : 0;
+    backfillDays = Math.max(backfillDays, days);
+    const label = STREAM_LABELS[g.key] ?? g.key.toUpperCase();
+    byLabel.set(label, Math.max(byLabel.get(label) ?? 0, days));
+  }
+
+  const streams = [...byLabel.entries()]
+    .map(([label, days]) => ({ label, days }))
+    .sort((a, b) => b.days - a.days);
+
+  return { configured, lastSyncedAt, lastSyncMins, backfillDays, readings, streams };
+}
+
 /**
  * Start the background poller. No-op unless HEALTH_PULL_URL is set.
  * Interval clamps to ≥5 min; first poll runs shortly after boot.

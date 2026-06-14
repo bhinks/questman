@@ -1,28 +1,36 @@
 /**
- * VitalsView — "Biomonitor". The daily vitals check-in.
+ * VitalsView — "Biomonitor". The daily vitals instrument panel.
  *
- * Renders one input per enabled MetricDef (number / integer / scale; mood
- * is a 1–5 scale selector). Prefills today's existing values; "SUBMIT LOG"
- * upserts them via PUT /api/metrics, which closes the loop on the daily
- * vitals quest (so submitting the log clears the quest + banks XP/eddies).
+ *   1. Command bar — title + logged/streams count + the PHONE UPLINK module.
+ *   2. Today's Readout — one instrument tile per enabled metric (blood
+ *      pressure combined into a single SYS/DIA tile). Prefills today's
+ *      persisted values (synced phone readings land here too); "SUBMIT LOG"
+ *      upserts them via PUT /api/metrics and closes the daily-vitals quest
+ *      (banks XP/eddies).
+ *   3. Trends — every enabled metric charted at once under ONE shared
+ *      time-window selector. Blood pressure's two streams share one dual-line
+ *      plot. Charts pull GET /api/metrics/history per key (fanned out).
+ *   4. Configure — toggle which MetricDefs appear.
  *
- * Below the form: a trends strip with an inline SVG sparkline for a chosen
- * metric, fed by GET /api/metrics/history. A "configure" affordance toggles
- * each MetricDef.enabled.
+ * Presentational extras (color/icon/source/good/band) come from lib/vitalsMeta;
+ * MetricDef stays data-only.
  */
-import { useState, useMemo, useEffect, useId } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { api } from '../lib/api';
 import type { MetricDef } from '../lib/api';
 import { Icon } from './Icon';
+import { metaFor } from '../lib/vitalsMeta';
+import type { MetricMeta, MetricSource } from '../lib/vitalsMeta';
+import { TrendChart, BpChart } from './VitalsCharts';
+import type { SeriesPoint, ChartStyle } from './VitalsCharts';
 
 interface DayLog {
   date: string;
   submitted: boolean;
   values: Record<string, number>;
 }
-/** PUT /api/metrics also returns the closed-loop quest result. */
 interface SubmitResponse extends DayLog {
   questAutoCompleted: { id: string; xpReward: number } | null;
 }
@@ -30,21 +38,52 @@ interface HistoryResponse {
   key: string;
   series: Array<{ date: string; value: number }>;
 }
+interface SyncStatus {
+  configured: boolean;
+  lastSyncedAt: string | null;
+  lastSyncMins: number | null;
+  backfillDays: number;
+  readings: number;
+  streams: Array<{ label: string; days: number }>;
+}
+interface SyncResult {
+  configured: boolean;
+  ok: boolean;
+  written: number;
+  days: number;
+  error?: string;
+  status: SyncStatus;
+}
 
-const inputStyle: React.CSSProperties = {
-  padding: '8px 12px',
-  background: '#070811',
-  border: '1px solid var(--line-2)',
-  borderRadius: 0,
-  color: 'var(--text)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 13,
-  outline: 'none',
+// One shared window selector → label + the days requested from the history
+// endpoint. ALL ≈ 10y (the server caps history there).
+const WINDOWS: Array<[string, number]> = [
+  ['7D', 7], ['30D', 30], ['90D', 90], ['1Y', 365], ['ALL', 3650],
+];
+
+// Product decisions baked from the design handoff's Tweaks panel (user picks):
+// chart style = bars, healthy-range bands on, comfortable density.
+const CHART_STYLE: ChartStyle = 'bars';
+const SHOW_BAND = true;
+const CARD_MIN = 320;
+
+const CARD: React.CSSProperties = { padding: 16, display: 'flex', flexDirection: 'column', gap: 12 };
+
+const tileInput: React.CSSProperties = {
+  width: '100%', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0,
+  color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 22,
+  padding: '6px 12px', outline: 'none', letterSpacing: '0.01em',
 };
+
+function toSeries(apiSeries?: Array<{ date: string; value: number }>): SeriesPoint[] {
+  if (!apiSeries) return [];
+  return apiSeries.map(p => ({ date: new Date(p.date), value: p.value }));
+}
 
 export function VitalsView() {
   const qc = useQueryClient();
   const [configuring, setConfiguring] = useState(false);
+  const [days, setDays] = useState(30);
   // Local edits to the form, keyed by metric key. '' = blank (not logged).
   const [draft, setDraft] = useState<Record<string, string>>({});
 
@@ -57,7 +96,8 @@ export function VitalsView() {
     queryFn: () => api.get<DayLog>('/api/metrics'),
   });
 
-  // Prefill the draft from today's persisted values whenever they load.
+  // Prefill the draft from today's persisted values whenever they load (this
+  // includes any readings the phone uplink already synced for today).
   useEffect(() => {
     if (!logQ.data) return;
     const next: Record<string, string> = {};
@@ -73,8 +113,8 @@ export function VitalsView() {
       const values: Record<string, number> = {};
       for (const [k, raw] of Object.entries(draft)) {
         if (raw === '' || raw == null) continue;
-        const n = Number(raw);
-        if (!Number.isNaN(n)) values[k] = n;
+        const num = Number(raw);
+        if (!Number.isNaN(num)) values[k] = num;
       }
       return api.put<SubmitResponse>('/api/metrics', { values });
     },
@@ -86,24 +126,47 @@ export function VitalsView() {
     },
   });
 
-  const setVal = (key: string, value: string) =>
-    setDraft(prev => ({ ...prev, [key]: value }));
+  const setVal = (key: string, value: string) => setDraft(prev => ({ ...prev, [key]: value }));
 
   if (defsQ.isLoading || logQ.isLoading) return <Empty>LOADING…</Empty>;
   if (defsQ.isError || logQ.isError) return <Empty color="var(--red)">FAILED TO LOAD</Empty>;
 
+  // Blood pressure → one combined card/tile when both streams are enabled.
+  const bpSysDef = enabled.find(d => d.key === 'bpSys');
+  const bpDiaDef = enabled.find(d => d.key === 'bpDia');
+  const hasBp = !!(bpSysDef && bpDiaDef);
+  const metricDefs = enabled.filter(d => !(hasBp && (d.key === 'bpSys' || d.key === 'bpDia')));
+
+  const isFilled = (k: string) => draft[k] !== '' && draft[k] != null;
+  const loggedCount = metricDefs.filter(d => isFilled(d.key)).length
+    + (hasBp && isFilled('bpSys') && isFilled('bpDia') ? 1 : 0);
+  const totalCount = metricDefs.length + (hasBp ? 1 : 0);
   const submitted = logQ.data?.submitted ?? false;
-  const loggedCount = Object.values(draft).filter(v => v !== '' && v != null).length;
+
+  // Trend cards: BP (wide) first, then every other enabled metric.
+  const trendCards = hasBp ? 1 + metricDefs.length : metricDefs.length;
 
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <Header
-        submitted={submitted}
-        loggedCount={loggedCount}
-        totalCount={enabled.length}
-        configuring={configuring}
-        onToggleConfig={() => setConfiguring(c => !c)}
-      />
+    <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* command bar */}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', flexWrap: 'wrap' }}>
+        <div className="panel hud" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flex: '1 1 320px', minWidth: 0 }}>
+          <div className="ncx-chip" style={{ color: submitted ? 'var(--lime)' : 'var(--cyan)' }}>
+            <Icon name="heart" size={18} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Biomonitor</h2>
+            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
+              {loggedCount} / {totalCount} LOGGED TODAY · {trendCards} STREAMS TRACKED
+            </div>
+          </div>
+          <button className={configuring ? 'btn btn-primary' : 'btn btn-ghost'} style={{ marginLeft: 'auto', padding: '7px 13px', fontSize: 11, flex: 'none' }}
+            onClick={() => setConfiguring(c => !c)} key={`cfg-${configuring}`}>
+            <Icon name="edit" size={13} /> {configuring ? 'DONE' : 'CONFIGURE'}
+          </button>
+        </div>
+        <UplinkModule />
+      </div>
 
       {configuring ? (
         <ConfigPanel defs={defs} />
@@ -112,233 +175,219 @@ export function VitalsView() {
           No metrics enabled — open <strong style={{ color: 'var(--text)' }}>CONFIGURE</strong> to turn some on.
         </Empty>
       ) : (
-        <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="edit" size={13} style={{ color: 'var(--cyan)' }} />
-            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
-            <span style={{ flex: 1 }} />
-            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
-              {logQ.data ? format(new Date(logQ.data.date), 'EEE · MMM d') : ''}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(188px, 1fr))', gap: 12 }}>
-            {enabled.map(def => (
-              <MetricField
-                key={def.id}
-                def={def}
-                value={draft[def.key] ?? ''}
-                onChange={v => setVal(def.key, v)}
-              />
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              className="btn btn-primary"
-              disabled={submit.isPending || loggedCount === 0}
-              onClick={() => submit.mutate()}
-            >
-              {submit.isPending ? 'TRANSMITTING…' : submitted ? 'UPDATE LOG' : 'SUBMIT LOG'}
-            </button>
-            {submit.isSuccess && submit.data?.questAutoCompleted && (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--lime)' }}>
-                +{submit.data.questAutoCompleted.xpReward} XP banked
+        <>
+          {/* readout / quick log */}
+          <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
+              {logQ.data && <span className="ncx-serial">LOG {format(new Date(logQ.data.date), 'yyyy.MM.dd')}</span>}
+              <span className="mono" style={{ marginLeft: 'auto', fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
+                UPLINK PREFILLED · EDIT ANYTIME
               </span>
-            )}
-            {submitted && !submit.isPending && (
-              <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Icon name="check" size={12} style={{ color: 'var(--lime)' }} /> LOGGED
-              </span>
-            )}
-          </div>
-        </section>
-      )}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(176px, 1fr))', gap: 12 }}>
+              {hasBp && (
+                <BpTile
+                  sys={draft.bpSys ?? ''} dia={draft.bpDia ?? ''}
+                  onSys={v => setVal('bpSys', v)} onDia={v => setVal('bpDia', v)}
+                />
+              )}
+              {metricDefs.map((def, i) => (
+                <MetricTile
+                  key={def.key}
+                  def={def}
+                  meta={metaFor(def.key, i)}
+                  value={draft[def.key] ?? ''}
+                  onChange={v => setVal(def.key, v)}
+                  logged={isFilled(def.key)}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button className="btn btn-primary" disabled={submit.isPending || loggedCount === 0} onClick={() => submit.mutate()}>
+                {submit.isPending ? 'TRANSMITTING…' : submitted ? 'UPDATE LOG' : 'SUBMIT LOG'}
+              </button>
+              {submit.isSuccess && submit.data?.questAutoCompleted && (
+                <span className="mono" style={{ fontSize: 12, color: 'var(--lime)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Icon name="check" size={13} style={{ color: 'var(--lime)' }} /> +{submit.data.questAutoCompleted.xpReward} XP banked · daily vitals contract cleared
+                </span>
+              )}
+              {submitted && !submit.isPending && !(submit.isSuccess && submit.data?.questAutoCompleted) && (
+                <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="check" size={12} style={{ color: 'var(--lime)' }} /> LOGGED
+                </span>
+              )}
+            </div>
+          </section>
 
-      {!configuring && enabled.length > 0 && (
-        <TrendsSection defs={enabled} />
+          {/* trends — one window selector governs every chart */}
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <Icon name="trend" size={16} style={{ color: 'var(--violet)' }} />
+              <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TRENDS</span>
+              <span className="ncx-serial">ALL STREAMS · ONE WINDOW</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                {WINDOWS.map(([label, d]) => {
+                  const on = days === d;
+                  return (
+                    <button key={label} onClick={() => setDays(d)} className="mono"
+                      style={{
+                        fontSize: 11, padding: '5px 13px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
+                        border: on ? '1px solid var(--violet)' : '1px solid var(--line-2)',
+                        background: on ? 'color-mix(in srgb, var(--violet) 16%, transparent)' : 'var(--panel-2)',
+                        color: on ? 'var(--violet)' : 'var(--text-dim)',
+                        transition: 'background .15s, border-color .15s, color .15s',
+                      }}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN}px, 1fr))`, gap: 14, alignItems: 'start' }}>
+              {hasBp && <BpTrendCard key="bp" sysDef={bpSysDef!} diaDef={bpDiaDef!} days={days} />}
+              {metricDefs.map((def, i) => (
+                <MetricTrendCard key={def.key} def={def} meta={metaFor(def.key, i)} days={days} />
+              ))}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
 }
 
-function Header({
-  submitted, loggedCount, totalCount, configuring, onToggleConfig,
-}: {
-  submitted: boolean; loggedCount: number; totalCount: number;
-  configuring: boolean; onToggleConfig: () => void;
-}) {
-  return (
-    <div className="panel hud" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-      <div className="ncx-chip" style={{ color: submitted ? 'var(--lime)' : 'var(--cyan)' }}>
-        <Icon name="heart" size={18} />
-      </div>
-      <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-        Biomonitor
-      </h2>
-      <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
-        {loggedCount} / {totalCount} LOGGED
-      </span>
-      <span style={{ flex: 1 }} />
-      <PhoneSyncButton />
-      <button
-        key={`cfg-${configuring}`}
-        className={configuring ? 'btn btn-primary' : 'btn btn-ghost'}
-        style={{ padding: '6px 12px', fontSize: 11 }}
-        onClick={onToggleConfig}
-      >
-        <Icon name="edit" size={13} style={{ marginRight: 6 }} />
-        {configuring ? 'DONE' : 'CONFIGURE'}
-      </button>
-    </div>
-  );
-}
-
-/**
- * On-demand pull from the phone's Health Connect server (pull mode).
- * Hidden entirely unless HEALTH_PULL_URL is configured server-side.
- * Result feedback lives inline: +N VALUES on success, PHONE OFFLINE when
- * the poll fails — the scheduled poller keeps retrying either way.
- */
-function PhoneSyncButton() {
+/* ---------- PHONE UPLINK sync module ---------- */
+function UplinkModule() {
   const qc = useQueryClient();
   const statusQ = useQuery({
-    queryKey: ['metrics', 'pull-status'],
-    queryFn: () => api.get<{ configured: boolean }>('/api/metrics/pull'),
-    staleTime: 10 * 60_000,
+    queryKey: ['metrics', 'sync-status'],
+    queryFn: () => api.get<SyncStatus>('/api/metrics/sync-status'),
+    staleTime: 60_000,
   });
-  const pull = useMutation({
-    mutationFn: () => api.post<{ configured: boolean; ok: boolean; written: number; days: number }>('/api/metrics/pull'),
+  const sync = useMutation({
+    mutationFn: () => api.post<SyncResult>('/api/metrics/sync'),
     onSuccess: (r) => {
       if (r.ok && r.written > 0) {
         qc.invalidateQueries({ queryKey: ['metrics'] });
         qc.invalidateQueries({ queryKey: ['quests', 'today'] });
+      } else {
+        qc.invalidateQueries({ queryKey: ['metrics', 'sync-status'] });
       }
     },
   });
 
-  if (!statusQ.data?.configured) return null;
+  // Prefer the freshest status: the sync response carries it, else the poll.
+  const status = sync.data?.status ?? statusQ.data;
+  if (statusQ.isLoading) return null;
+  if (!status?.configured) return null;          // pull mode off → no module
 
-  const r = pull.data;
-  const readout = pull.isPending
-    ? { text: 'POLLING…', color: 'var(--amber)' }
-    : pull.isError
-      ? { text: 'SYNC ERROR', color: 'var(--red)' }
-      : r
-        ? r.ok
-          ? { text: `+${r.written} VALUES`, color: 'var(--lime)' }
-          : { text: 'PHONE OFFLINE', color: 'var(--red)' }
-        : null;
+  const scanning = sync.isPending;
+  const offline = sync.isError || (sync.data && !sync.data.ok);
+  const dotColor = scanning ? 'var(--amber)' : offline ? 'var(--red)' : 'var(--lime)';
+  const mins = status.lastSyncMins;
+  const syncTxt = mins == null ? 'NEVER'
+    : mins === 0 ? 'JUST NOW'
+    : mins < 60 ? `${mins}M AGO`
+    : `${Math.floor(mins / 60)}H AGO`;
+  const statusTxt = scanning ? 'SYNCING…' : offline ? 'PHONE OFFLINE' : `SYNCED ${syncTxt}`;
+
+  const months = Math.round(status.backfillDays / 30.4);
+  const streamLine = status.streams.length
+    ? status.streams.map(s => `${s.label} ◂ ${s.days}d`).join(' · ')
+    : 'NO HISTORY YET';
 
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      {readout && (
-        <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.16em', color: readout.color }}>
-          {readout.text}
-        </span>
-      )}
-      <button
-        className="btn btn-ghost"
-        style={{ padding: '6px 12px', fontSize: 11 }}
-        disabled={pull.isPending}
-        title="Pull the latest readings from your phone now"
-        onClick={() => pull.mutate()}
-      >
-        <Icon name="repeat" size={13} style={{ marginRight: 6 }} />
-        SYNC PHONE
-      </button>
+    <div style={{ flex: '2 1 440px', minWidth: 0, display: 'flex' }}>
+      <div className="panel ncx-scan" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', minWidth: 0, width: '100%' }}>
+        <div className="sweep" style={{ animationDelay: '-3s' }} />
+        <div className="ncx-chip" style={{ color: 'var(--cyan)', flex: 'none' }}>
+          <Icon name="play" size={18} />
+        </div>
+
+        <div style={{ minWidth: 130 }}>
+          <div className="kicker" style={{ fontSize: 9.5 }}>PHONE UPLINK</div>
+          <div className="mono" style={{ fontSize: 12.5, color: 'var(--text)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span className="cursor-blink" style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
+            {statusTxt}
+          </div>
+        </div>
+
+        {/* backfill reach — the "grab as much history as possible" story */}
+        <div className="panel-inset" style={{ flex: 1, minWidth: 200, padding: '8px 12px' }}>
+          {scanning ? (
+            <div className="ncx-term" style={{ fontSize: 10, lineHeight: 1.6, maxHeight: 46, overflow: 'hidden' }}>
+              <div><span className="cy">▸</span> OPENING HEALTH BRIDGE</div>
+              <div><span className="cy">▸</span> AUTH OK · PULLING HISTORY</div>
+              <div><span className="cy">▸</span> {streamLine}</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              <Reach label="BACKFILL" value={`${months} MO`} />
+              <Reach label="READINGS" value={status.readings.toLocaleString()} />
+              <Reach label="STREAMS" value={`${status.streams.length}`} />
+            </div>
+          )}
+        </div>
+
+        <button
+          className={'btn ' + (scanning ? 'btn-ghost' : 'btn-primary')}
+          style={{ padding: '8px 16px', fontSize: 11, flex: 'none' }}
+          onClick={() => sync.mutate()}
+          disabled={scanning}
+          title="Pull your phone's health history now — backfills the trend lines"
+        >
+          <Icon name="repeat" size={13} /> {scanning ? 'PULLING…' : 'SYNC NOW'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Reach({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span className="ncx-serial">{label}</span>
+      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>{value}</span>
+    </div>
+  );
+}
+
+/* ---------- readout instrument tiles ---------- */
+function SourceTag({ source }: { source: MetricSource }) {
+  const map: Record<MetricSource, { icon: string; label: string; color: string }> = {
+    phone:  { icon: 'play',  label: 'UPLINK', color: 'var(--cyan)' },
+    scale:  { icon: 'trend', label: 'SCALE',  color: 'var(--teal)' },
+    manual: { icon: 'edit',  label: 'MANUAL', color: 'var(--text-faint)' },
+  };
+  const s = map[source];
+  return (
+    <span className="mono" style={{ fontSize: 8.5, letterSpacing: '0.18em', color: s.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <Icon name={s.icon} size={10} style={{ color: s.color }} /> {s.label}
     </span>
   );
 }
 
-/**
- * One metric input. `scale` renders a 1–5 (or min–max) segmented selector
- * (used for mood); `integer`/`number` render a numeric input with the unit
- * suffix shown inline.
- */
-function MetricField({
-  def, value, onChange,
-}: { def: MetricDef; value: string; onChange: (v: string) => void }) {
-  const [focused, setFocused] = useState(false);
-  const isScale = def.kind === 'scale';
-  const lo = def.min ?? 1;
-  const hi = def.max ?? 5;
-  const filled = value !== '' && value != null;
-
-  return (
-    <label
-      className="panel-inset"
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 8, padding: '11px 13px',
-        borderColor: filled ? 'color-mix(in srgb, var(--cyan) 34%, var(--line))' : undefined,
-        transition: 'border-color .15s',
-      }}
-    >
-      <span className="kicker" style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 9.5 }}>
-        {def.label}
-        {def.unit && <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>{def.unit}</span>}
-      </span>
-
-      {isScale ? (
-        <ScalePicker lo={lo} hi={hi} value={value} onChange={onChange} />
-      ) : (
-        <input
-          type="number"
-          inputMode={def.kind === 'integer' ? 'numeric' : 'decimal'}
-          step={def.kind === 'integer' ? 1 : 'any'}
-          min={def.min ?? undefined}
-          max={def.max ?? undefined}
-          placeholder="—"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          style={{
-            ...inputStyle,
-            background: 'var(--panel-2)',
-            borderColor: focused ? 'var(--cyan)' : 'var(--line-2)',
-            boxShadow: focused ? 'var(--glow-cyan)' : 'none',
-            transition: 'border-color .15s, box-shadow .15s',
-          }}
-        />
-      )}
-    </label>
-  );
-}
-
-/** Segmented 1..N selector for scale metrics (e.g. mood 1–5). */
-function ScalePicker({
-  lo, hi, value, onChange,
-}: { lo: number; hi: number; value: string; onChange: (v: string) => void }) {
+function ScalePicker({ lo, hi, value, onChange, color }: { lo: number; hi: number; value: string; onChange: (v: string) => void; color: string }) {
   const steps: number[] = [];
-  // Cap the visible buttons so an absurd min/max can't blow up the row.
   const ceiling = Math.min(hi, lo + 9);
   for (let n = lo; n <= ceiling; n++) steps.push(n);
-  const selected = value === '' ? null : Number(value);
-
+  const sel = value === '' ? null : Number(value);
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 5 }}>
       {steps.map(n => {
-        const on = selected === n;
+        const on = sel === n;
         return (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(on ? '' : String(n))}
-            aria-pressed={on}
-            className="mono"
+          <button key={n} type="button" onClick={() => onChange(on ? '' : String(n))} className="mono"
             style={{
-              width: 34, height: 34, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', fontSize: 13, fontWeight: 700,
-              border: on ? '1px solid var(--cyan)' : '1px solid var(--line-2)',
-              background: on
-                ? 'linear-gradient(135deg, var(--cyan), var(--violet))'
-                : 'var(--panel-2)',
-              color: on ? 'white' : 'var(--text-dim)',
-              boxShadow: on ? 'var(--glow-cyan)' : 'none',
-              transition: 'background .15s, box-shadow .15s, border-color .15s, color .15s',
-            }}
-          >
+              flex: 1, height: 38, cursor: 'pointer', fontSize: 14, fontWeight: 700, borderRadius: 0,
+              border: on ? `1px solid ${color}` : '1px solid var(--line-2)',
+              background: on ? `linear-gradient(135deg, ${color}, var(--violet))` : 'var(--panel-2)',
+              color: on ? '#06070d' : 'var(--text-dim)',
+              boxShadow: on ? '0 0 16px -4px ' + color : 'none',
+              transition: 'background .15s, color .15s, border-color .15s, box-shadow .15s',
+            }}>
             {n}
           </button>
         );
@@ -347,307 +396,112 @@ function ScalePicker({
   );
 }
 
-/**
- * Trends section: a single shared time-window selector over a responsive
- * grid of per-metric charts (one card per enabled metric; the two BP
- * metrics share one plot). Replaces the old pick-one-metric strip.
- */
-const WINDOWS = [7, 30, 90, 365];
-
-type ChartSpec =
-  | { type: 'single'; def: MetricDef }
-  | { type: 'bp'; sys: MetricDef; dia: MetricDef };
-
-/** Build the card list: collapse bpSys + bpDia into one combined plot. */
-function buildChartSpecs(defs: MetricDef[]): ChartSpec[] {
-  const sys = defs.find(d => d.key === 'bpSys');
-  const dia = defs.find(d => d.key === 'bpDia');
-  const pairBp = !!(sys && dia);
-  const specs: ChartSpec[] = [];
-  let bpDone = false;
-  for (const def of defs) {
-    if (pairBp && (def.key === 'bpSys' || def.key === 'bpDia')) {
-      if (!bpDone) { specs.push({ type: 'bp', sys: sys!, dia: dia! }); bpDone = true; }
-      continue;
-    }
-    specs.push({ type: 'single', def });
-  }
-  return specs;
-}
-
-/** Stable per-metric line colors; unknown keys cycle a palette by position. */
-const METRIC_COLORS: Record<string, string> = {
-  weight: 'var(--cyan)',
-  sleepHours: 'var(--violet)',
-  mood: 'var(--lime)',
-  water: 'var(--blue)',
-  workHours: 'var(--amber)',
-  steps: 'var(--magenta)',
-  restingHr: 'var(--red)',
-};
-const PALETTE = ['var(--cyan)', 'var(--violet)', 'var(--lime)', 'var(--amber)', 'var(--blue)', 'var(--pink)', 'var(--magenta)', 'var(--red)'];
-function colorFor(key: string, idx: number): string {
-  return METRIC_COLORS[key] ?? PALETTE[idx % PALETTE.length];
-}
-
-const DAY_MS = 86_400_000;
-function localMidnightMs(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-const fmtNum = (v: number) => (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1));
-const fmtValue = (v: number, unit: string | null) => (unit ? `${fmtNum(v)} ${unit}` : fmtNum(v));
-const fmtDelta = (v: number) => `${v >= 0 ? '+' : '−'}${fmtNum(Math.abs(v))}`;
-
-const cardStyle: React.CSSProperties = { padding: 14, display: 'flex', flexDirection: 'column', gap: 10 };
-
-function TrendsSection({ defs }: { defs: MetricDef[] }) {
-  const [days, setDays] = useState(30);
-  const specs = useMemo(() => buildChartSpecs(defs), [defs]);
-
+function MetricTile({ def, meta, value, onChange, logged }: {
+  def: MetricDef; meta: MetricMeta; value: string; onChange: (v: string) => void; logged: boolean;
+}) {
+  const isScale = def.kind === 'scale';
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="panel hud" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <Icon name="trend" size={16} style={{ color: 'var(--violet)' }} />
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Trends</span>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-faint)' }}>
-          {specs.length} {specs.length === 1 ? 'CHART' : 'CHARTS'}
-        </span>
-        <span style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 6 }}>
-          {WINDOWS.map(d => {
-            const on = days === d;
-            return (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className="mono"
-                style={{
-                  fontSize: 11, padding: '4px 10px', cursor: 'pointer', letterSpacing: '0.06em',
-                  border: on ? '1px solid var(--violet)' : '1px solid var(--line-2)',
-                  background: on ? 'color-mix(in srgb, var(--violet) 14%, transparent)' : 'var(--panel-2)',
-                  color: on ? 'var(--violet)' : 'var(--text-dim)',
-                  transition: 'background .15s, border-color .15s, color .15s',
-                }}
-              >
-                {d === 365 ? '1Y' : `${d}D`}
-              </button>
-            );
-          })}
+    <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="kicker" style={{ fontSize: 9.5, color: logged ? 'var(--text-dim)' : 'var(--text-faint)' }}>{def.label}</span>
+        {def.unit && <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-ghost)' }}>{def.unit}</span>}
+        <span style={{ marginLeft: 'auto' }}><SourceTag source={meta.source} /></span>
+      </div>
+      {isScale ? (
+        <ScalePicker lo={def.min ?? 1} hi={def.max ?? 5} value={value} onChange={onChange} color={meta.color} />
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <input type="number" inputMode={def.kind === 'integer' ? 'numeric' : 'decimal'}
+            step={def.kind === 'integer' ? 1 : 'any'} min={def.min ?? undefined} max={def.max ?? undefined}
+            placeholder="—" value={value} onChange={e => onChange(e.target.value)}
+            style={{ ...tileInput, color: value === '' ? 'var(--text-ghost)' : meta.color }} />
+          {logged && (
+            <Icon name="check" size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--lime)' }} />
+          )}
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-        {specs.map((spec, i) =>
-          spec.type === 'bp'
-            ? <BpTrendCard key="bp" sys={spec.sys} dia={spec.dia} days={days} />
-            : <TrendCard key={spec.def.key} def={spec.def} days={days} color={colorFor(spec.def.key, i)} />
-        )}
-      </div>
-    </section>
+      )}
+    </div>
   );
 }
 
-/** One metric's history card: header value + sparkline + min/max/Δ stats. */
-function TrendCard({ def, days, color }: { def: MetricDef; days: number; color: string }) {
+/* combined systolic/diastolic tile (spans 2 columns) */
+function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; onSys: (v: string) => void; onDia: (v: string) => void }) {
+  const logged = sys !== '' && dia !== '';
+  return (
+    <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, gridColumn: 'span 2' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="kicker" style={{ fontSize: 9.5 }}>Blood Pressure</span>
+        <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-ghost)' }}>mmHg</span>
+        <span style={{ marginLeft: 'auto' }}><SourceTag source="phone" /></span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="number" inputMode="numeric" placeholder="SYS" value={sys} onChange={e => onSys(e.target.value)}
+          style={{ ...tileInput, color: sys === '' ? 'var(--text-ghost)' : 'var(--magenta)', textAlign: 'center' }} />
+        <span className="ncx-val" style={{ fontSize: 22, color: 'var(--text-faint)' }}>/</span>
+        <input type="number" inputMode="numeric" placeholder="DIA" value={dia} onChange={e => onDia(e.target.value)}
+          style={{ ...tileInput, color: dia === '' ? 'var(--text-ghost)' : 'var(--cyan)', textAlign: 'center' }} />
+        {logged && <Icon name="check" size={15} style={{ color: 'var(--lime)', flex: 'none' }} />}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- trend cards (each fetches its own history) ---------- */
+function CardHead({ meta, label }: { meta: MetricMeta; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="ncx-chip" style={{ width: 30, height: 30, color: meta.color }}>
+        <Icon name={meta.icon} size={14} style={{ color: meta.color }} />
+      </div>
+      <span className="mono" style={{ fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text)' }}>{label}</span>
+      <span style={{ marginLeft: 'auto' }}><SourceTag source={meta.source} /></span>
+    </div>
+  );
+}
+
+function MetricTrendCard({ def, meta, days }: { def: MetricDef; meta: MetricMeta; days: number }) {
   const q = useQuery({
     queryKey: ['metrics', 'history', def.key, days],
     queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(def.key)}&days=${days}`),
   });
-  const points = q.data?.series ?? [];
-  const values = points.map(p => p.value);
-  const latest = values.length ? values[values.length - 1] : null;
-  const first = values.length ? values[0] : null;
-  const min = values.length ? Math.min(...values) : null;
-  const max = values.length ? Math.max(...values) : null;
-  const delta = latest != null && first != null ? latest - first : null;
-
   return (
-    <div className="panel" style={cardStyle}>
-      <CardHeader color={color} label={def.label} value={latest != null ? fmtValue(latest, def.unit) : '—'} />
-      <MiniChart days={days} loading={q.isLoading} series={[{ label: def.label, color, points }]} />
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline' }}>
-        {delta != null && delta !== 0 && (
-          <MiniStat
-            label={`Δ ${days === 365 ? '1Y' : `${days}D`}`}
-            value={
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <Icon name={delta >= 0 ? 'arrowUp' : 'arrowDn'} size={10} />
-                {fmtDelta(delta)}
-              </span>
-            }
-          />
-        )}
-        {min != null && <MiniStat label="MIN" value={fmtNum(min)} />}
-        {max != null && <MiniStat label="MAX" value={fmtNum(max)} />}
-        <span style={{ flex: 1 }} />
-        <MiniStat label="PTS" value={String(points.length)} color="var(--text-faint)" />
-      </div>
+    <div className="panel" style={CARD}>
+      <CardHead meta={meta} label={def.label} />
+      <TrendChart
+        series={toSeries(q.data?.series)}
+        color={meta.color}
+        unit={def.unit}
+        good={meta.good}
+        band={meta.band}
+        chartStyle={CHART_STYLE}
+        showBand={SHOW_BAND}
+      />
     </div>
   );
 }
 
-/** Combined blood-pressure card: systolic + diastolic on one shared plot. */
-function BpTrendCard({ sys, dia, days }: { sys: MetricDef; dia: MetricDef; days: number }) {
+function BpTrendCard({ sysDef, diaDef, days }: { sysDef: MetricDef; diaDef: MetricDef; days: number }) {
   const sysQ = useQuery({
-    queryKey: ['metrics', 'history', sys.key, days],
-    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(sys.key)}&days=${days}`),
+    queryKey: ['metrics', 'history', sysDef.key, days],
+    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(sysDef.key)}&days=${days}`),
   });
   const diaQ = useQuery({
-    queryKey: ['metrics', 'history', dia.key, days],
-    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(dia.key)}&days=${days}`),
+    queryKey: ['metrics', 'history', diaDef.key, days],
+    queryFn: () => api.get<HistoryResponse>(`/api/metrics/history?key=${encodeURIComponent(diaDef.key)}&days=${days}`),
   });
-  const sysPts = sysQ.data?.series ?? [];
-  const diaPts = diaQ.data?.series ?? [];
-  const sColor = 'var(--cyan)', dColor = 'var(--violet)';
-  const sysLast = sysPts.length ? sysPts[sysPts.length - 1].value : null;
-  const diaLast = diaPts.length ? diaPts[diaPts.length - 1].value : null;
-
+  const bands = {
+    sys: (metaFor('bpSys').band ?? [90, 120]) as [number, number],
+    dia: (metaFor('bpDia').band ?? [60, 80]) as [number, number],
+  };
   return (
-    <div className="panel" style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ width: 7, height: 7, borderRadius: '50%', background: `linear-gradient(135deg, ${sColor}, ${dColor})`, boxShadow: `0 0 6px ${sColor}`, flexShrink: 0, alignSelf: 'center' }} />
-        <span className="kicker" style={{ fontSize: 9.5 }}>Blood pressure</span>
-        <span style={{ flex: 1 }} />
-        <span className="mono" style={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>
-          <span style={{ color: sColor }}>{sysLast ?? '—'}</span>
-          <span style={{ color: 'var(--text-faint)' }}>/</span>
-          <span style={{ color: dColor }}>{diaLast ?? '—'}</span>
-          {sys.unit && <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 400, marginLeft: 4 }}>{sys.unit}</span>}
-        </span>
-      </div>
-      <MiniChart
-        days={days}
-        fill={false}
-        loading={sysQ.isLoading || diaQ.isLoading}
-        series={[
-          { label: 'SYS', color: sColor, points: sysPts },
-          { label: 'DIA', color: dColor, points: diaPts },
-        ]}
-      />
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline' }}>
-        <LegendDot color={sColor} label="SYS" />
-        <LegendDot color={dColor} label="DIA" />
-        <span style={{ flex: 1 }} />
-        <MiniStat label="PTS" value={String(Math.max(sysPts.length, diaPts.length))} color="var(--text-faint)" />
-      </div>
+    <div className="panel hud" style={{ ...CARD, gridColumn: 'span 2' }}>
+      <CardHead meta={metaFor('bpSys')} label="Blood Pressure" />
+      <BpChart sys={toSeries(sysQ.data?.series)} dia={toSeries(diaQ.data?.series)} bands={bands} chartStyle={CHART_STYLE} showBand={SHOW_BAND} />
     </div>
   );
 }
 
-function CardHeader({ color, label, value }: { color: string; label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0, alignSelf: 'center' }} />
-      <span className="kicker" style={{ fontSize: 9.5 }}>{label}</span>
-      <span style={{ flex: 1 }} />
-      <span className="mono" style={{ fontSize: 18, fontWeight: 700, color, lineHeight: 1 }}>{value}</span>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <span className="kicker" style={{ fontSize: 8.5 }}>{label}</span>
-      <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: color ?? 'var(--text-dim)' }}>{value}</span>
-    </div>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-      <span style={{ width: 9, height: 2, background: color, boxShadow: `0 0 4px ${color}`, display: 'inline-block' }} />
-      <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>{label}</span>
-    </span>
-  );
-}
-
-/**
- * Multi-series inline SVG chart — no chart lib. All series share one y-axis
- * and a fixed x-axis spanning the selected window (so sparse data sits where
- * it actually fell in time, and every card lines up). `fill` adds the area
- * gradient (on for single-metric cards, off for the two-line BP card).
- */
-function MiniChart({
-  series, days, fill = true, loading,
-}: {
-  series: Array<{ label: string; color: string; points: Array<{ date: string; value: number }> }>;
-  days: number; fill?: boolean; loading?: boolean;
-}) {
-  const gid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const W = 320, H = 76, PAD = 6;
-
-  const maxMs = localMidnightMs();
-  const minMs = maxMs - (days - 1) * DAY_MS;
-  const xSpan = maxMs - minMs || 1;
-  const x = (ms: number) => PAD + clamp((ms - minMs) / xSpan, 0, 1) * (W - PAD * 2);
-
-  const all = series.flatMap(s => s.points.map(p => p.value));
-  if (loading) return <ChartEmpty height={H} text="loading…" />;
-  if (all.length === 0) return <ChartEmpty height={H} text="no readings in window" />;
-
-  let lo = Math.min(...all), hi = Math.max(...all);
-  if (hi === lo) { lo -= 1; hi += 1; }
-  const padY = (hi - lo) * 0.14;
-  const yLo = lo - padY, yHi = hi + padY;
-  const y = (v: number) => H - PAD - ((v - yLo) / (yHi - yLo)) * (H - PAD * 2);
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }} aria-hidden="true">
-      <defs>
-        {fill && series.map((s, i) => (
-          <linearGradient key={i} id={`spark-${gid}-${i}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={s.color} stopOpacity={0.22} />
-            <stop offset="100%" stopColor={s.color} stopOpacity={0} />
-          </linearGradient>
-        ))}
-      </defs>
-      {series.map((s, i) => {
-        const pts = [...s.points].sort((a, b) => +new Date(a.date) - +new Date(b.date));
-        const n = pts.length;
-        if (n === 0) return null;
-        const line = pts.map(p => `${x(+new Date(p.date)).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-        const x0 = x(+new Date(pts[0].date)).toFixed(1);
-        const xN = x(+new Date(pts[n - 1].date)).toFixed(1);
-        return (
-          <g key={i}>
-            {fill && n > 1 && (
-              <polygon points={`${x0},${H - PAD} ${line} ${xN},${H - PAD}`} fill={`url(#spark-${gid}-${i})`} stroke="none" />
-            )}
-            {n > 1 && (
-              <polyline
-                points={line}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ filter: `drop-shadow(0 0 3px ${s.color})` }}
-              />
-            )}
-            {pts.map((p, j) => (
-              <circle key={j} cx={x(+new Date(p.date))} cy={y(p.value)} r={j === n - 1 ? 3 : 1.5} fill={s.color} />
-            ))}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function ChartEmpty({ height, text }: { height: number; text: string }) {
-  return (
-    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-      {text}
-    </div>
-  );
-}
-
-/** Configure panel: toggle each MetricDef.enabled. */
+/* ---------- configure ---------- */
 function ConfigPanel({ defs }: { defs: MetricDef[] }) {
   const qc = useQueryClient();
   const toggle = useMutation({
@@ -658,45 +512,41 @@ function ConfigPanel({ defs }: { defs: MetricDef[] }) {
 
   return (
     <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>METRIC SET — toggle what shows in your daily readout</span>
+      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>METRIC SET — toggle what shows in your readout + trends</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {defs.map(def => (
-          <div
-            key={def.id}
-            className="panel-inset"
-            style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: def.enabled ? 'var(--text)' : 'var(--text-faint)' }}>
-                {def.label}
-                {def.unit && (
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>
-                    {def.unit}
-                  </span>
-                )}
+        {defs.map((def, i) => {
+          const meta = metaFor(def.key, i);
+          return (
+            <div key={def.id} className="panel-inset" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="ncx-chip" style={{ width: 30, height: 30, color: meta.color }}>
+                <Icon name={meta.icon} size={14} style={{ color: meta.color }} />
               </div>
-              <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>
-                {def.key} · {def.kind.toUpperCase()}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: def.enabled ? 'var(--text)' : 'var(--text-faint)' }}>
+                  {def.label}
+                  {def.unit && <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>{def.unit}</span>}
+                </div>
+                <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>
+                  {def.key} · {def.kind.toUpperCase()} · {meta.source.toUpperCase()}
+                </div>
               </div>
+              <button
+                onClick={() => toggle.mutate({ id: def.id, enabled: !def.enabled })}
+                disabled={toggle.isPending}
+                aria-pressed={def.enabled}
+                className="mono"
+                style={{
+                  fontSize: 11, padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
+                  border: def.enabled ? '1px solid var(--lime)' : '1px solid var(--line-2)',
+                  background: def.enabled ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
+                  color: def.enabled ? 'var(--lime)' : 'var(--text-dim)',
+                  transition: 'background .15s, border-color .15s, color .15s',
+                }}>
+                {def.enabled ? 'ON' : 'OFF'}
+              </button>
             </div>
-            <button
-              onClick={() => toggle.mutate({ id: def.id, enabled: !def.enabled })}
-              disabled={toggle.isPending}
-              aria-pressed={def.enabled}
-              className="mono"
-              style={{
-                fontSize: 11, padding: '6px 14px', cursor: 'pointer',
-                letterSpacing: '0.06em',
-                border: def.enabled ? '1px solid var(--lime)' : '1px solid var(--line-2)',
-                background: def.enabled ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
-                color: def.enabled ? 'var(--lime)' : 'var(--text-dim)',
-                transition: 'background .15s, border-color .15s, color .15s',
-              }}
-            >
-              {def.enabled ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

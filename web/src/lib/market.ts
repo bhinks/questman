@@ -36,6 +36,7 @@ export const SKIN_META: Record<string, { name: string; colors: [string, string, 
   acid:        { name: 'ACID RAIN',        colors: ['#d8ff2e', '#7dff5e', '#eaff7a'] },
   arasaka:     { name: 'ARASAKA',          colors: ['#ff0040', '#ff4d8b', '#ff6d00'] },
   bloodmoon:   { name: 'BLOOD MOON',       colors: ['#ff4d6d', '#ff7a99', '#ff6b6b'] },
+  // 'ghost' retired from sale (near-duplicate of ghostwire) — kept so prior owners still render
   ghost:       { name: 'GHOST',            colors: ['#f2f5ff', '#aab4d0', '#c9d1e8'] },
   ghostwire:   { name: 'GHOSTWIRE',        colors: ['#e8ecff', '#aab4d0', '#c9d1e8'] },
   gold:        { name: 'GOLD CHROME',      colors: ['#ffc24b', '#ffe08a', '#ffb347'] },

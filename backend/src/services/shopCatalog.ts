@@ -73,11 +73,17 @@ export interface LootDrop {
 export const NIGHT_MARKET_THEME_KEYS = [
   'matrix', 'arctic', 'toxic', 'vaporwave', 'abyssal', 'militech', 'netrunner',
   'ember', 'sakura', 'ronin', 'synthwave', 'ultraviolet', 'edgerunner',
-  'acid', 'arasaka', 'bloodmoon', 'ghost', 'ghostwire', 'gold',
+  'acid', 'arasaka', 'bloodmoon', 'ghostwire', 'gold',
 ] as const;
 
-/** Every theme key /equip accepts. */
-export const COSMETIC_THEME_KEYS = NIGHT_MARKET_THEME_KEYS;
+/** Retired skins — pulled from sale and the loot pool, but still equippable
+ *  for anyone who already owns them (mirrors the 'showman' persona). 'ghost'
+ *  was a near-duplicate of 'ghostwire' — the same pale-white monochrome
+ *  palette — so it was dropped to keep the skin ladder distinct. */
+export const RETIRED_THEME_KEYS = ['ghost'] as const;
+
+/** Every theme key /equip accepts (the on-sale ladder + retired-but-owned). */
+export const COSMETIC_THEME_KEYS = [...NIGHT_MARKET_THEME_KEYS, ...RETIRED_THEME_KEYS] as const;
 
 /** Display-font pack keys index.css ships a html[data-font] block for. */
 export const FONT_KEYS = ['orbitron', 'vt323', 'spacemono', 'sharetech'] as const;
@@ -239,14 +245,6 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'cosmetic',
     priceEddies: 1500,
     payload: { themeKey: 'bloodmoon' },
-  },
-  {
-    key: 'theme_ghost',
-    name: 'Ghost',
-    description: 'Monochrome white phosphor. A war-room mainframe HUD — shall we play a game?',
-    category: 'cosmetic',
-    priceEddies: 1600,
-    payload: { themeKey: 'ghost' },
   },
   {
     key: 'theme_ghostwire',

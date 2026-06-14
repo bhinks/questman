@@ -81,7 +81,7 @@ const configSchema = z.object({
     // Historic backfill window (days) requested on the first successful pull
     // after boot, to fill the trend charts with as much past data as the
     // phone holds. Steady-state polls stay incremental (a few days).
-    backfillDays: z.number().int().min(2).max(365).default(365)
+    backfillDays: z.number().int().min(2).max(3650).default(365)
   })
 });
 

@@ -26,7 +26,7 @@ import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
 import { QuestCandidate } from '../services/anthropic';
 import { config } from '../config';
-import { pullNow } from '../services/healthSync';
+import { pullNow, getSyncStatus } from '../services/healthSync';
 
 const router = express.Router();
 
@@ -183,7 +183,8 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
 router.get('/history', asyncHandler(async (req: AuthRequest, res) => {
   const q = z.object({
     key:  KEY,
-    days: z.string().transform(Number).pipe(z.number().int().positive().max(365)).default('30'),
+    // Up to ~10y so the trends "1Y" / "ALL" windows can pull full history.
+    days: z.string().transform(Number).pipe(z.number().int().positive().max(3650)).default('30'),
   }).parse(req.query);
   const userId = req.user!.id;
 
@@ -332,6 +333,21 @@ router.get('/pull', asyncHandler(async (_req: AuthRequest, res) => {
 router.post('/pull', asyncHandler(async (req: AuthRequest, res) => {
   const backfill = req.query.full === '1' || req.query.full === 'true';
   res.json(await pullNow(prisma, { backfill }));
+}));
+
+/** GET /api/metrics/sync-status — Biomonitor PHONE UPLINK telemetry: whether
+ *  pull mode is configured, when it last synced, and how far back the stored
+ *  history reaches (overall + per stream). */
+router.get('/sync-status', asyncHandler(async (_req: AuthRequest, res) => {
+  res.json(await getSyncStatus(prisma));
+}));
+
+/** POST /api/metrics/sync — "SYNC NOW": deep historic backfill from the phone,
+ *  then the refreshed reach. Never throws; an unreachable phone reports
+ *  { ok:false } and the last known status. */
+router.post('/sync', asyncHandler(async (_req: AuthRequest, res) => {
+  const result = await pullNow(prisma, { backfill: true });
+  res.json({ ...result, status: await getSyncStatus(prisma) });
 }));
 
 export default router;
