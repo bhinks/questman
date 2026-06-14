@@ -1060,6 +1060,9 @@ model Interaction {
   minutes   Int?
   planned   Boolean  @default(false)
   note      String?
+  // Redesign fields: how contact was made + who reached out.
+  channel     String?  // "irl" | "call" | "text" | "video"
+  initiatedBy String?  // "me" | "them"
 
   createdAt DateTime @default(now())
 

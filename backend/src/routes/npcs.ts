@@ -46,10 +46,13 @@ const updateSchema = z.object({
 });
 
 const interactionSchema = z.object({
-  date:    z.string().datetime().optional(), // defaults to now
-  minutes: z.number().int().min(0).max(1440).nullable().optional(),
-  planned: z.boolean().optional(),
-  note:    z.string().max(2000).nullable().optional(),
+  date:        z.string().datetime().optional(), // defaults to now
+  minutes:     z.number().int().min(0).max(1440).nullable().optional(),
+  planned:     z.boolean().optional(),
+  note:        z.string().max(2000).nullable().optional(),
+  // Redesign: how contact was made + who reached out (both optional).
+  channel:     z.enum(['irl', 'call', 'text', 'video']).nullable().optional(),
+  initiatedBy: z.enum(['me', 'them']).nullable().optional(),
 });
 
 /** Resolve the "social" module for the user (throws if seed missing). */
@@ -232,6 +235,8 @@ router.post('/:id/interactions', asyncHandler(async (req: AuthRequest, res) => {
         minutes: data.minutes ?? null,
         planned,
         note: data.note ?? null,
+        channel: data.channel ?? null,
+        initiatedBy: data.initiatedBy ?? null,
       },
     });
 

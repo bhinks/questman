@@ -493,6 +493,8 @@ export interface MediaEstimate {
   meta?: Record<string, unknown>;
 }
 
+export type NpcChannel = 'irl' | 'call' | 'text' | 'video';
+export type NpcInitiatedBy = 'me' | 'them';
 export interface Interaction {
   id: string;
   npcId: string;
@@ -500,6 +502,8 @@ export interface Interaction {
   minutes: number | null;
   planned: boolean;
   note: string | null;
+  channel: NpcChannel | null;
+  initiatedBy: NpcInitiatedBy | null;
 }
 export interface Npc {
   id: string;
