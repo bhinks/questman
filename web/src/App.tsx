@@ -6,6 +6,7 @@ import { categorizeTransactions } from './utils/categorizer';
 import { api } from './lib/api';
 import type { ApiTransaction, TransactionListResponse, ImportPreviewResponse, ImportResultResponse, PlayerResponse } from './lib/api';
 import { AppShell } from './components/AppShell';
+import { QuickCapture } from './components/QuickCapture';
 import { OverviewCards } from './components/OverviewCards';
 import { PeriodFramingProvider, PeriodBar } from './components/PeriodFraming';
 import { SavingsMissions } from './components/SavingsMissions';
@@ -93,6 +94,26 @@ function HubApp() {
     setFocusSeed(seed);
     setFocusOpen(true);
   };
+
+  // Quick-capture (one-off chore) — topbar "+" or the global "C" hotkey.
+  const [quickOpen, setQuickOpen] = useState(false);
+  useEffect(() => {
+    const isEditable = (el: EventTarget | null) => {
+      const node = el as HTMLElement | null;
+      if (!node || !node.tagName) return false;
+      return node.tagName === 'INPUT' || node.tagName === 'TEXTAREA'
+        || node.tagName === 'SELECT' || node.isContentEditable;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key !== 'c' && e.key !== 'C') return;
+      if (isEditable(e.target)) return;
+      e.preventDefault();
+      setQuickOpen(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Player snapshot (shared via react-query cache with TodayView/Shop/etc.).
   // We read it here only to apply the equipped cosmetic theme to the whole
@@ -457,6 +478,7 @@ function HubApp() {
       onTabChange={setActiveTab}
       onUpload={handleUpload}
       onJackIn={() => openFocus(null)}
+      onQuickAdd={() => setQuickOpen(true)}
     >
       {/* Hidden file input driven by the topbar upload button. */}
       <input
@@ -473,6 +495,12 @@ function HubApp() {
       </div>
 
       <LevelUpOverlay />
+
+      <QuickCapture
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        onAdded={() => setActiveTab('today')}
+      />
 
       {/* Import status toast (success / in-flight). */}
       {importStatus && errors.length === 0 && (

@@ -753,6 +753,10 @@ model Quest {
   // incomplete instead of expiring. mustDo quests always carry + rank first.
   carryOver    Boolean   @default(false)
   mustDo       Boolean   @default(false)
+  // Quick-captured after the day's set was generated (ad-hoc chore). Pays its
+  // reward but does NOT gate the daily clear / overclock — it's bonus, not
+  // part of the day's plan.
+  adhoc        Boolean   @default(false)
   // The local day this quest was first generated (set on carry so the UI
   // can show "carried from <date>"); null = generated for its questDate.
   originDate   DateTime?

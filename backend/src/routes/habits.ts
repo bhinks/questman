@@ -204,6 +204,75 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
   res.status(201).json({ habit: serialize(habit) });
 }));
 
+/** Server-fixed reward for a quick-captured chore (the user types a name only). */
+const QUICK_CHORE_XP = 8;
+const QUICK_CHORE_MIN = 15;
+const quickSchema = z.object({ title: z.string().min(1).max(200) });
+
+/**
+ * POST /api/habits/quick
+ *
+ * Quick-capture: jot a stray to-do from anywhere. Creates a one-off CHORE
+ * (kind:'chore', cadence:'once', due today, no project → Operations'
+ * Uncategorized bucket) AND surfaces it as TODAY's quest immediately, with a
+ * server-owned small reward. The quest is flagged `adhoc` so it doesn't gate
+ * the day's clear/overclock, and carryOver so an unfinished one rolls forward.
+ */
+router.post('/quick', asyncHandler(async (req: AuthRequest, res) => {
+  const { title } = quickSchema.parse(req.body);
+  const userId = req.user!.id;
+  const today = startOfLocalDay();
+
+  // Ad-hoc chores live in the 'chores' module (the Uncategorized bucket).
+  const mod = await prisma.module.findUnique({
+    where: { userId_key: { userId, key: 'chores' } },
+    select: { id: true },
+  });
+  if (!mod) throw new AppError('module missing — re-run seed', 500);
+
+  const { habit, quest } = await prisma.$transaction(async (tx) => {
+    const habit = await tx.habit.create({
+      data: {
+        userId,
+        moduleId: mod.id,
+        kind: 'chore',
+        title,
+        cadence: 'once',
+        dueDate: today,
+        baseXp: QUICK_CHORE_XP,
+        difficulty: 'easy',
+        estMinutes: QUICK_CHORE_MIN,
+      },
+    });
+    const quest = await tx.quest.create({
+      data: {
+        userId,
+        moduleId: mod.id,
+        questDate: today,
+        title,
+        description: title,
+        difficulty: 'easy',
+        xpReward: QUICK_CHORE_XP,
+        source: 'habit',
+        sourceId: habit.id,
+        habitId: habit.id,
+        estMinutes: QUICK_CHORE_MIN,
+        carryOver: true,
+        adhoc: true,
+        originDate: today,
+      },
+    });
+    return { habit, quest };
+  });
+
+  const ws = (global as any).wsService;
+  if (ws?.broadcastGameEvent) {
+    ws.broadcastGameEvent(userId, 'quest-created', { questId: quest.id });
+  }
+
+  res.status(201).json({ habit: serialize(habit), quest });
+}));
+
 /** PUT /api/habits/:id */
 router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
   const data = updateSchema.parse(req.body);

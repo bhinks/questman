@@ -35,6 +35,8 @@ interface AppShellProps {
   onUpload: () => void;
   /** Open the FOCUS CHAMBER (arbitrary pomodoro — no preselected target). */
   onJackIn: () => void;
+  /** Open quick-capture (jot a one-off chore from anywhere). */
+  onQuickAdd: () => void;
 }
 
 type NavItem = [id: string, label: string, icon: string];
@@ -120,7 +122,7 @@ function PetWidget({ pet }: { pet: PetMeta }) {
   );
 }
 
-export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn }: AppShellProps) {
+export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn, onQuickAdd }: AppShellProps) {
   const qc = useQueryClient();
   const { user, logout } = useAuth();
   const [uplink, setUplink] = useState(true);
@@ -283,6 +285,15 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn 
                 }}
               />
               <Clock />
+              {/* Quick-capture a stray chore from anywhere (also bound to "C"). */}
+              <button
+                className="btn btn-ghost icon-btn"
+                onClick={onQuickAdd}
+                title="Quick-add a chore (C)"
+                aria-label="Quick-add a chore"
+              >
+                <Icon name="plus" size={15} />
+              </button>
               {/* Jack in from anywhere — demoted to a ghost icon (polish
                   pass §1c): the glowing CTA lives on Today's chamber strip;
                   global access survives without competing with it. */}

@@ -400,13 +400,16 @@ export class QuestEngine {
     // past day are about to expire = misses.
     const staleQuests = await this.prisma.quest.findMany({
       where: { userId, questDate: { lt: today } },
-      select: { status: true, carryOver: true, mustDo: true, questDate: true },
+      select: { status: true, carryOver: true, mustDo: true, questDate: true, adhoc: true },
     });
+    // The clear is judged on the day's GENERATED set only — ad-hoc adds are
+    // bonus, so they neither block a clear nor earn one on their own.
+    const planned = staleQuests.filter(q => !q.adhoc);
     // Quests still pending that WON'T carry are about to expire = misses.
-    const willExpire = staleQuests.filter(q => q.status === 'pending' && !q.carryOver && !q.mustDo);
+    const willExpire = planned.filter(q => q.status === 'pending' && !q.carryOver && !q.mustDo);
     // A "+1 full clear" credits only a clean YESTERDAY (quests existed and at
     // least one was completed) — never an older day or an empty gap.
-    const completed = staleQuests.filter(q => q.status === 'completed' && isSameLocalDay(q.questDate, yesterday));
+    const completed = planned.filter(q => q.status === 'completed' && isSameLocalDay(q.questDate, yesterday));
 
     let overclockStreak = profile.overclockStreak;
     let rrGrant = 0;

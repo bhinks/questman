@@ -58,12 +58,17 @@ router.get('/today', asyncHandler(async (req: AuthRequest, res) => {
   let xpAvailable = 0;
   let xpEarned = 0;
   let completedCount = 0;
+  let plannedCount = 0;
   for (const q of quests) {
     const key = q.module.key;
     (grouped[key] ??= []).push({
       ...q,
       meta: parseJson(q.meta),
     });
+    // Ad-hoc captures still render, but they don't gate the day's clear or the
+    // on-the-table HUD — they're bonus, not part of the generated plan.
+    if (q.adhoc) continue;
+    plannedCount += 1;
     if (q.status === 'completed') {
       completedCount += 1;
       xpEarned += q.xpReward;
@@ -88,7 +93,7 @@ router.get('/today', asyncHandler(async (req: AuthRequest, res) => {
     questDate: today,
     generated: result.generated,
     generator: result.generator,
-    totalCount: quests.length,
+    totalCount: plannedCount,
     completedCount,
     xpAvailable,
     xpEarned,
@@ -168,6 +173,12 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
         if (err?.code !== 'P2002') throw err; // already completed today; fine.
       }
       await game().bumpHabitStreak(quest.sourceId, today, tx);
+      // A one-off chore (ad-hoc capture or a 'once' habit) retires on
+      // completion so it stops surfacing — mirrors the habit /check path.
+      await tx.habit.updateMany({
+        where: { id: quest.sourceId, userId, cadence: 'once' },
+        data: { isActive: false },
+      });
     }
 
     // If this quest tracks a project task, mark the task done inside the
@@ -383,6 +394,11 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
           if (err?.code !== 'P2002') throw err;
         }
         await game().bumpHabitStreak(quest.sourceId, today, tx);
+        // Retire a one-off chore on completion (mirror /complete).
+        await tx.habit.updateMany({
+          where: { id: quest.sourceId, userId, cadence: 'once' },
+          data: { isActive: false },
+        });
       }
       // Mirror the project-task + bill side effects from /complete on the completing tick.
       if (quest.source === 'project' && quest.sourceId) {
