@@ -14,7 +14,8 @@
     "db:reset": "prisma migrate reset",
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "echo \"Linting not configured\"",
     "typecheck": "tsc --noEmit"
   },
@@ -49,7 +50,8 @@
     "@types/papaparse": "^5.3.14",
     "prisma": "^6.19.3",
     "tsx": "^4.6.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.6"
   },
   "keywords": [
     "finance",

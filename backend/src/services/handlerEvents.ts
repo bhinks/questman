@@ -27,6 +27,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { getAiSettings, aiAvailable } from './llm';
 import { asPersona, narrate, personaSystem, type Persona } from './handler';
+import { grantAllowed, type DataDomain } from './aiGrants';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -44,8 +45,6 @@ export type HandlerEvent =
   | { type: 'achievement_unlocked'; name: string; key: string }
   | { type: 'level_up'; from: number; to: number }
   | { type: 'streak_milestone'; days: number };
-
-type DataDomain = 'health' | 'social' | 'finance';
 
 interface EventSpec {
   /** The single fact the model is allowed to narrate. */
@@ -83,13 +82,6 @@ function specFor(e: HandlerEvent): EventSpec {
     case 'streak_milestone':
       return { fact: `The user's daily streak just reached ${e.days} days in a row.`, refType: 'streak', refId: null };
   }
-}
-
-function grantAllowed(grant: DataDomain | undefined, s: { aiAccessHealth: boolean; aiAccessSocial: boolean; aiAccessFinance: boolean }): boolean {
-  if (!grant) return true;
-  if (grant === 'health') return s.aiAccessHealth;
-  if (grant === 'social') return s.aiAccessSocial;
-  return s.aiAccessFinance;
 }
 
 /** Build the one-line, in-character reaction for an event. ~15-35 words. */

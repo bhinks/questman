@@ -23,6 +23,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import type { DailyDigest, WeeklyDigest } from './digest';
 import { AiSettings, completeJson } from './llm';
+import { applyGrants, type DomainGrants, type DomainLine } from './aiGrants';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -118,6 +119,47 @@ export async function narrate(
   }
 }
 
+/**
+ * Assemble the daily-rundown brief. Each line is tagged with the data domain
+ * it exposes; applyGrants drops any line whose grant is off (drop-unless-
+ * granted) BEFORE the model ever sees it. Pure + exported so the privacy
+ * guarantee is regression-testable without an LLM call.
+ */
+export function buildDailyBrief(d: DailyDigest, grants: DomainGrants): string {
+  const tagged: DomainLine[] = [
+    // The exact local day — the model must use THIS, never infer a weekday.
+    { text: `Today is ${d.dayLabel}${d.isWeekend ? ' (weekend)' : ''}. Refer to today by this day name only.` },
+    { text: `Open gigs on the board today: ${d.questCount}${d.mustDoCount ? ` (${d.mustDoCount} flagged must-do)` : ''}.` },
+  ];
+  if (d.questTitles.length) tagged.push({ text: `The lineup: ${d.questTitles.join('; ')}.` });
+  if (d.carriedOverCount) tagged.push({ text: `${d.carriedOverCount} carried over from yesterday — still hanging.` });
+  tagged.push({ text: `Daily streak: ${d.streak} day(s). Overclock: ${d.overclockStreak}-day chain (×${d.overclockMultiplier}).` });
+  // Energy tier derives from logged sleep — health data.
+  tagged.push({ text: `Energy reads ${d.energyTier}.`, domain: 'health' });
+  if (d.rrCredits) tagged.push({ text: `${d.rrCredits} R&R credit(s) banked for downtime.` });
+  if (d.topBoss) tagged.push({ text: `Boss in play: ${d.topBoss.name}, ${d.topBoss.pct}% down.` });
+  if (d.neglectedContact) tagged.push({ text: `${d.neglectedContact.name} has gone ${d.neglectedContact.days} days without a ping.`, domain: 'social' });
+  if (d.breachedYesterday.length) tagged.push({ text: `ICE breached yesterday: ${d.breachedYesterday.join(', ')}.` });
+  // Calendar: counts and free time only — event titles never leave the server.
+  if (d.calendar) {
+    const c = d.calendar;
+    tagged.push({
+      domain: 'calendar',
+      text: c.eventCount === 0
+        ? 'The grid is clear: no calendar commitments today.'
+        : `Calendar: ${c.eventCount} commitment(s) today${c.nextLabel ? `, next at ${c.nextLabel}` : ''}; roughly ${Math.round(c.freeMin / 60)}h of free runway.`,
+    });
+  }
+
+  return [
+    'Write ONE short daily rundown (about 40-70 words) from the brief below.',
+    'Open with the day, work in 1-2 concrete items, land a dry sign-off. In character.',
+    '',
+    'BRIEF:',
+    ...applyGrants(tagged, grants).map(l => `- ${l}`),
+  ].join('\n');
+}
+
 /** The Handler's daily rundown — "here's what's on your plate, choom." */
 export async function narrateDailyRundown(
   db: Db,
@@ -129,37 +171,40 @@ export async function narrateDailyRundown(
   if (!config.features.handler) return null;
   if (!settings.aiEnabled || !settings.handlerEnabled) return null;
 
-  const lines: string[] = [
-    // The exact local day — the model must use THIS, never infer a weekday.
-    `Today is ${d.dayLabel}${d.isWeekend ? ' (weekend)' : ''}. Refer to today by this day name only.`,
-    `Open gigs on the board today: ${d.questCount}${d.mustDoCount ? ` (${d.mustDoCount} flagged must-do)` : ''}.`,
+  return narrate(db, userId, settings, personaSystem(persona), buildDailyBrief(d, settings), 350);
+}
+
+/**
+/** Assemble the weekly-debrief brief (same grant-tagged, drop-unless-granted
+ *  discipline as the daily brief). Pure + exported for the privacy test. */
+export function buildWeeklyBrief(
+  w: WeeklyDigest,
+  insights: { title: string; evidence: string }[],
+  grants: DomainGrants,
+): string {
+  // Workouts are health data, so that clause is its own grant-tagged line
+  // rather than an inline conditional baked into a general line.
+  const tagged: DomainLine[] = [
+    { text: `Week of ${w.weekOf} to ${w.weekEnd}.` },
+    { text: `Active on ${w.activeDays} day(s). Quests: ${w.questsCompleted} cleared, ${w.questsSkipped} skipped, ${w.questsExpired} missed (${w.completionRate}% clear rate).` },
+    { text: `Earned ${w.xpEarned} cred and ${w.eddiesEarned} eddies; spent ${w.eddiesSpent} eddies.` },
+    { text: `Current streak ${w.currentStreak}, overclock chain ${w.overclockStreak}.` },
+    { text: `Boss hits: ${w.bossDamageEvents}, kills: ${w.bossesDefeated}. New cred badges: ${w.achievementsUnlocked}.` },
+    { text: `Workouts logged: ${w.workouts}.`, domain: 'health' },
   ];
-  if (d.questTitles.length) lines.push(`The lineup: ${d.questTitles.join('; ')}.`);
-  if (d.carriedOverCount) lines.push(`${d.carriedOverCount} carried over from yesterday — still hanging.`);
-  lines.push(`Daily streak: ${d.streak} day(s). Overclock: ${d.overclockStreak}-day chain (×${d.overclockMultiplier}).`);
-  // Energy tier derives from logged sleep — health data. Grant-gated.
-  if (settings.aiAccessHealth) lines.push(`Energy reads ${d.energyTier}.`);
-  if (d.rrCredits) lines.push(`${d.rrCredits} R&R credit(s) banked for downtime.`);
-  if (d.topBoss) lines.push(`Boss in play: ${d.topBoss.name}, ${d.topBoss.pct}% down.`);
-  if (d.neglectedContact && settings.aiAccessSocial) lines.push(`${d.neglectedContact.name} has gone ${d.neglectedContact.days} days without a ping.`);
-  if (d.breachedYesterday.length) lines.push(`ICE breached yesterday: ${d.breachedYesterday.join(', ')}.`);
-  // Calendar grant: counts and free time only — event titles never leave.
-  if (d.calendar && settings.aiAccessCalendar) {
-    const c = d.calendar;
-    lines.push(c.eventCount === 0
-      ? 'The grid is clear: no calendar commitments today.'
-      : `Calendar: ${c.eventCount} commitment(s) today${c.nextLabel ? `, next at ${c.nextLabel}` : ''}; roughly ${Math.round(c.freeMin / 60)}h of free runway.`);
-  }
+  if (w.spendTotal) tagged.push({ text: `Spend this week: $${w.spendTotal}${w.topCategories.length ? ` (top: ${w.topCategories.map(c => `${c.name} $${c.amount}`).join(', ')})` : ''}.`, domain: 'finance' });
+  if (w.vitals.sleepAvg != null) tagged.push({ text: `Avg sleep ${w.vitals.sleepAvg}h${w.vitals.moodAvg != null ? `, avg mood ${w.vitals.moodAvg}` : ''}${w.vitals.weightDelta != null ? `, weight ${w.vitals.weightDelta >= 0 ? '+' : ''}${w.vitals.weightDelta}` : ''}.`, domain: 'health' });
+  // Insights are pre-filtered to the user's grants by QuestEngine (by kind),
+  // so they pass through untagged here.
+  for (const i of insights) tagged.push({ text: `Pattern flagged: ${i.title} — ${i.evidence}.` });
 
-  const brief = [
-    'Write ONE short daily rundown (about 40-70 words) from the brief below.',
-    'Open with the day, work in 1-2 concrete items, land a dry sign-off. In character.',
+  return [
+    'Write a weekly debrief (about 70-120 words) from the after-action brief below.',
+    'Sum up how the week actually went, call out one win and one slack, and end with a forward-looking line. In character. Honest, not a hype reel — if the week was thin, say so dryly.',
     '',
-    'BRIEF:',
-    ...lines.map(l => `- ${l}`),
+    'AFTER-ACTION BRIEF:',
+    ...applyGrants(tagged, grants).map(l => `- ${l}`),
   ].join('\n');
-
-  return narrate(db, userId, settings, personaSystem(persona), brief, 350);
 }
 
 /**
@@ -178,26 +223,7 @@ export async function narrateWeeklyDebrief(
   if (!config.features.handler) return null;
   if (!settings.aiEnabled || !settings.handlerEnabled) return null;
 
-  const lines: string[] = [
-    `Week of ${w.weekOf} to ${w.weekEnd}.`,
-    `Active on ${w.activeDays} day(s). Quests: ${w.questsCompleted} cleared, ${w.questsSkipped} skipped, ${w.questsExpired} missed (${w.completionRate}% clear rate).`,
-    `Earned ${w.xpEarned} cred and ${w.eddiesEarned} eddies; spent ${w.eddiesSpent} eddies.`,
-    `Current streak ${w.currentStreak}, overclock chain ${w.overclockStreak}.`,
-    `${settings.aiAccessHealth ? `Workouts logged: ${w.workouts}. ` : ''}Boss hits: ${w.bossDamageEvents}, kills: ${w.bossesDefeated}. New cred badges: ${w.achievementsUnlocked}.`,
-  ];
-  if (w.spendTotal && settings.aiAccessFinance) lines.push(`Spend this week: $${w.spendTotal}${w.topCategories.length ? ` (top: ${w.topCategories.map(c => `${c.name} $${c.amount}`).join(', ')})` : ''}.`);
-  if (w.vitals.sleepAvg != null && settings.aiAccessHealth) lines.push(`Avg sleep ${w.vitals.sleepAvg}h${w.vitals.moodAvg != null ? `, avg mood ${w.vitals.moodAvg}` : ''}${w.vitals.weightDelta != null ? `, weight ${w.vitals.weightDelta >= 0 ? '+' : ''}${w.vitals.weightDelta}` : ''}.`);
-  for (const i of insights) lines.push(`Pattern flagged: ${i.title} — ${i.evidence}.`);
-
-  const brief = [
-    'Write a weekly debrief (about 70-120 words) from the after-action brief below.',
-    'Sum up how the week actually went, call out one win and one slack, and end with a forward-looking line. In character. Honest, not a hype reel — if the week was thin, say so dryly.',
-    '',
-    'AFTER-ACTION BRIEF:',
-    ...lines.map(l => `- ${l}`),
-  ].join('\n');
-
   // 70–120 words ≈ up to ~750 chars; give it headroom so the debrief isn't
   // clipped mid-sentence by the ticker-sized default cap.
-  return narrate(db, userId, settings, personaSystem(persona), brief, 500, 1000);
+  return narrate(db, userId, settings, personaSystem(persona), buildWeeklyBrief(w, insights, settings), 500, 1000);
 }
