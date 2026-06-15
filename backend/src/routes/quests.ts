@@ -484,9 +484,10 @@ router.post('/:id/focus', asyncHandler(async (req: AuthRequest, res) => {
  * weekends, from UserSettings). Returns a RANKED LIST with each quest
  * flagged inPlan/overflow — the app suggests WHAT to do, never WHEN.
  * Ranking: must-do first, then outdoor quests on their LAST CLEAR DAY
- * (doable today, blocked by tomorrow's forecast), then quests whose best
- * weather window is open now, then higher reward, then shorter (so more
- * fit).
+ * (doable today, blocked by tomorrow's forecast), then — when it's a
+ * genuinely NICE day — outdoor quests in general (don't waste it), then
+ * quests whose best weather window is open now, then higher reward, then
+ * shorter (so more fit).
  */
 router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
@@ -532,12 +533,16 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   // "tomorrow will be rainy/hot, do it while you can". One cached
   // snapshot covers every check; no snapshot → no boosts.
   const lastClearIds = new Set<string>();
+  const outdoorIds = new Set<string>();   // quests gated on an outdoor weather rule
+  let niceToday = false;                   // genuinely pleasant out → don't waste it
   const outdoorRules = quests
     .map(q => ({ id: q.id, rule: WeatherService.parseRule(q.habit?.weatherRule ?? null) }))
     .filter((x): x is { id: string; rule: NonNullable<ReturnType<typeof WeatherService.parseRule>> } => x.rule !== null);
   if (outdoorRules.length > 0) {
     const snap = await weather.getSnapshot();
+    niceToday = WeatherService.isNiceDay(snap);
     for (const { id, rule } of outdoorRules) {
+      outdoorIds.add(id);
       if (!weather.passesTomorrow(rule, snap)) lastClearIds.add(id);
     }
   }
@@ -569,6 +574,8 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
     if (q.source === 'bill') s += 800;
     // Tomorrow's forecast blocks this outdoor quest → today's the day.
     if (lastClearIds.has(q.id)) s += 1_200;
+    // It's a genuinely nice day out — float outdoor tasks up so we don't waste it.
+    if (niceToday && outdoorIds.has(q.id)) s += 800;
     if (windowOpenNow(meta)) s += 1_000;
     s += q.xpReward; // higher reward ranks higher
     // The GENERIC "log a workout" filler (source workout, no sourceId) is a
@@ -610,6 +617,7 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
       meta: parseJson(q.meta),
       inPlan: fits,
       lastClearDay: lastClearIds.has(q.id),
+      niceDay: niceToday && outdoorIds.has(q.id),
     };
   });
 

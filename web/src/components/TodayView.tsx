@@ -37,6 +37,18 @@ const MODULE_ICONS: Record<string, string> = {
 };
 const moduleIcon = (key: string): string => MODULE_ICONS[key] ?? 'target';
 
+/** Which deck tab a quest's underlying action lives on, so clicking a contract
+ *  jumps you to the page where you'd actually do (or manage) it. */
+const MODULE_TAB: Record<string, string> = {
+  habits: 'habits', chores: 'operations', projects: 'operations',
+  fitness: 'health', vitals: 'health', media: 'media', social: 'social',
+  finance: 'overview',
+};
+function questTab(q: { source: string; module: { key: string } }): string {
+  if (q.source === 'bill') return 'bills';
+  return MODULE_TAB[q.module.key] ?? 'today';
+}
+
 /** Ledger `reason` → terminal-log phrasing (lowercase, diegetic). */
 const REASON_LABELS: Record<string, string> = {
   quest_complete: 'contract cleared',
@@ -209,7 +221,7 @@ function Ticks({ focal, children }: { focal?: boolean; children: React.ReactNode
   );
 }
 
-export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => void }) {
+export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed | null) => void; onNavigate: (tab: string) => void }) {
   const qc = useQueryClient();
 
   const playerQ = useQuery({
@@ -314,6 +326,8 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
   const bestWindowQuest = pending.find(q => q.meta?.bestWindow) ?? null;
   // Outdoor quests on their LAST CLEAR DAY (blocked by tomorrow's forecast).
   const lastClearIds = new Set((plan?.quests ?? []).filter(q => q.lastClearDay).map(q => q.id));
+  // Outdoor quests boosted because today is genuinely nice — don't waste it.
+  const niceDayIds = new Set((plan?.quests ?? []).filter(q => q.niceDay).map(q => q.id));
 
   // Chamber strip stats: today's focus runs (same rows the SESSION LOG
   // interleaves below).
@@ -445,6 +459,11 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                         LAST CLEAR DAY
                       </span>
                     )}
+                    {!lastClearIds.has(priority.id) && niceDayIds.has(priority.id) && (
+                      <span className="ncx-stamp flat" style={{ color: 'var(--lime)' }} title="It's a nice day out — don't waste it">
+                        ☀ NICE DAY
+                      </span>
+                    )}
                     {priority.mustDo && <span className="ncx-stamp flat" style={{ color: 'var(--red)' }}>MUST-DO</span>}
                     <span className={`ncx-stamp ${priority.difficulty}`}>{priority.difficulty}</span>
                   </div>
@@ -453,7 +472,12 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                       <Icon name={moduleIcon(priority.module.key)} size={26} style={{ filter: 'drop-shadow(0 0 5px var(--cyan))' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'uppercase' }}>
+                      <div
+                        className="ncx-glitch ncx-chroma"
+                        style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'uppercase', cursor: 'pointer' }}
+                        onClick={() => onNavigate(questTab(priority))}
+                        title={`Open ${priority.module.name}`}
+                      >
                         {priority.title}
                       </div>
                       <div style={{ color: 'var(--text-dim)', fontSize: 13.5, marginTop: 5 }}>{priority.description}</div>
@@ -528,6 +552,8 @@ export function TodayView({ onJackIn }: { onJackIn: (seed: FocusSeed | null) => 
                   index={i}
                   skipTokens={player.skipTokens}
                   rerollTokens={player.rerollTokens}
+                  weatherTag={lastClearIds.has(q.id) ? 'last-clear' : niceDayIds.has(q.id) ? 'nice-day' : null}
+                  onNavigate={onNavigate}
                   onComplete={id => completeQuest.mutate(id)}
                   onProgress={id => progressQuest.mutate(id)}
                   onSkip={id => skipQuest.mutate(id)}
@@ -696,12 +722,14 @@ function Splash({ children, color }: { children: React.ReactNode; color?: string
 
 /** One CONTRACT LEDGER row. Numbering starts at 02 (01 is the priority). */
 function LedgerRow({
-  quest, index, skipTokens, rerollTokens, onComplete, onProgress, onSkip, onReroll,
+  quest, index, skipTokens, rerollTokens, weatherTag, onNavigate, onComplete, onProgress, onSkip, onReroll,
 }: {
   quest: Quest;
   index: number;
   skipTokens: number;
   rerollTokens: number;
+  weatherTag: 'last-clear' | 'nice-day' | null;
+  onNavigate: (tab: string) => void;
   onComplete: (id: string) => void;
   onProgress: (id: string) => void;
   onSkip: (id: string) => void;
@@ -735,7 +763,11 @@ function LedgerRow({
       <div className="ncx-chip" style={{ color: done ? 'var(--lime)' : 'var(--cyan)' }}>
         <Icon name={done ? 'check' : moduleIcon(quest.module.key)} size={18} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+        onClick={() => onNavigate(questTab(quest))}
+        title={`Open ${quest.module.name}`}
+      >
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
           <span className="ncx-row-title-text" style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {quest.title}
@@ -743,6 +775,11 @@ function LedgerRow({
           {!done && !skipped && carriedDays > 0 && (
             <span className="mono" style={{ flex: 'none', fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--amber)' }}>
               CARRIED ×{carriedDays}D
+            </span>
+          )}
+          {!done && !skipped && weatherTag && (
+            <span className="mono" style={{ flex: 'none', fontSize: 9.5, letterSpacing: '0.14em', color: weatherTag === 'last-clear' ? 'var(--amber)' : 'var(--lime)' }}>
+              {weatherTag === 'last-clear' ? 'LAST CLEAR DAY' : '☀ NICE DAY'}
             </span>
           )}
         </div>

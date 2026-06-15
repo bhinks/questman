@@ -371,7 +371,7 @@ function HubApp() {
     switch (activeTab) {
       // --- Life-hub tabs ---
       case 'today':
-        return <TodayView onJackIn={openFocus} />;
+        return <TodayView onJackIn={openFocus} onNavigate={setActiveTab} />;
 
       case 'habits':
         return <HabitsView />;

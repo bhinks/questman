@@ -194,6 +194,22 @@ export class WeatherService {
     return true;
   }
 
+  /**
+   * Is today a genuinely pleasant day for outdoor work — dry, mild, calm, and
+   * clear-ish? Drives the planner's "don't waste a nice day" boost so weather-
+   * gated tasks float up the board when the conditions are actually good (not
+   * merely passing a task's minimum gate). No snapshot → false (never nudge on
+   * a guess).
+   */
+  static isNiceDay(snap: WeatherSnapshot | null): boolean {
+    if (!snap) return false;
+    const clearish = snap.weatherCode <= 3;                 // clear → overcast, no precip codes
+    const dry = snap.rainTodayIn <= DRY_THRESHOLD_IN;
+    const mild = snap.tempMaxF >= 55 && snap.tempMaxF <= 88 && snap.tempMinF >= 38;
+    const calm = snap.windMaxMph <= 22;
+    return clearish && dry && mild && calm;
+  }
+
   /** Parse a Habit.weatherRule JSON string. Returns null if absent or not outdoor. */
   static parseRule(raw: string | null): WeatherRule | null {
     if (!raw) return null;

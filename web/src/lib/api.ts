@@ -349,6 +349,8 @@ export interface PlanQuest {
   inPlan: boolean;
   /** Outdoor quest that passes its weather rule today but not tomorrow. */
   lastClearDay?: boolean;
+  /** Outdoor quest boosted because today is a genuinely nice day. */
+  niceDay?: boolean;
 }
 export interface DayPlan {
   budgetMin: number;
