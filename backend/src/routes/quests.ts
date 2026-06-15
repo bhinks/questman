@@ -4,7 +4,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { QuestEngine } from '../services/QuestEngine';
-import { GamificationService } from '../services/GamificationService';
+import { GamificationService, type PlayerSnapshot } from '../services/GamificationService';
 import { WeatherService } from '../services/WeatherService';
 import { calendarService } from '../services/CalendarService';
 import { eddiesForReward } from '../utils/economy';
@@ -139,16 +139,14 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
   }
 
   const today = startOfLocalDay();
-  let questCompletion;
-  let player: Awaited<ReturnType<GamificationService['awardXp']>> | null = null;
 
-  await prisma.$transaction(async (tx) => {
+  const { player, questCompletion } = await prisma.$transaction(async (tx) => {
     const updated = await tx.quest.update({
       where: { id: quest.id },
       data: { status: 'completed', progress: quest.target },
     });
 
-    questCompletion = await tx.questCompletion.create({
+    const questCompletion = await tx.questCompletion.create({
       data: {
         userId,
         questId: quest.id,
@@ -197,7 +195,7 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
       where: { id: quest.moduleId },
       select: { key: true },
     });
-    player = await game().awardXp(userId, {
+    const player = await game().awardXp(userId, {
       amount: quest.xpReward,
       eddies: eddiesForReward(quest.xpReward, quest.difficulty),
       reason: 'quest_complete',
@@ -209,7 +207,7 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
     // Stamp the completion's meta with the level transition.
     if (player.leveledUp) {
       await tx.questCompletion.update({
-        where: { id: (questCompletion as any).id },
+        where: { id: questCompletion.id },
         data: {
           meta: JSON.stringify({
             leveledUp: true,
@@ -219,6 +217,8 @@ router.post('/:id/complete', asyncHandler(async (req: AuthRequest, res) => {
         },
       });
     }
+
+    return { player, questCompletion };
   });
 
   const ws = (global as any).wsService;
@@ -361,10 +361,8 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
     : Math.max(0, baseXp);
 
   const today = startOfLocalDay();
-  let player: Awaited<ReturnType<GamificationService['awardXp']>> | null = null;
-  let raced = false;
 
-  await prisma.$transaction(async (tx) => {
+  const { player, raced } = await prisma.$transaction(async (tx) => {
     // Guarded update: the WHERE pins currentCount to the value we read.
     // Under a concurrent +1 (double-click / retry) only the first commit
     // matches; the loser updates 0 rows and bails WITHOUT awarding, so a
@@ -378,7 +376,7 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
         status: willComplete ? 'completed' : 'pending',
       },
     });
-    if (upd.count !== 1) { raced = true; return; }
+    if (upd.count !== 1) return { player: null as PlayerSnapshot | null, raced: true };
 
     if (willComplete) {
       await tx.questCompletion.create({
@@ -412,7 +410,7 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
     const moduleKey = await tx.module.findUnique({
       where: { id: quest.moduleId }, select: { key: true },
     });
-    player = await game().awardXp(userId, {
+    const player = await game().awardXp(userId, {
       amount: xpAward,
       eddies: eddieAward,
       reason: willComplete ? 'quest_complete' : 'quest_progress',
@@ -420,6 +418,7 @@ router.post('/:id/progress', asyncHandler(async (req: AuthRequest, res) => {
       refType: 'quest',
       refId: quest.id,
     }, tx);
+    return { player, raced: false };
   });
 
   // Lost a concurrent race — another +1 already advanced the counter. Return

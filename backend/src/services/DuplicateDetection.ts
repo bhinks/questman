@@ -503,7 +503,7 @@ export class DuplicateDetection {
     });
 
     // Find potential duplicates (same amount and similar date)
-    const potentialDuplicates = await prisma.$queryRaw`
+    const potentialDuplicates = await prisma.$queryRaw<Array<{ duplicate_groups: number; total_duplicates: number }>>`
       SELECT 
         COUNT(*) as duplicate_groups,
         SUM(group_size - 1) as total_duplicates

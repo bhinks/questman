@@ -258,7 +258,7 @@ export class CategorizationEngine {
     if (bestMatch.combinedScore > 0.6) {
       return {
         categoryId: bestMatch.transaction.categoryId!,
-        vendorId: bestMatch.transaction.vendorId,
+        vendorId: bestMatch.transaction.vendorId ?? undefined,
         confidence: bestMatch.combinedScore
       };
     }

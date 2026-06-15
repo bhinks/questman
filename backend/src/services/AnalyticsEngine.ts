@@ -324,7 +324,7 @@ export class AnalyticsEngine {
   }
 
   private static identifySavingsOpportunities(categorySpending: any[], vendorSpending: any[]) {
-    const opportunities = [];
+    const opportunities: Array<{ type: string; category: string; amount: number; suggestion: string }> = [];
 
     // High spending categories
     categorySpending.slice(0, 3).forEach(cat => {
