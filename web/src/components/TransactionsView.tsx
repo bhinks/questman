@@ -642,10 +642,12 @@ function fmtDate(d: Date): string {
 
 const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-/** A transaction's bucket key "YYYY-MM" — matches the burn chart's buckets. */
+/** A transaction's bucket key "YYYY-MM" — LOCAL fields, matching the burn
+ *  chart and the server's local-month budgets (toISOString would bucket a
+ *  late-night transaction into the next UTC month). */
 function monthKey(d: Date): string {
   const dt = d instanceof Date ? d : new Date(d);
-  return dt.toISOString().substring(0, 7);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
 }
 
 /** "YYYY-MM" → "MMM YYYY" for the active-filter chip. */

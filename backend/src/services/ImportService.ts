@@ -112,13 +112,14 @@ export class ImportService {
       };
 
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       await this.updateImportRecord(importRecord.id, {
         totalProcessed: 0,
         imported: 0,
         duplicatesSkipped: 0,
         errors: 1,
         duplicateDetails: []
-      }, 'failed', error.message);
+      }, 'failed', msg);
 
       throw error;
     }
@@ -271,7 +272,7 @@ export class ImportService {
           }
           resolve(results.data);
         },
-        error: (error) => {
+        error: (error: Error) => {
           reject(new Error(`CSV parsing failed: ${error.message}`));
         }
       });
@@ -316,7 +317,8 @@ export class ImportService {
         });
 
     } catch (error) {
-      throw new Error(`Excel parsing failed: ${error.message}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Excel parsing failed: ${msg}`);
     }
   }
 
@@ -353,7 +355,8 @@ export class ImportService {
           successfulRows++;
         }
       } catch (error) {
-        warnings.push(`Row ${i + 1}: ${error.message}`);
+        const msg = error instanceof Error ? error.message : String(error);
+        warnings.push(`Row ${i + 1}: ${msg}`);
       }
     }
 

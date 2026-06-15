@@ -2,7 +2,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Transaction, SpendingAnalysis } from './types';
 import { analyzeSpending } from './utils/analyzer';
-import { categorizeTransactions } from './utils/categorizer';
 import { api } from './lib/api';
 import type { ApiTransaction, TransactionListResponse, ImportPreviewResponse, ImportResultResponse, PlayerResponse } from './lib/api';
 import { AppShell } from './components/AppShell';
@@ -73,6 +72,12 @@ function mapApiTransaction(t: ApiTransaction): Transaction {
     account: t.account ?? undefined,
   };
 }
+
+/** Local-time bucket keys so the burn chart + month drill-filter agree with
+ *  the server's LOCAL-month budgets. toISOString() would bucket a late-night
+ *  transaction into the next UTC day/month. */
+const localMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;       // YYYY-MM
+const localDayKey = (d: Date) => `${localMonthKey(d)}-${String(d.getDate()).padStart(2, '0')}`;             // YYYY-MM-DD
 
 function HubApp() {
   const qc = useQueryClient();
@@ -249,23 +254,23 @@ function HubApp() {
     onError: (err: any) => setErrors([err?.message ?? 'Save failed']),
   });
 
-  const categorizedTransactions = useMemo(() =>
-    categorizeTransactions(transactions),
-    [transactions]
-  );
+  // Category display + the drill-filter come straight from the server's
+  // persisted category (transaction.category was mapped from category.name on
+  // load) — never re-derived client-side, which would clobber a manual
+  // re-categorize. (categorizer.ts is retained for the pre-import preview only.)
 
   // Finance depth: excluded rows (transfers) drop out of the charts.
   // analyzeSpending already filters them internally; chartData reads the
   // transaction list directly, so filter them out here too. (The transaction
   // log below keeps the FULL list — it greys excluded rows in place.)
   const includedTransactions = useMemo(
-    () => categorizedTransactions.filter(t => !t.excluded),
-    [categorizedTransactions],
+    () => transactions.filter(t => !t.excluded),
+    [transactions],
   );
 
-  const analysis: SpendingAnalysis = useMemo(() => 
-    analyzeSpending(categorizedTransactions), 
-    [categorizedTransactions]
+  const analysis: SpendingAnalysis = useMemo(() =>
+    analyzeSpending(transactions),
+    [transactions]
   );
 
   // Prepare chart data (excluded transactions already filtered out)
@@ -275,7 +280,7 @@ function HubApp() {
 
     // Monthly data
     const monthlyData = expenses.reduce((acc, transaction) => {
-      const month = transaction.date.toISOString().substring(0, 7); // YYYY-MM
+      const month = localMonthKey(transaction.date); // YYYY-MM (local)
       if (!acc[month]) {
         acc[month] = { month, spending: 0, income: 0, net: 0 };
       }
@@ -284,7 +289,7 @@ function HubApp() {
     }, {} as Record<string, any>);
     
     income.forEach(transaction => {
-      const month = transaction.date.toISOString().substring(0, 7);
+      const month = localMonthKey(transaction.date);
       if (!monthlyData[month]) {
         monthlyData[month] = { month, spending: 0, income: 0, net: 0 };
       }
@@ -302,7 +307,7 @@ function HubApp() {
     const dailyData = expenses
       .filter(t => t.date >= thirtyDaysAgo)
       .reduce((acc, transaction) => {
-        const date = transaction.date.toISOString().substring(0, 10); // YYYY-MM-DD
+        const date = localDayKey(transaction.date); // YYYY-MM-DD (local)
         if (!acc[date]) {
           acc[date] = { date, amount: 0 };
         }
@@ -351,12 +356,12 @@ function HubApp() {
   // Get available categories for the editor
   const availableCategories = useMemo(() => {
     const categories = new Set(
-      categorizedTransactions
+      transactions
         .map(t => t.category)
         .filter((category): category is string => Boolean(category))
     );
     return Array.from(categories).sort();
-  }, [categorizedTransactions]);
+  }, [transactions]);
 
   // (The old "no transactions → FileUpload" gate is gone. FileUpload
   // now lives behind the upload button in the topbar / a future
@@ -435,7 +440,7 @@ function HubApp() {
 
             {/* The transaction log, cross-filtered by the selections above + text */}
             <TransactionsView
-              transactions={categorizedTransactions}
+              transactions={transactions}
               onEdit={handleEditTransaction}
               monthFilter={selectedMonth}
               categoryFilter={selectedCategory}
@@ -449,7 +454,7 @@ function HubApp() {
         return (
           <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
             <PeriodBar period={analysis.period} />
-            <SavingsMissions analysis={analysis} />
+            <SavingsMissions />
           </div>
         );
       

@@ -18,7 +18,6 @@ import { WebSocketService } from './services/WebSocketService';
 import authRoutes from './routes/auth';
 import transactionRoutes from './routes/transactions';
 import categoryRoutes from './routes/categories';
-import analyticsRoutes from './routes/analytics';
 import importRoutes from './routes/import';
 import playerRoutes from './routes/player';
 import moduleRoutes from './routes/modules';
@@ -104,7 +103,6 @@ const sensitiveLimiter = rateLimit({
 app.use('/api/auth', sensitiveLimiter, authRoutes);
 app.use('/api/transactions', authMiddleware, transactionRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
-app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/import', authMiddleware, importRoutes);
 app.use('/api/player', authMiddleware, playerRoutes);
 app.use('/api/modules', authMiddleware, moduleRoutes);

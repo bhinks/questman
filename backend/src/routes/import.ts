@@ -66,7 +66,8 @@ router.post('/preview', upload.single('file'), asyncHandler(async (req: AuthRequ
       ...preview
     });
   } catch (error) {
-    throw new AppError(`File preview failed: ${error.message}`, 400);
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new AppError(`File preview failed: ${msg}`, 400);
   }
 }));
 
@@ -108,13 +109,14 @@ router.post('/upload', upload.single('file'), asyncHandler(async (req: AuthReque
     });
 
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     // Broadcast error to user
     global.io.to(`user-${req.user!.id}`).emit('import-error', {
       filename: req.file.originalname,
-      error: error.message
+      error: msg
     });
 
-    throw new AppError(`Import failed: ${error.message}`, 400);
+    throw new AppError(`Import failed: ${msg}`, 400);
   }
 }));
 
