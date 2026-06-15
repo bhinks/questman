@@ -63,7 +63,7 @@ export function LoginScreen() {
 
             {/* Brand lockup */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 6 }}>
-              <div className="ncx-hex" style={{ width: 44, height: 44, fontSize: 18, boxShadow: '0 0 22px -2px rgba(var(--accent-rgb),0.55)' }}>Q</div>
+              <div className="ncx-hex" style={{ width: 44, height: 44, fontSize: 18, boxShadow: '0 0 22px -2px rgba(var(--accent-rgb),0.55)' }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
               <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, letterSpacing: '0.03em' }}>
                 QUEST<span style={{ color: 'var(--cyan)' }}>MAN</span>
               </div>

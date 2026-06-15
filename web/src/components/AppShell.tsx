@@ -182,7 +182,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         {/* ---- DECK ---- */}
         <aside className="ncx-deck">
           <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>Q</div>
+            <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, letterSpacing: '0.02em' }}>
                 QUEST<span className="ncx-chroma" style={{ color: 'var(--cyan)' }}>MAN</span>
@@ -254,7 +254,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         <main className="main-col">
           <header className="ncx-topbar">
             <div className="mobile-brand">
-              <div className="ncx-hex" style={{ width: 28, height: 28, fontSize: 11 }}>Q</div>
+              <div className="ncx-hex" style={{ width: 28, height: 28, fontSize: 11 }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
             </div>
             <div className="ncx-topcell cell-title">
               <span className="mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--cyan)' }}>
