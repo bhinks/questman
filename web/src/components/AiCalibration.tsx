@@ -61,7 +61,10 @@ const INPUT: CSSProperties = {
 };
 
 /** Curated cloud picks; the server defaults live in backend config. */
-const CLOUD_MODELS = [
+type ModelOption = { id: string; label: string };
+
+/** Fallback cloud catalog, shown if live discovery (the server key) fails. */
+const CLOUD_MODELS: ModelOption[] = [
   { id: 'claude-opus-4-8', label: 'OPUS 4.8 — FLAGSHIP' },
   { id: 'claude-sonnet-4-6', label: 'SONNET 4.6 — BALANCED' },
   { id: 'claude-haiku-4-5', label: 'HAIKU 4.5 — FAST + CHEAP' },
@@ -109,6 +112,16 @@ export function AiCalibrationPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 
+  // Discover the models actually available for the active provider so the
+  // dropdowns reflect reality (cloud catalog / Ollama tags). Re-runs when the
+  // provider or node URL changes; falls back to the built-in list on failure.
+  const modelsQ = useQuery({
+    queryKey: ['ai', 'models', local?.aiProvider, local?.aiProvider === 'ollama' ? local?.ollamaUrl : 'cloud'],
+    queryFn: () => api.get<{ models: ModelOption[] }>(`/api/settings/models?provider=${local!.aiProvider}`).then(r => r.models),
+    enabled: !!local && (local.aiProvider === 'anthropic' ? !!local.aiCloudKey : !!local.ollamaUrl),
+    staleTime: 5 * 60_000,
+  });
+
   /** Toggles/selects: apply locally + persist in one step. */
   const apply = (patch: AiPatch) => {
     setLocal(prev => (prev ? { ...prev, ...patch } : prev));
@@ -135,6 +148,17 @@ export function AiCalibrationPanel() {
   const usedPct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
   const cloud = local.aiProvider === 'anthropic';
   const cloudOffline = cloud && !local.aiCloudKey;
+
+  // Provider model options: live discovery when available, else the built-in
+  // cloud list (Ollama has no static fallback — show the text field instead).
+  const fetchedModels = modelsQ.data ?? [];
+  const cloudModels: ModelOption[] = cloud && fetchedModels.length > 0 ? fetchedModels : CLOUD_MODELS;
+  const ollamaModels: ModelOption[] = !cloud ? fetchedModels : [];
+  // Keep the currently-saved Ollama model selectable even if the node didn't
+  // list it (custom pull, stale value).
+  const ollamaOptions: ModelOption[] = !cloud && local.ollamaModel && !ollamaModels.some(m => m.id === local.ollamaModel)
+    ? [{ id: local.ollamaModel, label: local.ollamaModel }, ...ollamaModels]
+    : ollamaModels;
 
   const dimWhenOff: CSSProperties = local.aiEnabled
     ? {}
@@ -284,16 +308,18 @@ export function AiCalibrationPanel() {
             <>
               <SelectRow
                 label="QUEST MODEL"
-                hint="MISSION SYNTHESIS TIER"
+                hint={modelsQ.isFetching ? 'SCANNING CATALOG…' : 'MISSION SYNTHESIS TIER'}
                 value={local.aiModelQuests ?? ''}
                 defaultLabel="SERVER DEFAULT (OPUS 4.8)"
+                options={cloudModels}
                 onChange={v => apply({ aiModelQuests: v || null })}
               />
               <SelectRow
                 label="HANDLER MODEL"
-                hint="RUNDOWN + DEBRIEF TIER"
+                hint={modelsQ.isFetching ? 'SCANNING CATALOG…' : 'RUNDOWN + DEBRIEF TIER'}
                 value={local.aiModelHandler ?? ''}
                 defaultLabel="SERVER DEFAULT (HAIKU 4.5)"
+                options={cloudModels}
                 onChange={v => apply({ aiModelHandler: v || null })}
               />
               {cloudOffline && (
@@ -324,20 +350,33 @@ export function AiCalibrationPanel() {
                 <span />
               </div>
               <div style={ROW}>
-                <div>
+                <div style={ROW_LABEL}>
                   <div style={SECTION_HEADER}>LOCAL MODEL</div>
-                  <div className="ncx-serial" style={{ marginTop: 4 }}>E.G. LLAMA3.1 · QWEN3</div>
+                  <div className="ncx-serial" style={ROW_HINT}>
+                    {modelsQ.isFetching ? 'SCANNING NODE…' : ollamaModels.length > 0 ? `${ollamaModels.length} PULLED` : 'E.G. LLAMA3.1 · QWEN3'}
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  aria-label="Ollama model"
-                  value={local.ollamaModel}
-                  placeholder="llama3.1"
-                  style={INPUT}
-                  onChange={e => tune({ ollamaModel: e.target.value })}
-                  onBlur={() => commit('ollamaModel')}
-                  onKeyUp={e => e.key === 'Enter' && commit('ollamaModel')}
-                />
+                {ollamaModels.length > 0 ? (
+                  <select
+                    aria-label="Ollama model"
+                    value={local.ollamaModel}
+                    onChange={e => apply({ ollamaModel: e.target.value })}
+                    style={{ ...INPUT, appearance: 'auto', minWidth: 170 }}
+                  >
+                    {ollamaOptions.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    aria-label="Ollama model"
+                    value={local.ollamaModel}
+                    placeholder="llama3.1"
+                    style={INPUT}
+                    onChange={e => tune({ ollamaModel: e.target.value })}
+                    onBlur={() => commit('ollamaModel')}
+                    onKeyUp={e => e.key === 'Enter' && commit('ollamaModel')}
+                  />
+                )}
                 <span />
               </div>
               <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)' }}>
@@ -458,15 +497,17 @@ function ToggleRow(props: {
   );
 }
 
-/** Labeled native select for the cloud model overrides. */
+/** Labeled native select for a model override. `defaultLabel` is the empty
+ *  "use server default" option; omit it (null) for a required choice. */
 function SelectRow(props: {
   label: string;
   hint: string;
   value: string;
-  defaultLabel: string;
+  defaultLabel: string | null;
+  options: ModelOption[];
   onChange: (v: string) => void;
 }) {
-  const { label, hint, value, defaultLabel, onChange } = props;
+  const { label, hint, value, defaultLabel, options, onChange } = props;
   return (
     <div style={ROW}>
       <div style={ROW_LABEL}>
@@ -479,8 +520,8 @@ function SelectRow(props: {
         onChange={e => onChange(e.target.value)}
         style={{ ...INPUT, appearance: 'auto', minWidth: 170 }}
       >
-        <option value="">{defaultLabel}</option>
-        {CLOUD_MODELS.map(m => (
+        {defaultLabel !== null && <option value="">{defaultLabel}</option>}
+        {options.map(m => (
           <option key={m.id} value={m.id}>{m.label}</option>
         ))}
       </select>

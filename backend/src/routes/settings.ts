@@ -21,6 +21,8 @@ import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { config } from '../config';
 import { AI_DEFAULTS, tokensUsedToday } from '../services/llm';
+import Anthropic from '@anthropic-ai/sdk';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -110,6 +112,56 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     select: SETTINGS_SELECT,
   });
   res.json({ settings: project(settings) });
+}));
+
+/**
+ * GET /api/settings/models?provider=anthropic|ollama
+ *
+ * Discover the models actually available for a provider so the SYS//CAL
+ * dropdowns reflect reality instead of a hardcoded guess: Anthropic's catalog
+ * (server key) or the local Ollama node's pulled tags. Best-effort — any
+ * failure (no key, node down, timeout) returns an empty list and the UI falls
+ * back to its built-in options. Never throws.
+ */
+router.get('/models', asyncHandler(async (req: AuthRequest, res) => {
+  const provider = req.query.provider === 'ollama' ? 'ollama' : 'anthropic';
+  let models: Array<{ id: string; label: string }> = [];
+
+  try {
+    if (provider === 'anthropic') {
+      if (config.anthropic.apiKey) {
+        const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+        const list = await client.models.list({ limit: 100 });
+        models = (list.data ?? []).map((m: { id: string; display_name?: string }) => ({
+          id: m.id,
+          label: m.display_name ?? m.id,
+        }));
+      }
+    } else {
+      const row = await prisma.userSettings.findUnique({
+        where: { userId: req.user!.id }, select: { ollamaUrl: true },
+      });
+      const url = (row?.ollamaUrl || AI_DEFAULTS.ollamaUrl).replace(/\/+$/, '');
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 4000);
+      try {
+        const r = await fetch(`${url}/api/tags`, { signal: ctrl.signal });
+        if (r.ok) {
+          const body = await r.json() as { models?: Array<{ name?: string; model?: string }> };
+          models = (body.models ?? [])
+            .map(m => m.name ?? m.model)
+            .filter((n): n is string => !!n)
+            .map(n => ({ id: n, label: n }));
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  } catch (err: any) {
+    logger.warn(`[settings] model discovery (${provider}) failed: ${err?.message ?? err}`);
+  }
+
+  res.json({ provider, models });
 }));
 
 /** PUT /api/settings — update any subset; upserts so first-save works. */
