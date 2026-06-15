@@ -214,7 +214,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>{p?.level ?? '—'}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', whiteSpace: 'normal', lineHeight: 1.35, wordBreak: 'break-word' }}>
                   {handle} <span style={{ color: equippedTitle ? 'var(--cyan)' : 'var(--text-ghost)' }}>// {equippedTitle ? equippedTitle.name : 'RUNNER-01'}</span>
                 </div>
                 <div className="ncx-bar slim" style={{ marginTop: 6 }}>

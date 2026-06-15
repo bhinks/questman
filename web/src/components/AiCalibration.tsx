@@ -35,12 +35,19 @@ const SECTION_HEADER: CSSProperties = {
 
 const ROW: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '150px 1fr 64px',
+  // Flexible label column (min 0 so it contains its own text instead of sliding
+  // the subtext under the controls), controls sized to content, fixed readout.
+  gridTemplateColumns: 'minmax(0, 1fr) auto 64px',
   gap: 14,
   alignItems: 'center',
   padding: '14px 18px',
   borderTop: '1px solid var(--line)',
 };
+
+/** The label + subtext cell — minWidth:0 lets it shrink within its grid track,
+ *  and the hint wraps instead of overflowing into the control column. */
+const ROW_LABEL: CSSProperties = { minWidth: 0 };
+const ROW_HINT: CSSProperties = { marginTop: 4, whiteSpace: 'normal', lineHeight: 1.4 };
 
 const INPUT: CSSProperties = {
   width: '100%',
@@ -418,9 +425,9 @@ function ToggleRow(props: {
   const { label, hint, on, onSet, readoutOn = 'LIVE', readoutOff = 'MUTE' } = props;
   return (
     <div style={ROW}>
-      <div>
+      <div style={ROW_LABEL}>
         <div style={SECTION_HEADER}>{label}</div>
-        <div className="ncx-serial" style={{ marginTop: 4 }}>{hint}</div>
+        <div className="ncx-serial" style={ROW_HINT}>{hint}</div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button
@@ -462,15 +469,15 @@ function SelectRow(props: {
   const { label, hint, value, defaultLabel, onChange } = props;
   return (
     <div style={ROW}>
-      <div>
+      <div style={ROW_LABEL}>
         <div style={SECTION_HEADER}>{label}</div>
-        <div className="ncx-serial" style={{ marginTop: 4 }}>{hint}</div>
+        <div className="ncx-serial" style={ROW_HINT}>{hint}</div>
       </div>
       <select
         aria-label={label}
         value={value}
         onChange={e => onChange(e.target.value)}
-        style={{ ...INPUT, appearance: 'auto' }}
+        style={{ ...INPUT, appearance: 'auto', minWidth: 170 }}
       >
         <option value="">{defaultLabel}</option>
         {CLOUD_MODELS.map(m => (

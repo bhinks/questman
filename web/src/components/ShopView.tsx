@@ -483,8 +483,8 @@ export function ShopView() {
           const equipped = player.equippedTitle === titleKey;
           return (
             <MktCard key={item.key} equipped={equipped}>
-              <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px' }}>
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.14em', whiteSpace: 'nowrap' }}>
+              <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px' }}>
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', textAlign: 'center', lineHeight: 1.45, wordBreak: 'break-word' }}>
                   {handle} <span style={{ color: equipped ? 'var(--cyan)' : 'var(--text-dim)' }}>// {name}</span>
                 </span>
               </div>
