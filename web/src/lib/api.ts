@@ -2,36 +2,27 @@
  * Typed fetch wrapper for the Questman backend.
  *
  * In dev we hit http://localhost:3001 directly (CORS configured to
- * allow http://localhost:5173). In Docker/prod, nginx proxies /api
- * and /socket.io to the backend so this defaults to "" (same origin).
+ * allow http://localhost:5173 with credentials). In Docker/prod, nginx
+ * proxies /api and /socket.io to the backend so this defaults to ""
+ * (same origin).
  *
- * Token is read from the auth context's `localStorage` slot on every
- * call so it's always fresh — no need to recreate the client on login.
+ * Auth is a server-set httpOnly cookie, not a JS-readable token: every
+ * request sends `credentials: 'include'` and the browser attaches the
+ * cookie. There is no token in localStorage for XSS to lift.
  */
 
 export const API_BASE: string =
   (import.meta.env.VITE_API_URL as string | undefined) ??
   (import.meta.env.DEV ? 'http://localhost:3001' : '');
 
-export const TOKEN_KEY = 'questman.auth.token';
-
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  // "Remember me" stores in localStorage (survives restart); otherwise
-  // sessionStorage (cleared when the browser/tab closes). Read both.
-  return window.localStorage.getItem(TOKEN_KEY)
-    ?? window.sessionStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string | null, remember = true): void {
+/** One-time cleanup of the pre-cookie token (older builds stored it in
+ *  web storage). Safe to call repeatedly. */
+export function clearLegacyAuthToken(): void {
   if (typeof window === 'undefined') return;
-  // Always clear both stores first so toggling "remember" never leaves a
-  // stale copy behind in the other one.
-  window.localStorage.removeItem(TOKEN_KEY);
-  window.sessionStorage.removeItem(TOKEN_KEY);
-  if (token) {
-    (remember ? window.localStorage : window.sessionStorage).setItem(TOKEN_KEY, token);
-  }
+  try {
+    window.localStorage.removeItem('questman.auth.token');
+    window.sessionStorage.removeItem('questman.auth.token');
+  } catch { /* storage unavailable — nothing to clean */ }
 }
 
 export class ApiError extends Error {
@@ -56,13 +47,12 @@ async function request<T>(
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {};
-  const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(url, {
     method,
     headers,
+    credentials: 'include', // send/receive the httpOnly auth cookie
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
@@ -98,11 +88,7 @@ async function upload<T>(
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
 
-  const headers: Record<string, string> = {};
-  const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: form });
+  const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: form, credentials: 'include' });
 
   let payload: any = null;
   const text = await res.text();

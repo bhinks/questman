@@ -15,6 +15,10 @@ model User {
   email     String   @unique
   password  String
   name      String?
+  // Bumped to revoke every outstanding JWT for this user ("log out
+  // everywhere"). The signed token carries the version it was minted at;
+  // authMiddleware rejects any token whose version is behind the user's.
+  tokenVersion Int    @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

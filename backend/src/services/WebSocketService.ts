@@ -1,9 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from '../utils/logger';
-import { AuthRequest } from '../middleware/auth';
-import jwt from 'jsonwebtoken';
-import { config } from '../config';
-import { prisma } from '../server';
+import { AuthRequest, readCookie, verifyAuthToken, AUTH_COOKIE } from '../middleware/auth';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -28,22 +25,19 @@ export class WebSocketService {
    */
   private async authenticateSocket(socket: AuthenticatedSocket, next: Function) {
     try {
-      const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-      
+      // The httpOnly cookie rides along on the handshake; fall back to the
+      // auth payload / Authorization header for non-browser clients.
+      const token = readCookie(socket.handshake.headers.cookie, AUTH_COOKIE)
+        || socket.handshake.auth.token
+        || socket.handshake.headers.authorization?.split(' ')[1];
+
       if (!token) {
         return next(new Error('Authentication error: No token provided'));
       }
 
-      // JWT is signed with `{ id, email }` (see routes/auth.ts), so read `id`.
-      const decoded = jwt.verify(token, config.jwt.secret) as { id: string };
-
-      // Mirror the HTTP auth middleware: a valid signature isn't enough — the
-      // account must still exist, so a deleted user's un-expired token can't
-      // open a live socket.
-      const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true } });
-      if (!user) {
-        return next(new Error('Authentication error: Unknown user'));
-      }
+      // Same gate as the HTTP middleware: valid signature + the account still
+      // exists + the token hasn't been revoked (tokenVersion match).
+      const user = await verifyAuthToken(token);
       socket.userId = user.id;
 
       logger.info(`Socket authenticated for user: ${user.id}`);

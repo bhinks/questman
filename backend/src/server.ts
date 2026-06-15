@@ -49,7 +49,8 @@ const server = createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' ? false : 'http://localhost:5173',
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    credentials: true // allow the httpOnly auth cookie on the handshake (dev cross-port)
   }
 });
 

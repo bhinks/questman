@@ -124,7 +124,7 @@ function PetWidget({ pet }: { pet: PetMeta }) {
 
 export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn, onQuickAdd }: AppShellProps) {
   const qc = useQueryClient();
-  const { user, logout } = useAuth();
+  const { user, logout, logoutAll } = useAuth();
   const [uplink, setUplink] = useState(true);
   // Mobile MORE sheet (polish pass §3a): full-deck glass overlay.
   const [moreOpen, setMoreOpen] = useState(false);
@@ -231,6 +231,14 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
               <span style={{ color: 'var(--amber)' }}>
                 €${p ? (p.eddies >= 1000 ? (p.eddies / 1000).toFixed(1) + 'K' : p.eddies) : '—'}
               </span>
+              <button
+                onClick={() => { if (confirm('Revoke ALL sessions on every device?')) logoutAll(); }}
+                title="Revoke all sessions (sign out everywhere)"
+                aria-label="Revoke all sessions"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-ghost)', padding: 0, display: 'inline-flex' }}
+              >
+                <Icon name="shield" size={10} />
+              </button>
               <button
                 onClick={logout}
                 title="Jack out (sign off)"

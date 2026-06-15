@@ -5,10 +5,34 @@ import { z } from 'zod';
 import { prisma } from '../server';
 import { config } from '../config';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
-import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { authMiddleware, AuthRequest, AUTH_COOKIE } from '../middleware/auth';
 import { provisionLifeHub } from '../utils/provision';
 
 const router = express.Router();
+
+const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/** True when the request reached us over HTTPS (directly or via a proxy). */
+function isSecureReq(req: express.Request): boolean {
+  return req.secure || req.headers['x-forwarded-proto'] === 'https';
+}
+
+/** Issue the JWT as an httpOnly, SameSite=Strict cookie (Secure when behind
+ *  HTTPS). This — not localStorage — is the session: JS can't read it, so XSS
+ *  can't lift the token, and SameSite=Strict blocks cross-site CSRF. */
+function setAuthCookie(req: express.Request, res: express.Response, token: string, remember: boolean): void {
+  res.cookie(AUTH_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: isSecureReq(req),
+    path: '/',
+    ...(remember ? { maxAge: REMEMBER_MS } : {}), // omit → session cookie
+  });
+}
+
+function clearAuthCookie(req: express.Request, res: express.Response): void {
+  res.clearCookie(AUTH_COOKIE, { httpOnly: true, sameSite: 'strict', secure: isSecureReq(req), path: '/' });
+}
 
 // Validation schemas
 const registerSchema = z.object({
@@ -29,10 +53,11 @@ const loginSchema = z.object({
 // extends it so the session survives browser/app restarts comfortably.
 const REMEMBER_EXPIRES_IN = '30d';
 
-// Generate JWT token
-const generateToken = (userId: string, email: string, expiresIn?: string) => {
+// Generate JWT token. tokenVersion is embedded so a "log out everywhere" bump
+// invalidates every previously-issued token.
+const generateToken = (userId: string, email: string, tokenVersion: number, expiresIn?: string) => {
   return jwt.sign(
-    { id: userId, email },
+    { id: userId, email, tokenVersion },
     config.jwt.secret,
     { expiresIn: expiresIn ?? config.jwt.expiresIn } as jwt.SignOptions
   );
@@ -91,8 +116,9 @@ router.post('/register', asyncHandler(async (req, res) => {
   // user. Shared with the seed via provisionLifeHub.
   await provisionLifeHub(prisma, user.id);
 
-  // Generate token
-  const token = generateToken(user.id, user.email);
+  // Generate token + set the httpOnly session cookie (new users start at v0).
+  const token = generateToken(user.id, user.email, 0);
+  setAuthCookie(req, res, token, true);
 
   res.status(201).json({
     message: 'User created successfully',
@@ -121,8 +147,11 @@ router.post('/login', asyncHandler(async (req, res) => {
     throw new AppError('Invalid email or password', 401);
   }
 
-  // Generate token — long-lived when "remember me" is checked.
-  const token = generateToken(user.id, user.email, remember ? REMEMBER_EXPIRES_IN : undefined);
+  // Generate token — long-lived when "remember me" is checked — and set the
+  // httpOnly session cookie (the authoritative session; the body token is kept
+  // for non-browser API clients).
+  const token = generateToken(user.id, user.email, user.tokenVersion, remember ? REMEMBER_EXPIRES_IN : undefined);
+  setAuthCookie(req, res, token, !!remember);
 
   // Remove password from response
   const { password: _, ...userWithoutPassword } = user;
@@ -132,6 +161,24 @@ router.post('/login', asyncHandler(async (req, res) => {
     user: userWithoutPassword,
     token
   });
+}));
+
+// Log out THIS session — clear the cookie (the token simply expires elsewhere).
+router.post('/logout', asyncHandler(async (req, res) => {
+  clearAuthCookie(req, res);
+  res.json({ message: 'Logged out' });
+}));
+
+// Log out EVERYWHERE — bump tokenVersion so every outstanding token (any
+// device) is rejected on its next request, then clear this cookie. The
+// compromise / "sign out all sessions" response.
+router.post('/logout-all', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
+  await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { tokenVersion: { increment: 1 } },
+  });
+  clearAuthCookie(req, res);
+  res.json({ message: 'All sessions revoked' });
 }));
 
 // Get current user profile
