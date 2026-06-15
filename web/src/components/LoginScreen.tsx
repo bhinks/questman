@@ -17,11 +17,12 @@ import { Icon } from './Icon';
 import { useAuth } from '../context/AuthContext';
 
 export function LoginScreen() {
-  const { login } = useAuth();
+  const { login, demo } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [demoing, setDemoing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent) {
@@ -35,6 +36,19 @@ export function LoginScreen() {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function onDemo() {
+    if (demoing) return;
+    setDemoing(true);
+    setError(null);
+    try {
+      await demo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start demo');
+    } finally {
+      setDemoing(false);
     }
   }
 
@@ -102,10 +116,19 @@ export function LoginScreen() {
                 key={submitting ? 'auth' : 'idle'}
                 type="submit"
                 className="btn btn-primary"
-                disabled={submitting}
+                disabled={submitting || demoing}
                 style={{ padding: 14, fontSize: 13, marginTop: 6, width: '100%' }}
               >
                 {submitting ? 'AUTHENTICATING…' : (<><Icon name="zap" size={15} /> JACK IN</>)}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={submitting || demoing}
+                onClick={onDemo}
+                style={{ padding: 11, fontSize: 11, width: '100%', letterSpacing: '0.12em' }}
+              >
+                {demoing ? 'SPINNING UP NIGHT CITY…' : (<><Icon name="play" size={13} /> EXPLORE THE DEMO</>)}
               </button>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
@@ -125,7 +148,7 @@ export function LoginScreen() {
               <span>DATA NEVER LEAVES THIS DEVICE</span>
             </div>
             <div className="mono" style={{ marginTop: 10, fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-ghost)', textAlign: 'center' }}>
-              DEMO: demo@questman.app / demo123
+              NO ACCOUNT? EXPLORE A SEEDED SANDBOX — NO DATA LEAVES THIS DEVICE
             </div>
           </div>
         </div>

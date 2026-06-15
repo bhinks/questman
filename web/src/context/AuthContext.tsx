@@ -10,6 +10,8 @@ interface AuthState {
   isAuthed: boolean;      // shorthand for `!!user`
   error: string | null;
   login: (email: string, password: string, remember?: boolean) => Promise<void>;
+  /** Start a throwaway, re-seeded demo session (no credentials). */
+  demo: () => Promise<void>;
   logout: () => void;
   /** Revoke EVERY session for this account (bumps the server tokenVersion),
    *  then sign out here. The "lost a device / compromise" response. */
@@ -53,6 +55,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const demo = useCallback(async () => {
+    setError(null);
+    try {
+      // Server re-seeds the demo sandbox and sets a short-lived session cookie.
+      const res = await api.post<LoginResponse>('/api/auth/demo');
+      setUser({ id: res.user.id, email: res.user.email, name: res.user.name });
+      connectSocket();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not start demo';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
   const logout = useCallback(() => {
     // Clear the cookie server-side, then drop local state.
     void api.post('/api/auth/logout').catch(() => { /* best effort */ });
@@ -73,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthed: !!user,
     error,
     login,
+    demo,
     logout,
     logoutAll,
   };

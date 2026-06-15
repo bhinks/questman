@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { startOfLocalDay } from '../utils/dates';
+import { DEMO_EMAIL } from '../utils/demoSeed';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -41,12 +42,14 @@ export const healthConnectSchema = z.object({
 export type HealthConnectPayload = z.infer<typeof healthConnectSchema>;
 
 /** Hub user for tokened/pulled ingestion (single-user system):
- *  HUB_USER_EMAIL when set, else the oldest account. */
+ *  HUB_USER_EMAIL when set, else the oldest NON-demo account. The demo
+ *  sandbox is explicitly excluded so it can never silently become the
+ *  AI/ingest identity. */
 export async function resolveHubUserId(db: Db): Promise<string | null> {
   const email = process.env.HUB_USER_EMAIL;
   const user = email
     ? await db.user.findUnique({ where: { email }, select: { id: true } })
-    : await db.user.findFirst({ orderBy: { createdAt: 'asc' }, select: { id: true } });
+    : await db.user.findFirst({ where: { email: { not: DEMO_EMAIL } }, orderBy: { createdAt: 'asc' }, select: { id: true } });
   return user?.id ?? null;
 }
 

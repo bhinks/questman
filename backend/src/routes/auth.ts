@@ -7,6 +7,7 @@ import { config } from '../config';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { authMiddleware, AuthRequest, AUTH_COOKIE } from '../middleware/auth';
 import { provisionLifeHub } from '../utils/provision';
+import { seedDemoUser } from '../utils/demoSeed';
 
 const router = express.Router();
 
@@ -179,6 +180,19 @@ router.post('/logout-all', authMiddleware, asyncHandler(async (req: AuthRequest,
   });
   clearAuthCookie(req, res);
   res.json({ message: 'All sessions revoked' });
+}));
+
+// Demo mode — drop a visitor into a fresh, Night-City-seeded sandbox with no
+// credentials typed. Re-seeds the dedicated demo account every time so it
+// always looks pristine and visitor edits never persist. The hub user + real
+// data are untouched and unreachable from this session.
+const DEMO_EXPIRES_IN = '2h';
+router.post('/demo', asyncHandler(async (req, res) => {
+  const user = await seedDemoUser(prisma);
+  // Fresh account → tokenVersion 0. Short-lived, session-only cookie.
+  const token = generateToken(user.id, user.email, 0, DEMO_EXPIRES_IN);
+  setAuthCookie(req, res, token, false);
+  res.json({ message: 'Demo session started', user, token });
 }));
 
 // Get current user profile

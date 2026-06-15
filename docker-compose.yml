@@ -9,9 +9,8 @@
 #              to the backend.
 #
 # Reach the app at http://localhost:8080. Sign in with the hub user
-# from .env (HUB_USER_EMAIL / HUB_USER_PASSWORD). If the hub user
-# variables are unset, the seeded demo account (demo@questman.app /
-# demo123) is the only login that works.
+# from .env (HUB_USER_EMAIL / HUB_USER_PASSWORD), or click DEMO to
+# explore a fresh, re-seeded Night City sandbox with no account.
 # =====================================================================
 
 # Pin the compose project name so it's independent of the parent
