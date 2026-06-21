@@ -15,7 +15,7 @@
  * All data is bound from shared react-query caches (player / today / handler
  * / antigoals / bosses / settings) so the shell stays live everywhere.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from './Icon';
 import { api } from '../lib/api';
@@ -64,6 +64,24 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
 
 /** The four tabs pinned to the mobile bottom nav (everything else → MORE). */
 const PINNED_TABS: string[] = ['today', 'habits', 'operations', 'health'];
+
+/**
+ * Maps module keys (from the server) to the nav tab IDs they unlock.
+ * Tabs not listed here are always visible (OPS / PROGRESSION / SYSTEM).
+ */
+const MODULE_TO_TABS: Record<string, string[]> = {
+  habits:   ['habits'],
+  chores:   ['habits'],
+  fitness:  ['health'],
+  vitals:   ['health'],
+  projects: ['operations'],
+  media:    ['media'],
+  social:   ['social'],
+  finance:  ['overview', 'budgets', 'bills', 'savings'],
+};
+
+/** Tab IDs that are always shown regardless of module access. */
+const ALWAYS_VISIBLE = new Set(['today', 'bosses', 'handler', 'progress', 'shop', 'calibration']);
 
 const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
@@ -129,6 +147,28 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
   // Mobile MORE sheet (polish pass §3a): full-deck glass overlay.
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // Module access: fetch which modules this user can see, then derive visible tabs.
+  const modulesQ = useQuery({
+    queryKey: ['modules'],
+    queryFn: () => api.get<{ modules: Array<{ key: string }> }>('/api/modules').then(r => r.modules),
+    staleTime: 5 * 60_000,
+  });
+  const visibleTabIds = useMemo(() => {
+    const ids = new Set(ALWAYS_VISIBLE);
+    for (const m of modulesQ.data ?? []) {
+      for (const tabId of MODULE_TO_TABS[m.key] ?? []) {
+        ids.add(tabId);
+      }
+    }
+    return ids;
+  }, [modulesQ.data]);
+  const filteredNavGroups = useMemo(() =>
+    NAV_GROUPS
+      .map(g => ({ ...g, items: g.items.filter(([id]) => visibleTabIds.has(id)) }))
+      .filter(g => g.items.length > 0),
+    [visibleTabIds],
+  );
+
   const playerQ = useQuery({
     queryKey: ['player'],
     queryFn: () => api.get<PlayerResponse>('/api/player').then(r => r.player),
@@ -191,7 +231,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
             </div>
           </div>
           <nav>
-            {NAV_GROUPS.map(g => (
+            {filteredNavGroups.map(g => (
               <div key={g.group}>
                 <div className="ncx-deck-group">{g.group}<i /></div>
                 {g.items.map(([id, label, icon]) => (
@@ -360,7 +400,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
           <div className="qm-sheet-backdrop" onClick={() => setMoreOpen(false)} />
           <div className="qm-sheet">
             <div className="qm-sheet-handle" />
-            {NAV_GROUPS.map(g => (
+            {filteredNavGroups.map(g => (
               <div key={g.group}>
                 <div className="ncx-deck-group">{g.group}<i /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, margin: '6px 0 12px' }}>

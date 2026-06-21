@@ -66,6 +66,12 @@ const configSchema = z.object({
   // Single-user self-hosted hub: public signup is off by default.
   allowRegistration: z.boolean().default(false),
 
+  // Service-to-service admin key (e.g. for NovaHQ to manage Questman users
+  // without a browser session). Must be 16+ chars. When set, requests carrying
+  // "X-Admin-Key: <key>" on /api/admin/* are treated as authenticated admin calls.
+  // Unset = API key auth disabled (admin endpoints require a logged-in admin user).
+  adminApiKey: z.string().min(16).optional(),
+
   // Long-lived shared secret for POST /api/ingest/* (phone-side health
   // bridges that can't do the JWT login dance). Min 16 chars — fail fast
   // on a guessable token rather than expose an unauthenticated writer.
@@ -144,6 +150,8 @@ const env = {
   },
 
   allowRegistration: process.env.ALLOW_REGISTRATION === 'true',
+
+  adminApiKey: process.env.ADMIN_API_KEY || undefined,
 
   ingestToken: process.env.INGEST_TOKEN || undefined,
 

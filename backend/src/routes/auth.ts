@@ -64,9 +64,13 @@ const generateToken = (userId: string, email: string, tokenVersion: number, expi
   );
 };
 
-// Register new user (disabled by default for single-user self-hosted deployments)
+// Register new user (disabled by default for single-user self-hosted deployments).
+// The first user to ever register (when the DB is empty) gets admin role and
+// bypasses the allowRegistration check — this bootstraps a fresh installation.
 router.post('/register', asyncHandler(async (req, res) => {
-  if (!config.allowRegistration) {
+  const isFirstUser = (await prisma.user.count()) === 0;
+
+  if (!isFirstUser && !config.allowRegistration) {
     throw new AppError('Registration is disabled', 403);
   }
 
@@ -84,12 +88,13 @@ router.post('/register', asyncHandler(async (req, res) => {
   // Hash password
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  // Create user with default settings
+  // Create user with default settings. First user is always admin.
   const user = await prisma.user.create({
     data: {
       email,
       password: hashedPassword,
       name,
+      role: isFirstUser ? 'admin' : 'user',
       settings: {
         create: {
           currency: 'USD',
@@ -104,6 +109,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       id: true,
       email: true,
       name: true,
+      role: true,
       createdAt: true,
       settings: true
     }
@@ -203,6 +209,7 @@ router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => 
       id: true,
       email: true,
       name: true,
+      role: true,
       createdAt: true,
       settings: true
     }

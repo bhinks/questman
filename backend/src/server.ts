@@ -43,6 +43,8 @@ import budgetRoutes from './routes/budgets';
 import recurringRoutes from './routes/recurring';
 import settingsRoutes from './routes/settings';
 import focusRoutes from './routes/focus';
+import adminRoutes from './routes/admin';
+import { adminAuth } from './middleware/admin';
 
 const app = express();
 const server = createServer(app);
@@ -131,6 +133,8 @@ app.use('/api/budgets', authMiddleware, budgetRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/focus', authMiddleware, focusRoutes);
+// Admin routes: accept either a logged-in admin JWT or the ADMIN_API_KEY header.
+app.use('/api/admin', adminAuth, adminRoutes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);
