@@ -30,10 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     clearLegacyAuthToken(); // one-time: drop any pre-cookie web-storage token
     let cancelled = false;
-    api.get<{ user: AuthUser }>('/api/auth/me')
+    api.get<{ user: AuthUser & { role?: string } }>('/api/auth/me')
       .then(res => {
         if (cancelled) return;
-        setUser(res.user);
+        setUser({ ...res.user, role: res.user.role });
         connectSocket();
       })
       .catch(() => { /* not signed in — the login screen handles it */ })
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // The server sets the httpOnly session cookie; we just track the user.
       const res = await api.post<LoginResponse>('/api/auth/login', { email, password, remember });
-      setUser({ id: res.user.id, email: res.user.email, name: res.user.name });
+      setUser({ id: res.user.id, email: res.user.email, name: res.user.name, role: res.user.role });
       connectSocket();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed';
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Server re-seeds the demo sandbox and sets a short-lived session cookie.
       const res = await api.post<LoginResponse>('/api/auth/demo');
-      setUser({ id: res.user.id, email: res.user.email, name: res.user.name });
+      setUser({ id: res.user.id, email: res.user.email, name: res.user.name, role: res.user.role });
       connectSocket();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not start demo';

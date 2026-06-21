@@ -9,7 +9,12 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     name: string | null;
+    role: string;
   };
+  /** True when the request was authenticated via the ADMIN_API_KEY header
+   *  instead of a user JWT. Admin route handlers can check this to know
+   *  there is no associated user identity (e.g. service-to-service call). */
+  isApiKeyAuth?: boolean;
 }
 
 /** Name of the httpOnly session cookie carrying the JWT. */
@@ -40,15 +45,15 @@ interface JwtPayload {
  * by "log out everywhere"). Throws AppError(401) on any failure. Shared by the
  * REST middleware and the socket handshake.
  */
-export async function verifyAuthToken(token: string): Promise<{ id: string; email: string; name: string | null }> {
+export async function verifyAuthToken(token: string): Promise<{ id: string; email: string; name: string | null; role: string }> {
   const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
   const user = await prisma.user.findUnique({
     where: { id: decoded.id },
-    select: { id: true, email: true, name: true, tokenVersion: true },
+    select: { id: true, email: true, name: true, tokenVersion: true, role: true },
   });
   if (!user) throw new AppError('Invalid token', 401);
   if ((decoded.tokenVersion ?? 0) !== user.tokenVersion) throw new AppError('Token revoked', 401);
-  return { id: user.id, email: user.email, name: user.name };
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 
 /** The session JWT from the httpOnly cookie (primary) or, as a fallback for

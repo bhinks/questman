@@ -19,6 +19,12 @@ model User {
   // everywhere"). The signed token carries the version it was minted at;
   // authMiddleware rejects any token whose version is behind the user's.
   tokenVersion Int    @default(0)
+  // Multi-user: "admin" | "user". The first provisioned user gets "admin".
+  // Admins can create users and manage domain access via /api/admin/users.
+  role      String   @default("user")
+  // Module access control: JSON array of module keys (e.g. ["habits","chores"]).
+  // null = all modules allowed. Admins always see all modules regardless.
+  allowedModuleKeys String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

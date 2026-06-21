@@ -19,10 +19,26 @@ const updateSchema = z.object({
 /**
  * GET /api/modules
  * Drives the frontend nav. Ordered by sortOrder then name.
+ * For non-admin users with a restricted allowedModuleKeys list, only the
+ * permitted modules are returned — the nav filters itself automatically.
  */
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
+  const userMeta = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { role: true, allowedModuleKeys: true },
+  });
+
+  // Admins and users with null allowedModuleKeys get the full module list.
+  let keyFilter: string[] | undefined;
+  if (userMeta?.role !== 'admin' && userMeta?.allowedModuleKeys) {
+    keyFilter = JSON.parse(userMeta.allowedModuleKeys) as string[];
+  }
+
   const modules = await prisma.module.findMany({
-    where: { userId: req.user!.id },
+    where: {
+      userId: req.user!.id,
+      ...(keyFilter ? { key: { in: keyFilter } } : {}),
+    },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   });
   res.json({ modules });

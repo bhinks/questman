@@ -30,16 +30,26 @@ async function main() {
     throw new Error('HUB_USER_PASSWORD must be at least 8 characters');
   }
 
-  let hub = await prisma.user.findUnique({ where: { email: hubEmail }, select: { id: true } });
+  let hub = await prisma.user.findUnique({ where: { email: hubEmail }, select: { id: true, role: true } });
   if (hub) {
     logger.info(`✅ Hub user already exists: ${hubEmail}`);
+    // Ensure the hub user is admin if no admin exists yet (migration safety net).
+    if (hub.role !== 'admin') {
+      const adminCount = await prisma.user.count({ where: { role: 'admin' } });
+      if (adminCount === 0) {
+        await prisma.user.update({ where: { id: hub.id }, data: { role: 'admin' } });
+        logger.info(`✅ Granted admin role to hub user: ${hubEmail}`);
+      }
+    }
   } else {
+    // New install: first user is always admin.
     const hashed = await bcrypt.hash(hubPassword, 12);
     hub = await prisma.user.create({
       data: {
         email: hubEmail,
         password: hashed,
         name: hubName,
+        role: 'admin',
         settings: {
           create: {
             currency: 'USD',
@@ -50,9 +60,9 @@ async function main() {
           },
         },
       },
-      select: { id: true },
+      select: { id: true, role: true },
     });
-    logger.info(`✅ Created hub user: ${hubEmail}`);
+    logger.info(`✅ Created hub user (admin): ${hubEmail}`);
   }
 
   // Modules + player profile + default vitals metric set (shared with the

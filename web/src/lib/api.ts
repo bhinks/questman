@@ -117,6 +117,17 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
+  role?: string;
+}
+
+// Admin user-management types
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: 'admin' | 'user';
+  allowedModuleKeys: string[] | null;
+  createdAt: string;
 }
 export interface LoginResponse {
   message: string;

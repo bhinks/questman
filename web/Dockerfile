@@ -30,7 +30,7 @@ RUN npm run build
 # ----- 2) Serve -------------------------------------------------------
 FROM nginx:alpine
 
-# nginx config: serve SPA + proxy /api + /socket.io
+# nginx config: serve SPA + proxy /api + /socket.io to backend
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Static bundle
