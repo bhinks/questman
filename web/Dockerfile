@@ -18,6 +18,10 @@ RUN npm install --no-audit --no-fund
 
 COPY . .
 
+# Sub-path mount: the edge can serve this under a path prefix (e.g. /questman/),
+# so the Vite asset base must match. Passed from the compose override; '/' default.
+ARG VITE_BASE=/
+ENV VITE_BASE=$VITE_BASE
 # VITE_API_URL is "" in production so the frontend talks to the same
 # origin nginx is fronting — the proxy below handles /api + /socket.io.
 ENV VITE_API_URL=""
@@ -26,7 +30,7 @@ RUN npm run build
 # ----- 2) Serve -------------------------------------------------------
 FROM nginx:alpine
 
-# nginx config: serve SPA + proxy /api + /socket.io
+# nginx config: serve SPA + proxy /api + /socket.io to backend
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Static bundle
