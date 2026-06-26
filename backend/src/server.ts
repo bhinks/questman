@@ -44,7 +44,10 @@ import recurringRoutes from './routes/recurring';
 import settingsRoutes from './routes/settings';
 import focusRoutes from './routes/focus';
 import adminRoutes from './routes/admin';
+import apikeyRoutes from './routes/apikeys';
+import v1Routes from './routes/v1';
 import { adminAuth } from './middleware/admin';
+import { apiKeyAuth } from './middleware/apiKeyAuth';
 
 const app = express();
 const server = createServer(app);
@@ -135,6 +138,10 @@ app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/focus', authMiddleware, focusRoutes);
 // Admin routes: accept either a logged-in admin JWT or the ADMIN_API_KEY header.
 app.use('/api/admin', adminAuth, adminRoutes);
+// API key management (requires a logged-in session).
+app.use('/api/apikeys', authMiddleware, apikeyRoutes);
+// External REST API v1: authenticated via user-generated API keys (bearer tokens).
+app.use('/api/v1', apiKeyAuth, v1Routes);
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService(io);

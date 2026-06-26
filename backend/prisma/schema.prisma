@@ -80,7 +80,28 @@ model User {
   // Focus timer (phase 9): persisted JACK IN sessions
   focusSessions        FocusSession[]
 
+  // User-generated API keys (one active key per user)
+  apiKeys              ApiKey[]
+
   @@map("users")
+}
+
+// One active API key per user (bearer token auth for external API clients).
+// The plaintext key is returned once on creation and never stored. keyHash
+// is a SHA-256 of the raw key; keyPrefix (first 10 chars, e.g. "qm_a1b2c3d")
+// is stored for display so users can recognise a key they issued without
+// exposing the secret itself.
+model ApiKey {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keyHash    String   @unique
+  keyPrefix  String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
+  @@map("api_keys")
 }
 
 model UserSettings {
