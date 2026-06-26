@@ -5,6 +5,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 import { AnalyticsEngine } from '../services/AnalyticsEngine';
 import { CategorizationEngine } from '../services/CategorizationEngine';
+import { DescriptionNormalizer } from '../services/DescriptionNormalizer';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ const updateTransactionSchema = createTransactionSchema.partial();
 const querySchema = z.object({
   page: z.string().transform(Number).default('1'),
   limit: z.string().transform(Number).default('50'),
-  sortBy: z.enum(['date', 'amount', 'description', 'category']).default('date'),
+  sortBy: z.enum(['date', 'amount', 'description', 'descriptionNormalized', 'category']).default('date'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
@@ -210,6 +211,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
       vendorId,
       userId: req.user!.id,
       tags: data.tags ? JSON.stringify(data.tags) : null,
+      descriptionNormalized: DescriptionNormalizer.normalizeOne(data.description),
       isManual: true
     },
     include: {
@@ -249,6 +251,7 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
   const updateData: any = { ...data, isManual: true };
   if (data.date) updateData.date = new Date(data.date);
   if (data.tags) updateData.tags = JSON.stringify(data.tags);
+  if (data.description) updateData.descriptionNormalized = DescriptionNormalizer.normalizeOne(data.description);
 
   const transaction = await prisma.transaction.update({
     where: { id: req.params.id },
@@ -454,6 +457,19 @@ router.post('/categorize', asyncHandler(async (req: AuthRequest, res) => {
     message: 'Auto-categorization completed',
     categorized,
     total: transactions.length
+  });
+}));
+
+// Normalize descriptions — batch-cluster all unique descriptions for the user
+// into consistent vendor names and persist as descriptionNormalized.
+router.post('/normalize-descriptions', asyncHandler(async (req: AuthRequest, res) => {
+  const updated = await DescriptionNormalizer.normalizeUserDescriptions(req.user!.id);
+
+  global.io.to(`user-${req.user!.id}`).emit('descriptions-normalized', { updated });
+
+  res.json({
+    message: 'Description normalization completed',
+    updated
   });
 }));
 

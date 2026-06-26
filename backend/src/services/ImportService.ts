@@ -2,6 +2,7 @@ import { prisma } from '../server';
 import { logger } from '../utils/logger';
 import { DuplicateDetection, ImportSummary, TransactionInput } from './DuplicateDetection';
 import { CategorizationEngine } from './CategorizationEngine';
+import { DescriptionNormalizer } from './DescriptionNormalizer';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { parse as parseDate, isValid } from 'date-fns';
@@ -85,6 +86,12 @@ export class ImportService {
       // Auto-categorize imported transactions if enabled
       if (options.autoCategorize && summary.imported > 0) {
         await this.autoCategorizeImportedTransactions(userId, importRecord.id);
+      }
+
+      // Re-cluster normalized descriptions across all user transactions so
+      // the new import's descriptions group consistently with existing data.
+      if (summary.imported > 0) {
+        await DescriptionNormalizer.normalizeUserDescriptions(userId);
       }
 
       // Update import record with results

@@ -572,6 +572,7 @@ export interface ApiTransaction {
   id: string;
   date: string;            // ISO
   description: string;
+  descriptionNormalized: string | null;
   amount: number;          // +income, -expense
   categoryId: string | null;
   category: { id: string; name: string; color: string | null; icon: string | null } | null;
