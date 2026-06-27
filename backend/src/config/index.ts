@@ -72,6 +72,12 @@ const configSchema = z.object({
   // Unset = API key auth disabled (admin endpoints require a logged-in admin user).
   adminApiKey: z.string().min(16).optional(),
 
+  // Shared secret for HinksID SSO. When set, NovaHQ can redirect users to
+  // GET /api/auth/sso?token=<signed-jwt> to start a Questman session without
+  // typing a password. The token must be a short-lived JWT signed with this
+  // secret by NovaHQ. Must be 16+ chars. Unset = SSO disabled.
+  hinksIdSsoSecret: z.string().min(16).optional(),
+
   // Long-lived shared secret for POST /api/ingest/* (phone-side health
   // bridges that can't do the JWT login dance). Min 16 chars — fail fast
   // on a guessable token rather than expose an unauthenticated writer.
@@ -152,6 +158,8 @@ const env = {
   allowRegistration: process.env.ALLOW_REGISTRATION === 'true',
 
   adminApiKey: process.env.ADMIN_API_KEY || undefined,
+
+  hinksIdSsoSecret: process.env.HINKSID_SSO_SECRET || undefined,
 
   ingestToken: process.env.INGEST_TOKEN || undefined,
 
