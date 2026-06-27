@@ -201,6 +201,53 @@ router.post('/demo', asyncHandler(async (req, res) => {
   res.json({ message: 'Demo session started', user, token });
 }));
 
+// HinksID SSO entry point. NovaHQ generates a short-lived JWT signed with the
+// shared HINKSID_SSO_SECRET and redirects the browser here. We verify the
+// signature, look up the user by email, issue a Questman session cookie, and
+// redirect to the SPA root so the app boots as that user (no password needed).
+//
+// NovaHQ token payload: { email: string, name?: string, iat, exp }
+// Recommended TTL: 5 minutes. Longer windows widen the replay surface.
+router.get('/sso', asyncHandler(async (req, res) => {
+  if (!config.hinksIdSsoSecret) {
+    throw new AppError('SSO is not configured on this instance', 501);
+  }
+
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    throw new AppError('Missing SSO token', 400);
+  }
+
+  let payload: { email: string; name?: string };
+  try {
+    // Use the shared secret, not JWT_SECRET, so neither side can forge the other's tokens.
+    payload = jwt.verify(token, config.hinksIdSsoSecret) as { email: string; name?: string };
+  } catch {
+    throw new AppError('Invalid or expired SSO token', 401);
+  }
+
+  if (!payload.email || typeof payload.email !== 'string') {
+    throw new AppError('SSO token missing email claim', 400);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: payload.email },
+    select: { id: true, email: true, tokenVersion: true },
+  });
+
+  if (!user) {
+    throw new AppError('No Questman account for this HinksID identity', 403);
+  }
+
+  // Issue a long-lived session so the app stays open like a normal login.
+  const questToken = generateToken(user.id, user.email, user.tokenVersion, REMEMBER_EXPIRES_IN);
+  setAuthCookie(req, res, questToken, true);
+
+  // Redirect to the SPA root. nginx serves both surfaces on the same origin,
+  // so the cookie is immediately available to the React app on load.
+  res.redirect('/');
+}));
+
 // Get current user profile
 router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({

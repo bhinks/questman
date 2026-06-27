@@ -57,6 +57,8 @@ services:
       HEALTH_PULL_URL: ${HEALTH_PULL_URL:-}
       HEALTH_PULL_MINUTES: ${HEALTH_PULL_MINUTES:-30}
       HEALTH_PULL_TOKEN: ${HEALTH_PULL_TOKEN:-}
+      # HinksID SSO shared secret (NovaHQ app-link auto-login).
+      HINKSID_SSO_SECRET: ${HINKSID_SSO_SECRET:-}
     volumes:
       - questman-data:/data
     expose:
