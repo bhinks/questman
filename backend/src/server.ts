@@ -46,6 +46,7 @@ import focusRoutes from './routes/focus';
 import adminRoutes from './routes/admin';
 import apikeyRoutes from './routes/apikeys';
 import v1Routes from './routes/v1';
+import steamRoutes from './routes/steam';
 import { adminAuth } from './middleware/admin';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 
@@ -136,6 +137,7 @@ app.use('/api/budgets', authMiddleware, budgetRoutes);
 app.use('/api/recurring', authMiddleware, recurringRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/focus', authMiddleware, focusRoutes);
+app.use('/api/steam', authMiddleware, steamRoutes);
 // Admin routes: accept either a logged-in admin JWT or the ADMIN_API_KEY header.
 app.use('/api/admin', adminAuth, adminRoutes);
 // API key management (requires a logged-in session).

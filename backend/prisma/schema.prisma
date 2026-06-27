@@ -83,6 +83,9 @@ model User {
   // User-generated API keys (one active key per user)
   apiKeys              ApiKey[]
 
+  // Steam integration (phase 10)
+  steamGames           SteamGame[]
+
   @@map("users")
 }
 
@@ -1318,6 +1321,41 @@ model WeeklyReview {
   @@unique([userId, weekOf])
   @@index([userId, weekOf])
   @@map("weekly_reviews")
+}
+
+// ============================================================
+// Steam integration (phase 10) — library sync + playtime tracking.
+//
+// SteamGame mirrors the Steam Web API's owned-games list. It is a
+// local cache of what the Steam API returns (name, playtime, icon).
+// Games can optionally be linked to a MediaItem so they enter the
+// Media quest loop. Sync is triggered manually (POST /api/steam/sync)
+// and rate-limited to protect the upstream API.
+// ============================================================
+model SteamGame {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  appId          String   // Steam application ID (numeric, stored as string)
+  name           String
+  playtimeTotal  Int      @default(0)  // minutes, all-time (playtime_forever)
+  playtime2Weeks Int      @default(0)  // minutes, last 14 days (may be 0 between syncs)
+  lastPlayedAt   DateTime?             // from rtime_last_played (null = never played)
+  iconUrl        String?               // full icon CDN URL
+
+  // When pushed to the Media library the MediaItem id is stored here.
+  // The MediaItem is NOT deleted when the link is cleared — only the pointer is.
+  mediaItemId    String?  @unique
+
+  lastSyncedAt   DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, appId])
+  @@index([userId, playtimeTotal])
+  @@index([userId, lastPlayedAt])
+  @@map("steam_games")
 }
 
 // ============================================================

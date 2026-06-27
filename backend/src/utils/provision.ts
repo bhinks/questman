@@ -19,6 +19,7 @@ export const MODULE_SEEDS = [
   { key: 'media',    name: 'Media',    icon: 'play',   color: 'var(--violet)',  sortOrder: 5 },
   { key: 'vitals',   name: 'Vitals',   icon: 'heart',  color: 'var(--lime)',    sortOrder: 6 },
   { key: 'social',   name: 'Social',   icon: 'spark',  color: 'var(--magenta)', sortOrder: 7 },
+  { key: 'steam',    name: 'Steam',    icon: 'target', color: 'var(--cyan)',    sortOrder: 8 },
 ] as const;
 
 // Default vitals metric set. Water lives here (moved out of habits).

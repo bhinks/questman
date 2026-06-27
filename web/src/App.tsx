@@ -28,6 +28,7 @@ import { BudgetsView } from './components/BudgetsView';
 import { BillsView } from './components/BillsView';
 import { TransactionsView } from './components/TransactionsView';
 import { CalibrationView } from './components/CalibrationView';
+import { SteamView } from './components/SteamView';
 import { FocusView } from './components/FocusView';
 import type { FocusSeed } from './components/FocusView';
 import { LevelUpOverlay } from './components/LevelUpOverlay';
@@ -388,6 +389,9 @@ function HubApp() {
 
       case 'social':
         return <NpcsView />;
+
+      case 'steam':
+        return <SteamView />;
 
       case 'progress':
         return <StreetCredView />;
