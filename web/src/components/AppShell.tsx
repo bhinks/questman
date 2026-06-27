@@ -49,6 +49,7 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     ['habits', 'Habits', 'check'], ['operations', 'Operations', 'grid'],
     ['health', 'Health', 'heart'],
     ['media', 'Media', 'play'], ['social', 'Social', 'flag'],
+    ['steam', 'Steam', 'target'],
   ]},
   { group: 'VAULT', items: [
     ['overview', 'Finance', 'wallet'], ['budgets', 'Budgets', 'gauge'],
@@ -77,6 +78,7 @@ const MODULE_TO_TABS: Record<string, string[]> = {
   projects: ['operations'],
   media:    ['media'],
   social:   ['social'],
+  steam:    ['steam'],
   finance:  ['overview', 'budgets', 'bills', 'savings'],
 };
 
@@ -87,7 +89,7 @@ const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
   habits: 'LIFE // HABITS',
   health: 'LIFE // HEALTH', operations: 'LIFE // OPERATIONS', media: 'LIFE // BRAINDANCE',
-  social: 'LIFE // CREW',
+  social: 'LIFE // CREW', steam: 'LIFE // STEAM',
   progress: 'PROGRESS // STREET CRED',
   shop: 'SHOP // NIGHT MARKET',
   overview: 'VAULT // FINANCE', budgets: 'VAULT // BUDGETS',

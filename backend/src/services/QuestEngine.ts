@@ -45,6 +45,7 @@ import { buildNpcCandidates } from '../routes/npcs';
 import { buildBudgetCandidates } from '../routes/budgets';
 import { buildBillCandidates } from '../routes/recurring';
 import { buildWorkoutCandidates } from '../routes/workouts';
+import { buildSteamCandidates } from '../routes/steam';
 
 type Tx = Prisma.TransactionClient;
 
@@ -734,6 +735,7 @@ export class QuestEngine {
       buildNpcCandidates,
       buildBudgetCandidates,  // phase 7: budget-breach reminders
       buildBillCandidates,    // phase 7: recurring-bill reminders
+      buildSteamCandidates,   // phase 10: Steam backlog nudge
     ];
     for (const build of poolBuilders) {
       try {
