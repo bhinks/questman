@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { DisplaySettings, SettingsResponse } from '../lib/api';
 import { AiCalibrationPanel } from './AiCalibration';
+import { ApiKeyPanel } from './ApiKeyPanel';
 import { Icon } from './Icon';
 
 /** Documented baselines from the handoff ("ship as defaults"). */
@@ -131,6 +132,9 @@ export function CalibrationView() {
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {/* ---- AI Calibration (neural governor) — sits above display tuning ---- */}
       <AiCalibrationPanel />
+
+      {/* ---- API Access (external bearer-token API) ---- */}
+      <ApiKeyPanel />
 
       {/* ---- Header ---- */}
       <div className="panel hud" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>

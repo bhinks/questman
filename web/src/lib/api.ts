@@ -933,6 +933,22 @@ export interface SubscriptionAudit {
   annualSubCost: number;
 }
 
+// ---- user API keys (external REST access) ----------------------------------
+
+/** Metadata for a user-generated API key (prefix + dates; never the hash). */
+export interface ApiKeyInfo {
+  id: string;
+  keyPrefix: string;   // e.g. "qm_a1b2c3d" — display only, not the secret
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+export interface ApiKeyResponse { keys: ApiKeyInfo[]; }
+export interface NewApiKeyResponse {
+  key: ApiKeyInfo;
+  /** The raw bearer token — returned once, never stored or re-exposed. */
+  rawKey: string;
+}
+
 /** An anti-goal ("ICE") — a Habit with polarity:"avoid". You log only slips. */
 export interface AntiGoal {
   id: string;
