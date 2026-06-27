@@ -47,6 +47,8 @@ export function TransactionsView({
   const [accountFilter, setAccountFilter] = useState('');
   // Free-text description/vendor search — '' means no text filter.
   const [search, setSearch] = useState('');
+  // Group the log by normalized vendor name instead of a flat chronological list.
+  const [groupByVendor, setGroupByVendor] = useState(false);
 
   // Categories for the bulk RECATEGORIZE picker (shared cache).
   const catsQ = useQuery({
@@ -88,6 +90,32 @@ export function TransactionsView({
   // Only the rows we actually paint are selectable via "select all (visible)".
   const visible = useMemo(() => filtered.slice(0, RENDER_CAP), [filtered]);
   const hiddenCount = total - visible.length;
+
+  // When group-by-vendor is on, aggregate filtered rows into vendor groups sorted
+  // by total absolute spend. Each group is capped at RENDER_CAP rows.
+  const grouped = useMemo(() => {
+    if (!groupByVendor) return null;
+    const map = new Map<string, Transaction[]>();
+    for (const t of filtered) {
+      const key = t.descriptionNormalized || t.description;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(t);
+    }
+    return [...map.entries()]
+      .map(([name, txs]) => ({
+        name,
+        total: txs.reduce((s, t) => s + t.amount, 0),
+        count: txs.length,
+        txs: txs.slice(0, RENDER_CAP),
+      }))
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+  }, [filtered, groupByVendor]);
+
+  // Batch normalize descriptions via the API.
+  const normalizeMut = useMutation({
+    mutationFn: () => api.post<{ updated: number }>('/api/transactions/normalize-descriptions'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['transactions'] }),
+  });
 
   const bulk = useMutation({
     mutationFn: (vars: { operation: BulkOp; data?: Record<string, unknown> }) =>
@@ -147,6 +175,9 @@ export function TransactionsView({
     monthFilter: monthFilter ?? null,
     categoryFilter: categoryFilter ?? null,
     onClearMonth, onClearCategory,
+    groupByVendor, onGroupByVendor: setGroupByVendor,
+    normalizing: normalizeMut.isPending,
+    onNormalize: () => normalizeMut.mutate(),
   };
 
   if (transactions.length === 0) {
@@ -158,8 +189,7 @@ export function TransactionsView({
     );
   }
 
-  // Data exists but the active filters matched nothing — keep them visible
-  // (with clear affordances) so the log can be opened back up.
+  // Data exists but the active filters matched nothing.
   if (total === 0) {
     return (
       <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -195,55 +225,80 @@ export function TransactionsView({
         onCategorize={categoryId => runBulk('categorize', { categoryId })}
       />
 
-      <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <div
-            className="mono"
-            role="table"
-            style={{ minWidth: 720, fontSize: 12.5 }}
-          >
-            {/* Header row */}
-            <div role="row" style={{ ...gridRow, ...headerRow }}>
-              <div style={cellCenter}>
-                <Check
-                  checked={allVisibleSelected}
-                  onChange={toggleAllVisible}
-                  title="Select all visible"
-                />
-              </div>
-              <div className="kicker" style={cellHead}>DATE</div>
-              <div className="kicker" style={cellHead}>DESCRIPTION</div>
-              <div className="kicker" style={cellHead}>CATEGORY</div>
-              <div className="kicker" style={{ ...cellHead, textAlign: 'right' }}>AMOUNT</div>
-              <div style={cellCenter} aria-hidden />
+      {groupByVendor ? (
+        /* Grouped-by-vendor view */
+        <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <div className="mono" style={{ minWidth: 720, fontSize: 12.5 }}>
+              {grouped!.map(group => (
+                <div key={group.name}>
+                  <VendorGroupHeader name={group.name} total={group.total} count={group.count} />
+                  {group.txs.map(t => (
+                    <Row
+                      key={t.id}
+                      tx={t}
+                      selected={selected.has(t.id)}
+                      onToggle={() => toggleOne(t.id)}
+                      onEdit={() => onEdit(t)}
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
-
-            {/* Body rows */}
-            {visible.map(t => (
-              <Row
-                key={t.id}
-                tx={t}
-                selected={selected.has(t.id)}
-                onToggle={() => toggleOne(t.id)}
-                onEdit={() => onEdit(t)}
-              />
-            ))}
           </div>
         </div>
+      ) : (
+        /* Flat chronological view */
+        <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <div
+              className="mono"
+              role="table"
+              style={{ minWidth: 720, fontSize: 12.5 }}
+            >
+              {/* Header row */}
+              <div role="row" style={{ ...gridRow, ...headerRow }}>
+                <div style={cellCenter}>
+                  <Check
+                    checked={allVisibleSelected}
+                    onChange={toggleAllVisible}
+                    title="Select all visible"
+                  />
+                </div>
+                <div className="kicker" style={cellHead}>DATE</div>
+                <div className="kicker" style={cellHead}>DESCRIPTION</div>
+                <div className="kicker" style={cellHead}>CATEGORY</div>
+                <div className="kicker" style={{ ...cellHead, textAlign: 'right' }}>AMOUNT</div>
+                <div style={cellCenter} aria-hidden />
+              </div>
 
-        {hiddenCount > 0 && (
-          <div
-            className="ncx-serial"
-            style={{
-              padding: '10px 16px',
-              borderTop: '1px solid var(--line)',
-              background: 'rgba(150,168,224,0.03)',
-            }}
-          >
-            SHOWING FIRST {visible.length.toLocaleString()} OF {total.toLocaleString()} RECORDS
+              {/* Body rows */}
+              {visible.map(t => (
+                <Row
+                  key={t.id}
+                  tx={t}
+                  selected={selected.has(t.id)}
+                  onToggle={() => toggleOne(t.id)}
+                  onEdit={() => onEdit(t)}
+                />
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+
+          {hiddenCount > 0 && (
+            <div
+              className="ncx-serial"
+              style={{
+                padding: '10px 16px',
+                borderTop: '1px solid var(--line)',
+                background: 'rgba(150,168,224,0.03)',
+              }}
+            >
+              SHOWING FIRST {visible.length.toLocaleString()} OF {total.toLocaleString()} RECORDS
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -253,6 +308,7 @@ export function TransactionsView({
 function Header({
   total, excluded, accounts, account, onAccount,
   search, onSearch, monthFilter, categoryFilter, onClearMonth, onClearCategory,
+  groupByVendor, onGroupByVendor, normalizing, onNormalize,
 }: {
   total: number;
   excluded: number;
@@ -265,6 +321,10 @@ function Header({
   categoryFilter: string | null;
   onClearMonth?: () => void;
   onClearCategory?: () => void;
+  groupByVendor: boolean;
+  onGroupByVendor: (v: boolean) => void;
+  normalizing: boolean;
+  onNormalize: () => void;
 }) {
   const hasChips = !!(monthFilter || categoryFilter);
   return (
@@ -320,6 +380,28 @@ function Header({
               {accounts.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           )}
+          <button
+            className="btn btn-ghost"
+            onClick={() => onGroupByVendor(!groupByVendor)}
+            title={groupByVendor ? 'Switch to chronological view' : 'Group by normalized vendor name'}
+            style={{
+              padding: '7px 12px', fontSize: 11,
+              color: groupByVendor ? 'var(--cyan)' : 'var(--text-dim)',
+              border: groupByVendor ? '1px solid color-mix(in srgb, var(--cyan) 45%, transparent)' : undefined,
+              background: groupByVendor ? 'color-mix(in srgb, var(--cyan) 10%, transparent)' : undefined,
+            }}
+          >
+            <Icon name="layers" size={12} /> GROUP BY VENDOR
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={onNormalize}
+            disabled={normalizing}
+            title="Cluster similar descriptions into consistent vendor names"
+            style={{ padding: '7px 12px', fontSize: 11, color: 'var(--text-faint)' }}
+          >
+            <Icon name="zap" size={12} /> {normalizing ? 'NORMALIZING…' : 'NORMALIZE'}
+          </button>
           <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>
             {total.toLocaleString()} RECORDS
           </span>
@@ -464,6 +546,40 @@ function BulkBar({
           CLEAR
         </button>
       </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------- vendor group row -- */
+
+function VendorGroupHeader({ name, total, count }: { name: string; total: number; count: number }) {
+  const income = total >= 0;
+  return (
+    <div
+      className="mono"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr auto auto',
+        alignItems: 'center',
+        gap: 12,
+        padding: '10px 16px',
+        background: 'rgba(150,168,224,0.05)',
+        borderTop: '1px solid var(--line-2)',
+        borderBottom: '1px solid var(--line)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 2,
+      }}
+    >
+      <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text)', letterSpacing: '0.04em' }}>
+        {name}
+      </span>
+      <span className="kicker" style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>
+        {count} {count === 1 ? 'txn' : 'txns'}
+      </span>
+      <span style={{ fontWeight: 700, fontSize: 13, color: income ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap' }}>
+        {fmtMoney(total)}
+      </span>
     </div>
   );
 }

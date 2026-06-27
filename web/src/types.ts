@@ -2,6 +2,7 @@ export interface Transaction {
   id: string;
   date: Date;
   description: string;
+  descriptionNormalized?: string; // cleaned + clustered vendor name for grouping
   amount: number;
   category?: string;
   categoryId?: string;        // finance depth: id for server-side re-categorize

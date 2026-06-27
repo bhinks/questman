@@ -1,5 +1,6 @@
 import { prisma } from '../server';
 import { logger } from '../utils/logger';
+import { DescriptionNormalizer } from './DescriptionNormalizer';
 
 export interface TransactionInput {
   date: Date;
@@ -215,6 +216,7 @@ export class DuplicateDetection {
             description: transaction.description,
             amount: transaction.amount,
             originalDescription: transaction.originalDescription || transaction.description,
+            descriptionNormalized: DescriptionNormalizer.normalizeOne(transaction.description),
             // The source filename lives on the linked Import record; the
             // Transaction model has no `sourceFile` column.
             importId: importId || null,

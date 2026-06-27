@@ -209,7 +209,11 @@ model Transaction {
   // Notes and tags
   notes       String?
   tags        String?   // JSON array of tags
-  
+
+  // Normalized vendor name — cleaned and clustered across similar descriptions
+  // for consistent grouping (e.g. "STARBUCKS #12345 SEA WA" → "Starbucks").
+  descriptionNormalized String?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -218,6 +222,7 @@ model Transaction {
   @@index([userId, categoryId])
   @@index([userId, amount])
   @@index([userId, excluded])
+  @@index([userId, descriptionNormalized])
   @@index([projectId])
   @@index([choreId])
 }

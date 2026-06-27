@@ -58,6 +58,7 @@ function mapApiTransaction(t: ApiTransaction): Transaction {
     id: t.id,
     date: new Date(t.date),
     description: t.description,
+    descriptionNormalized: t.descriptionNormalized ?? undefined,
     amount: t.amount,
     category: t.category?.name ?? undefined,
     categoryId: t.categoryId ?? t.category?.id ?? undefined,
