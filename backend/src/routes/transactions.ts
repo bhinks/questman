@@ -64,6 +64,33 @@ const bulkOperationSchema = z.object({
   }).optional()
 });
 
+// Verify that any user-supplied foreign keys (category/vendor/project/chore) on a
+// write belong to the CALLER. Without this, a body-supplied id pointing at another
+// user's record is stored as a cross-tenant link and reflected back through the
+// `include`, leaking that record's fields (IDOR). Mirrors categories.ts's parentId
+// ownership check. null/undefined links (e.g. an explicit unlink) are skipped.
+async function assertLinksOwned(
+  userId: string,
+  links: { categoryId?: string | null; vendorId?: string | null; projectId?: string | null; choreId?: string | null },
+): Promise<void> {
+  if (links.categoryId) {
+    const c = await prisma.category.findFirst({ where: { id: links.categoryId, userId }, select: { id: true } });
+    if (!c) throw new AppError('Category not found', 404);
+  }
+  if (links.vendorId) {
+    const v = await prisma.vendor.findFirst({ where: { id: links.vendorId, userId }, select: { id: true } });
+    if (!v) throw new AppError('Vendor not found', 404);
+  }
+  if (links.projectId) {
+    const p = await prisma.project.findFirst({ where: { id: links.projectId, userId }, select: { id: true } });
+    if (!p) throw new AppError('Project not found', 404);
+  }
+  if (links.choreId) {
+    const h = await prisma.habit.findFirst({ where: { id: links.choreId, userId }, select: { id: true } });
+    if (!h) throw new AppError('Chore not found', 404);
+  }
+}
+
 // Get transactions with advanced filtering
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const {
@@ -188,7 +215,10 @@ router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
 // Create new transaction
 router.post('/', asyncHandler(async (req: AuthRequest, res) => {
   const data = createTransactionSchema.parse(req.body);
-  
+
+  // Reject body-supplied category/vendor/project/chore links that aren't the caller's own.
+  await assertLinksOwned(req.user!.id, { categoryId: data.categoryId, vendorId: data.vendorId, projectId: data.projectId, choreId: data.choreId });
+
   // Auto-categorize if no category provided
   let categoryId = data.categoryId;
   let vendorId = data.vendorId;
@@ -247,6 +277,9 @@ router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
   if (!existing) {
     throw new AppError('Transaction not found', 404);
   }
+
+  // Reject re-linking to a category/vendor/project/chore the caller doesn't own.
+  await assertLinksOwned(req.user!.id, { categoryId: data.categoryId, vendorId: data.vendorId, projectId: data.projectId, choreId: data.choreId });
 
   const updateData: any = { ...data, isManual: true };
   if (data.date) updateData.date = new Date(data.date);
@@ -335,7 +368,8 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res) => {
       if (!data?.categoryId) {
         throw new AppError('Category ID is required for categorize operation', 400);
       }
-      
+      await assertLinksOwned(req.user!.id, { categoryId: data.categoryId });
+
       result = await prisma.transaction.updateMany({
         where: {
           id: { in: transactionIds },
@@ -384,6 +418,7 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res) => {
 
     // Finance depth: link a batch to a project and/or chore (null to unlink).
     case 'link':
+      await assertLinksOwned(req.user!.id, { projectId: data?.projectId, choreId: data?.choreId });
       result = await prisma.transaction.updateMany({
         where: { id: { in: transactionIds }, userId: req.user!.id },
         data: {

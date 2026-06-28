@@ -202,32 +202,39 @@ router.post('/demo', asyncHandler(async (req, res) => {
   res.json({ message: 'Demo session started', user, token });
 }));
 
-// HinksID SSO entry point. NovaHQ generates a short-lived JWT signed with the
-// shared HINKSID_SSO_SECRET and redirects the browser here. We verify the
-// signature, look up the user by email, issue a Questman session cookie, and
-// redirect to the SPA root so the app boots as that user (no password needed).
+// HinksID SSO entry point. NovaHQ mints a short-lived JWT signed with the shared
+// HINKSID_SSO_SECRET and POSTs it here via an auto-submitting form, so the token
+// never rides a URL (no access-log / browser-history exposure). We verify the
+// signature, resolve the account by the NORMALIZED email claim, issue a Questman
+// session cookie, and redirect into the SPA. For emailless HinksID identities
+// NovaHQ derives a STABLE synthetic email from the immutable HinksID id, so a
+// recycled username can never collide onto another person's account.
 //
-// NovaHQ token payload: { email: string, name?: string, iat, exp }
-// Recommended TTL: 5 minutes. Longer windows widen the replay surface.
-router.get('/sso', asyncHandler(async (req, res) => {
+// NovaHQ token payload: { sub: string, email: string, name?: string, iat, exp }
+router.post('/sso', asyncHandler(async (req, res) => {
   if (!config.hinksIdSsoSecret) {
     throw new AppError('SSO is not configured on this instance', 501);
   }
 
-  const { token } = req.query;
-  if (!token || typeof token !== 'string') {
+  // Token arrives in the POST body (auto-submit form); tolerate a query param too.
+  const token = typeof req.body?.token === 'string' ? req.body.token
+    : (typeof req.query.token === 'string' ? req.query.token : '');
+  if (!token) {
     throw new AppError('Missing SSO token', 400);
   }
 
-  let payload: { email: string; name?: string };
+  let payload: { email?: string; name?: string };
   try {
-    // Use the shared secret, not JWT_SECRET, so neither side can forge the other's tokens.
-    payload = jwt.verify(token, config.hinksIdSsoSecret) as { email: string; name?: string };
+    // Shared secret (not JWT_SECRET) so neither side can forge the other's tokens;
+    // pin HS256 + a max age so a captured token can't outlive its short window.
+    payload = jwt.verify(token, config.hinksIdSsoSecret, { algorithms: ['HS256'], maxAge: '10m' }) as { email?: string; name?: string };
   } catch {
     throw new AppError('Invalid or expired SSO token', 401);
   }
 
-  if (!payload.email || typeof payload.email !== 'string') {
+  // Normalize the email key (case-insensitive) so case variants can't fork accounts.
+  const email = (payload.email || '').trim().toLowerCase();
+  if (!email) {
     throw new AppError('SSO token missing email claim', 400);
   }
 
@@ -237,7 +244,7 @@ router.get('/sso', asyncHandler(async (req, res) => {
   // /register — a full life-hub user — but with a random, unusable password, since
   // SSO users never sign in with a Questman password.
   let user = await prisma.user.findUnique({
-    where: { email: payload.email },
+    where: { email },
     select: { id: true, email: true, tokenVersion: true },
   });
 
@@ -245,9 +252,9 @@ router.get('/sso', asyncHandler(async (req, res) => {
     const unusablePassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
     user = await prisma.user.create({
       data: {
-        email: payload.email,
+        email,
         password: unusablePassword,
-        name: payload.name || payload.email.split('@')[0],
+        name: payload.name || email.split('@')[0],
         role: 'user',
         settings: {
           create: {

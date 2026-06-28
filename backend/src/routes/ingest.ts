@@ -73,9 +73,11 @@ async function resolveUserId(req: express.Request): Promise<string> {
   const bearer = req.headers.authorization?.replace('Bearer ', '');
   if (bearer) {
     try {
-      const decoded = jwt.verify(bearer, config.jwt.secret) as { id: string };
-      const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true } });
-      if (user) return user.id;
+      const decoded = jwt.verify(bearer, config.jwt.secret) as { id: string; tokenVersion?: number };
+      const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true, tokenVersion: true } });
+      // Honor tokenVersion revocation exactly like authMiddleware/verifyAuthToken,
+      // so a logged-out / password-rotated token can't keep ingesting.
+      if (user && (decoded.tokenVersion ?? 0) === user.tokenVersion) return user.id;
     } catch { /* fall through to the 401 */ }
   }
   throw new AppError('Ingest requires a JWT or a valid X-Ingest-Token', 401);
