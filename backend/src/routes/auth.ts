@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -230,22 +231,56 @@ router.get('/sso', asyncHandler(async (req, res) => {
     throw new AppError('SSO token missing email claim', 400);
   }
 
-  const user = await prisma.user.findUnique({
+  // Find the account by email, or AUTO-PROVISION one on first SSO. Brent's call:
+  // an unknown HinksID identity self-onboards rather than 403 (the family hub is
+  // admin-curated at NovaHQ, so Questman trusts a validly-signed identity). Mirrors
+  // /register — a full life-hub user — but with a random, unusable password, since
+  // SSO users never sign in with a Questman password.
+  let user = await prisma.user.findUnique({
     where: { email: payload.email },
     select: { id: true, email: true, tokenVersion: true },
   });
 
   if (!user) {
-    throw new AppError('No Questman account for this HinksID identity', 403);
+    const unusablePassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+    user = await prisma.user.create({
+      data: {
+        email: payload.email,
+        password: unusablePassword,
+        name: payload.name || payload.email.split('@')[0],
+        role: 'user',
+        settings: {
+          create: {
+            currency: 'USD',
+            dateFormat: 'MM/dd/yyyy',
+            theme: 'cyberpunk',
+            autoCategoriztion: true,
+            notifications: true,
+          },
+        },
+      },
+      select: { id: true, email: true, tokenVersion: true },
+    });
+    // Default categories only for a brand-new account (createMany isn't idempotent).
+    await createDefaultCategories(user.id);
   }
+  // provisionLifeHub is idempotent and "safe to call on every login" (provision.ts):
+  // running it on every SSO self-heals the module/profile/metric set, so a row that
+  // committed but didn't finish seeding (e.g. a mid-provision DB error) is never left
+  // permanently quest-broken.
+  await provisionLifeHub(prisma, user.id);
 
   // Issue a long-lived session so the app stays open like a normal login.
   const questToken = generateToken(user.id, user.email, user.tokenVersion, REMEMBER_EXPIRES_IN);
   setAuthCookie(req, res, questToken, true);
 
-  // Redirect to the SPA root. nginx serves both surfaces on the same origin,
-  // so the cookie is immediately available to the React app on load.
-  res.redirect('/');
+  // Land back in the SPA. Behind NovaHQ's Caddy the app is mounted at a sub-path and
+  // Caddy SETS X-Forwarded-Prefix (e.g. /questman); a bare '/' would bounce to the
+  // platform root, so honor it — but validate to a single safe path segment so a
+  // spoofed header can never turn this into an open redirect. No/invalid prefix -> '/'.
+  const rawPrefix = String(req.headers['x-forwarded-prefix'] || '');
+  const prefix = /^\/[A-Za-z0-9_-]+$/.test(rawPrefix) ? rawPrefix : '';
+  res.redirect(`${prefix}/`);
 }));
 
 // Get current user profile
