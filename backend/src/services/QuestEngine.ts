@@ -281,8 +281,14 @@ export class QuestEngine {
       const digest = await buildDailyDigest(this.prisma, userId, today);
       // Calendar grant (SYS//CAL): a sealed calendar is never even fetched
       // for the AI path. Counts/times only — titles stay out of the brief.
-      if (ai.aiAccessCalendar && CalendarService.configured()) {
-        const cal = await calendarService.getToday().catch(() => null);
+      // Feeds are per-user (UserSettings.calendarIcsUrls).
+      const calUrls = CalendarService.parseUrls(
+        (await this.prisma.userSettings.findUnique({
+          where: { userId }, select: { calendarIcsUrls: true },
+        }))?.calendarIcsUrls,
+      );
+      if (ai.aiAccessCalendar && CalendarService.configured(calUrls)) {
+        const cal = await calendarService.getToday(calUrls).catch(() => null);
         if (cal) {
           const now = Date.now();
           const next = cal.events.find(e => !e.allDay && e.startsAt.getTime() > now);
@@ -680,10 +686,16 @@ export class QuestEngine {
 
     // Fetch one weather snapshot for the whole batch, but only if some
     // habit actually has an outdoor rule (avoids a needless API call).
+    // Location is per-user (UserSettings.weatherLat/weatherLon); no coords →
+    // null snapshot → outdoor gating degrades to interval-only.
     const anyOutdoor = habits.some(h => WeatherService.parseRule(h.weatherRule) !== null);
-    const snapshot: WeatherSnapshot | null = anyOutdoor
-      ? await this.weather.getSnapshot()
-      : null;
+    let snapshot: WeatherSnapshot | null = null;
+    if (anyOutdoor) {
+      const loc = await this.prisma.userSettings.findUnique({
+        where: { userId }, select: { weatherLat: true, weatherLon: true },
+      });
+      snapshot = await this.weather.getSnapshot(loc?.weatherLat ?? null, loc?.weatherLon ?? null);
+    }
 
     for (const h of habits) {
       if (completedToday.has(h.id)) continue;

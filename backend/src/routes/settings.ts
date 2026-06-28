@@ -15,6 +15,7 @@
  * a second query; they are not accepted on PUT.
  */
 import express from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
@@ -27,6 +28,22 @@ import { logger } from '../utils/logger';
 const router = express.Router();
 
 const DISPLAY_DEFAULTS = { displayCut: 24, displayChroma: 2, displayCrt: 75 };
+
+/** A fresh per-user ingest token: 32 hex chars (128 bits) — high-entropy, used
+ *  like an API key in the phone bridge's /api/ingest secret URL. */
+function genIngestToken(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+/** The convenience URL the user pastes into their phone bridge: the
+ *  health-connect ingest path carrying their own token. Built from the
+ *  request host so it works on whatever origin they reached us through. */
+function ingestUrlFor(req: express.Request, token: string | null): string | null {
+  if (!token) return null;
+  const host = req.get('host');
+  if (!host) return null;
+  return `${req.protocol}://${host}/api/ingest/health-connect?token=${token}`;
+}
 
 const updateSchema = z.object({
   displayCut: z.number().int().min(0).max(28).optional(),
@@ -50,6 +67,17 @@ const updateSchema = z.object({
   // anti-goal the planner breaches when you overrun it (null = inert).
   rrBudgetByDay: z.string().max(100).optional(),
   rrOverrunAntiGoalId: z.string().max(60).nullable().optional(),
+  // --- Per-user integrations: location, calendar, phone-health-pull ---
+  // (formerly global env values; now owned per account, no global fallback)
+  weatherLat: z.number().min(-90).max(90).nullable().optional(),
+  weatherLon: z.number().min(-180).max(180).nullable().optional(),
+  calendarIcsUrls: z.string().max(4000).nullable().optional(),
+  healthPullUrl: z.string().url().max(500).nullable().optional(),
+  healthPullToken: z.string().max(500).nullable().optional(),
+  healthPullMinutes: z.number().int().min(5).max(1440).optional(),
+  healthBackfillDays: z.number().int().min(2).max(3650).optional(),
+  // ingestToken is NOT settable here — it's (re)generated via
+  // POST /api/settings/ingest-token or lazily on GET (treated like an API key).
 });
 
 const SETTINGS_SELECT = {
@@ -61,6 +89,9 @@ const SETTINGS_SELECT = {
   ollamaUrl: true, ollamaModel: true, aiDailyTokenCap: true,
   aiTokensUsed: true, aiTokensUsedOn: true,
   rrBudgetByDay: true, rrOverrunAntiGoalId: true,
+  weatherLat: true, weatherLon: true, calendarIcsUrls: true,
+  healthPullUrl: true, healthPullToken: true, healthPullMinutes: true,
+  healthBackfillDays: true, ingestToken: true,
 } as const;
 
 type SettingsRow = {
@@ -72,6 +103,9 @@ type SettingsRow = {
   ollamaUrl: string; ollamaModel: string; aiDailyTokenCap: number;
   aiTokensUsed: number; aiTokensUsedOn: Date | null;
   rrBudgetByDay: string; rrOverrunAntiGoalId: string | null;
+  weatherLat: number | null; weatherLon: number | null; calendarIcsUrls: string | null;
+  healthPullUrl: string | null; healthPullToken: string | null; healthPullMinutes: number;
+  healthBackfillDays: number; ingestToken: string | null;
 };
 
 function project(s: SettingsRow | null) {
@@ -94,6 +128,14 @@ function project(s: SettingsRow | null) {
     aiTokensUsedOn: null as Date | null,
     rrBudgetByDay: '[2,1,1,1,1,2,3]',
     rrOverrunAntiGoalId: null as string | null,
+    weatherLat: null as number | null,
+    weatherLon: null as number | null,
+    calendarIcsUrls: null as string | null,
+    healthPullUrl: null as string | null,
+    healthPullToken: null as string | null,
+    healthPullMinutes: 30,
+    healthBackfillDays: 365,
+    ingestToken: null as string | null,
   };
   const { aiTokensUsed, aiTokensUsedOn, ...rest } = base;
   return {
@@ -105,13 +147,24 @@ function project(s: SettingsRow | null) {
   };
 }
 
-/** GET /api/settings — display + AI calibration blocks (defaults if no row). */
+/** GET /api/settings — display + AI calibration + per-user integration blocks
+ *  (defaults if no row). The owner's own authenticated view, so their own
+ *  secrets (health/ingest tokens) are returned. Lazily mints an ingestToken
+ *  if the user has none yet, so the phone-bridge URL is always displayable. */
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
-  const settings = await prisma.userSettings.findUnique({
-    where: { userId: req.user!.id },
-    select: SETTINGS_SELECT,
+  const userId = req.user!.id;
+  let settings = await prisma.userSettings.findUnique({
+    where: { userId }, select: SETTINGS_SELECT,
   });
-  res.json({ settings: project(settings) });
+  if (!settings || !settings.ingestToken) {
+    settings = await prisma.userSettings.upsert({
+      where: { userId },
+      update: { ingestToken: genIngestToken() },
+      create: { userId, ingestToken: genIngestToken() },
+      select: SETTINGS_SELECT,
+    });
+  }
+  res.json({ settings: { ...project(settings), ingestUrl: ingestUrlFor(req, settings.ingestToken) } });
 }));
 
 /**
@@ -173,7 +226,24 @@ router.put('/', asyncHandler(async (req: AuthRequest, res) => {
     create: { userId: req.user!.id, ...data },
     select: SETTINGS_SELECT,
   });
-  res.json({ settings: project(settings) });
+  res.json({ settings: { ...project(settings), ingestUrl: ingestUrlFor(req, settings.ingestToken) } });
+}));
+
+/**
+ * POST /api/settings/ingest-token — (re)generate the per-user ingest token.
+ * Rotating it immediately invalidates any phone bridge still using the old
+ * secret URL (the lookup in routes/ingest.ts is exact-match). Returns the
+ * fresh token + the convenience ingest URL to paste into the bridge.
+ */
+router.post('/ingest-token', asyncHandler(async (req: AuthRequest, res) => {
+  const token = genIngestToken();
+  const settings = await prisma.userSettings.upsert({
+    where: { userId: req.user!.id },
+    update: { ingestToken: token },
+    create: { userId: req.user!.id, ingestToken: token },
+    select: SETTINGS_SELECT,
+  });
+  res.json({ settings: { ...project(settings), ingestUrl: ingestUrlFor(req, settings.ingestToken) } });
 }));
 
 export default router;

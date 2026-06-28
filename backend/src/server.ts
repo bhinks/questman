@@ -11,7 +11,7 @@ import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 import { rateLimit } from './middleware/rateLimit';
-import { startHealthPull } from './services/healthSync';
+import { startHealthPull, resolveHubUserId } from './services/healthSync';
 import { WebSocketService } from './services/WebSocketService';
 
 // Routes
@@ -167,6 +167,53 @@ app.use('*', (req, res) => {
 // errors thrown downstream were never formatted by it.
 app.use(errorHandler);
 
+/**
+ * One-time migration of the GLOBAL integration env values onto the hub user's
+ * own UserSettings row (Brent's call: seed the hub user's existing config once;
+ * new users start blank; no global fallback). Sets ONLY fields that are still
+ * null (or still at their default, for the non-null cadence/backfill) so it
+ * never stomps a value the user has since chosen. Idempotent — safe every boot.
+ * Best-effort: a failure here never blocks startup.
+ */
+async function seedHubUserIntegrations(): Promise<void> {
+  try {
+    const hubId = await resolveHubUserId(prisma);
+    if (!hubId) return;
+    // "if their UserSettings row exists" — only seed onto an existing row.
+    const row = await prisma.userSettings.findUnique({
+      where: { userId: hubId },
+      select: {
+        weatherLat: true, weatherLon: true, calendarIcsUrls: true,
+        healthPullUrl: true, healthPullToken: true, healthPullMinutes: true,
+        healthBackfillDays: true, ingestToken: true,
+      },
+    });
+    if (!row) return;
+
+    const patch: Record<string, unknown> = {};
+    if (row.weatherLat === null && config.weather.lat !== undefined) patch.weatherLat = config.weather.lat;
+    if (row.weatherLon === null && config.weather.lon !== undefined) patch.weatherLon = config.weather.lon;
+    if (row.calendarIcsUrls === null && config.calendar.icsUrls.length > 0) {
+      patch.calendarIcsUrls = config.calendar.icsUrls.join(',');
+    }
+    if (row.healthPullUrl === null && config.health.pullUrl) {
+      patch.healthPullUrl = config.health.pullUrl;
+      // The cadence + backfill travel with the global pull config, but only
+      // seed them onto still-default values so a user's later choice survives.
+      if (row.healthPullMinutes === 30 && config.health.pullMinutes !== 30) patch.healthPullMinutes = config.health.pullMinutes;
+      if (row.healthBackfillDays === 365 && config.health.backfillDays !== 365) patch.healthBackfillDays = config.health.backfillDays;
+    }
+    if (row.healthPullToken === null && config.health.pullToken) patch.healthPullToken = config.health.pullToken;
+    if (row.ingestToken === null && config.ingestToken) patch.ingestToken = config.ingestToken;
+
+    if (Object.keys(patch).length === 0) return;
+    await prisma.userSettings.update({ where: { userId: hubId }, data: patch });
+    logger.info(`[seed] migrated global integration env → hub user ${hubId}: ${Object.keys(patch).join(', ')}`);
+  } catch (err: any) {
+    logger.warn(`[seed] hub integration seed skipped: ${err?.message ?? err}`);
+  }
+}
+
 // Graceful shutdown
 const gracefulShutdown = async () => {
   logger.info('Starting graceful shutdown...');
@@ -196,8 +243,11 @@ server.listen(PORT, () => {
   logger.info(`🚀 Questman backend running on port ${PORT}`);
   logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📊 Database: ${config.database.url}`);
-  // Health pull mode (no-op unless HEALTH_PULL_URL is set): poll the
-  // phone's local Health Connect server for daily metrics.
+  // One-time: migrate the old global integration env (location, calendar,
+  // health pull, ingest token) onto the hub user's own settings. Idempotent.
+  void seedHubUserIntegrations();
+  // Per-user health pull scheduler: polls each user who has set a
+  // healthPullUrl from their own phone on their own cadence.
   startHealthPull(prisma);
 });
 

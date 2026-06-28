@@ -1,8 +1,9 @@
 /**
  * CalendarService — the calendar uplink (roadmap §Inputs & integrations).
  *
- * Reads one or more PRIVATE ICS feeds (config.calendar.icsUrls — e.g. Google
- * Calendar's "secret address in iCal format") and reduces today to:
+ * Reads one or more PRIVATE ICS feeds (UserSettings.calendarIcsUrls — e.g.
+ * Google Calendar's "secret address in iCal format", comma-separated) and
+ * reduces today to:
  *   - the day's events (recurrence-expanded, exdates/overrides honored),
  *   - merged BUSY minutes inside the waking window (08:00–22:00 local),
  *   - the matching FREE minutes and the next upcoming event.
@@ -15,7 +16,6 @@
  * when granted, only counts/times/free-busy reach the model — never titles.
  */
 import * as ical from 'node-ical';
-import { config } from '../config';
 import { logger } from '../utils/logger';
 import { startOfLocalDay } from '../utils/dates';
 
@@ -45,15 +45,25 @@ const WAKE_END_H = 22;
 export class CalendarService {
   private cache: { key: string; snap: CalendarSnapshot } | null = null;
 
-  static configured(): boolean {
-    return config.calendar.icsUrls.length > 0;
+  /** Parse the per-user comma-separated calendarIcsUrls string into a clean
+   *  list (trimmed, blanks dropped). Mirrors the retired CALENDAR_ICS_URL env
+   *  parsing so existing feed strings carry over verbatim. */
+  static parseUrls(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    return raw.split(',').map(s => s.trim()).filter(Boolean);
   }
 
-  /** Today's snapshot, or null (not configured / all feeds failed). */
-  async getToday(): Promise<CalendarSnapshot | null> {
-    if (!CalendarService.configured()) return null;
+  static configured(urls: string[]): boolean {
+    return urls.length > 0;
+  }
+
+  /** Today's snapshot for the given feeds, or null (none configured / all
+   *  feeds failed). The cache key includes the feed list so different users'
+   *  calendars never collide in the shared singleton's one-entry cache. */
+  async getToday(urls: string[]): Promise<CalendarSnapshot | null> {
+    if (urls.length === 0) return null;
     const dayStart = startOfLocalDay();
-    const key = `${config.calendar.icsUrls.join('|')}:${dayStart.getTime()}`;
+    const key = `${urls.join('|')}:${dayStart.getTime()}`;
 
     if (this.cache?.key === key &&
         Date.now() - this.cache.snap.fetchedAt.getTime() < CACHE_TTL_MS) {
@@ -61,7 +71,7 @@ export class CalendarService {
     }
 
     try {
-      const events = await this.fetchDay(dayStart);
+      const events = await this.fetchDay(dayStart, urls);
       const snap = summarize(events, dayStart);
       this.cache = { key, snap };
       return snap;
@@ -73,11 +83,11 @@ export class CalendarService {
   }
 
   /** Fetch + parse every feed, expanding recurrences into today's range. */
-  private async fetchDay(dayStart: Date): Promise<CalEvent[]> {
+  private async fetchDay(dayStart: Date, urls: string[]): Promise<CalEvent[]> {
     const dayEnd = new Date(dayStart.getTime() + 86_400_000 - 1);
     const out: CalEvent[] = [];
 
-    for (const url of config.calendar.icsUrls) {
+    for (const url of urls) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!res.ok) {

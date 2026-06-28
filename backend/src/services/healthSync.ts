@@ -153,14 +153,42 @@ export async function ingestHealthConnectPayload(
 
 const FETCH_TIMEOUT_MS = 10_000;
 
-/** In-memory poll state for catch-up sizing + transition-based logging. */
-let lastOkAt: number | null = null;
-let lastFailLogged = false;
-// Whether a deep historic pull has succeeded this process. The first
-// successful pull after boot backfills a wide window to fill trend charts;
-// every poll after that stays incremental. Resets on restart, so a reboot
-// re-backfills once (idempotent upserts — it just refills any downtime gap).
-let hasBackfilled = false;
+/**
+ * Per-user in-memory poll state for catch-up sizing + transition-based
+ * logging. Health pull config is now PER-USER (UserSettings.healthPull*), so
+ * the process tracks each user's reachability independently — one user's
+ * phone being away never affects another's backfill/incremental decision.
+ *   - lastOkAt: last successful pull (drives the catch-up window width).
+ *   - lastFailLogged: whether the "phone away" warning was already emitted.
+ *   - hasBackfilled: whether a deep historic pull has succeeded this process
+ *     for this user. The first success after boot backfills a wide window to
+ *     fill trend charts; every poll after stays incremental. Resets on
+ *     restart (idempotent upserts just refill any downtime gap).
+ *   - lastAttemptAt: last poll attempt (success OR failure) — the scheduler
+ *     uses this, not lastOkAt, so the cadence holds while the phone is away.
+ */
+interface PollState {
+  lastOkAt: number | null;
+  lastFailLogged: boolean;
+  hasBackfilled: boolean;
+  lastAttemptAt: number | null;
+}
+const pollStateByUser = new Map<string, PollState>();
+function pollState(userId: string): PollState {
+  let s = pollStateByUser.get(userId);
+  if (!s) {
+    s = { lastOkAt: null, lastFailLogged: false, hasBackfilled: false, lastAttemptAt: null };
+    pollStateByUser.set(userId, s);
+  }
+  return s;
+}
+
+/** The caller's health-pull config (from their UserSettings row). */
+export interface HealthPullConfig {
+  pullUrl?: string | null;
+  pullToken?: string | null;
+  backfillDays?: number | null;
+}
 
 export interface PullResult {
   configured: boolean;
@@ -171,15 +199,21 @@ export interface PullResult {
 }
 
 /**
- * One pull from the phone, shared by the interval poller and the Vitals
- * page's on-demand SYNC button (POST /api/metrics/pull). Never throws.
+ * One pull from a specific user's phone, shared by the background poller and
+ * the Vitals page's on-demand SYNC button (POST /api/metrics/pull). Acts only
+ * on the GIVEN user's data using the GIVEN user's config — never the hub user
+ * regardless of caller. Never throws.
  */
 export async function pullNow(
   prisma: PrismaClient,
+  userId: string,
+  cfg: HealthPullConfig,
   opts: { backfill?: boolean } = {},
 ): Promise<PullResult> {
-  const baseUrl = config.health.pullUrl;
+  const baseUrl = cfg.pullUrl;
   if (!baseUrl) return { configured: false, ok: false, written: 0, days: 0 };
+
+  const state = pollState(userId);
 
   // Two request shapes:
   //  - Backfill: the first successful pull of the process (or an explicit
@@ -190,10 +224,10 @@ export async function pullNow(
   //    and widened if the phone has been away so the gap backfills on return.
   // The app's `/` endpoint reads Health Connect on demand; ?days=N asks for
   // N full days. A deep scan can be slow, so backfills get a longer timeout.
-  const wantBackfill = opts.backfill || !hasBackfilled;
-  const hoursSinceOk = lastOkAt ? (Date.now() - lastOkAt) / 3_600_000 : 48;
+  const wantBackfill = opts.backfill || !state.hasBackfilled;
+  const hoursSinceOk = state.lastOkAt ? (Date.now() - state.lastOkAt) / 3_600_000 : 48;
   const incrementalDays = Math.min(14, Math.max(2, Math.ceil(hoursSinceOk / 24) + 1));
-  const days = wantBackfill ? config.health.backfillDays : incrementalDays;
+  const days = wantBackfill ? (cfg.backfillDays ?? 365) : incrementalDays;
   const url = `${baseUrl.replace(/\/+$/, '')}/?days=${days}`;
   const timeout = wantBackfill ? 30_000 : FETCH_TIMEOUT_MS;
 
@@ -202,37 +236,34 @@ export async function pullNow(
       signal: AbortSignal.timeout(timeout),
       // The app's "Local HTTP auth" toggle: Authorization: Bearer <token>,
       // 401 without it. Optional — omitted when no token is configured.
-      headers: config.health.pullToken
-        ? { authorization: `Bearer ${config.health.pullToken}` }
+      headers: cfg.pullToken
+        ? { authorization: `Bearer ${cfg.pullToken}` }
         : undefined,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const parsed = healthConnectSchema.safeParse(await res.json());
     if (!parsed.success) throw new Error('payload failed validation');
 
-    const userId = await resolveHubUserId(prisma);
-    if (!userId) return { configured: true, ok: false, written: 0, days: 0, error: 'no hub user' };
-
     const { written, days: dayCount } = await ingestHealthConnectPayload(prisma, userId, parsed.data);
-    if (lastFailLogged || lastOkAt === null) {
-      logger.info('[healthSync] phone reachable — pull sync active');
+    if (state.lastFailLogged || state.lastOkAt === null) {
+      logger.info(`[healthSync] phone reachable — pull sync active (user ${userId})`);
     }
-    lastOkAt = Date.now();
-    lastFailLogged = false;
+    state.lastOkAt = Date.now();
+    state.lastFailLogged = false;
     if (wantBackfill) {
-      hasBackfilled = true;
-      logger.info(`[healthSync] historic backfill: requested ${days}d, wrote ${written} value(s) across ${dayCount} day(s)`);
+      state.hasBackfilled = true;
+      logger.info(`[healthSync] historic backfill (user ${userId}): requested ${days}d, wrote ${written} value(s) across ${dayCount} day(s)`);
     } else if (written > 0) {
-      logger.info(`[healthSync] pulled ${written} value(s) across ${dayCount} day(s)`);
+      logger.info(`[healthSync] pulled ${written} value(s) across ${dayCount} day(s) (user ${userId})`);
     }
     return { configured: true, ok: true, written, days: dayCount };
   } catch (err: any) {
     const msg = String(err?.message ?? err);
     // A phone that's out of the house is normal life, not an incident —
     // log the transition once, then stay quiet until it's back.
-    if (!lastFailLogged) {
-      logger.warn(`[healthSync] pull failed (phone away?): ${msg} — will keep retrying quietly`);
-      lastFailLogged = true;
+    if (!state.lastFailLogged) {
+      logger.warn(`[healthSync] pull failed for user ${userId} (phone away?): ${msg} — will keep retrying quietly`);
+      state.lastFailLogged = true;
     }
     return { configured: true, ok: false, written: 0, days: 0, error: msg };
   }
@@ -259,15 +290,17 @@ export interface SyncStatus {
   streams: Array<{ label: string; days: number }>;
 }
 
-/** Reach of the stored daily history for the hub user: total rows, the
- *  oldest-to-today span, and per-stream day counts. Cheap groupBy. */
-export async function getSyncStatus(prisma: PrismaClient): Promise<SyncStatus> {
-  const configured = !!config.health.pullUrl;
-  const lastSyncedAt = lastOkAt ? new Date(lastOkAt).toISOString() : null;
-  const lastSyncMins = lastOkAt ? Math.max(0, Math.round((Date.now() - lastOkAt) / 60_000)) : null;
-
-  const userId = await resolveHubUserId(prisma);
-  if (!userId) return { configured, lastSyncedAt, lastSyncMins, backfillDays: 0, readings: 0, streams: [] };
+/** Reach of the stored daily history for THIS user: total rows, the
+ *  oldest-to-today span, and per-stream day counts. Cheap groupBy. Scoped to
+ *  the caller (req.user.id) — never the hub user regardless of caller. */
+export async function getSyncStatus(prisma: PrismaClient, userId: string): Promise<SyncStatus> {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId }, select: { healthPullUrl: true },
+  });
+  const configured = !!settings?.healthPullUrl;
+  const state = pollState(userId);
+  const lastSyncedAt = state.lastOkAt ? new Date(state.lastOkAt).toISOString() : null;
+  const lastSyncMins = state.lastOkAt ? Math.max(0, Math.round((Date.now() - state.lastOkAt) / 60_000)) : null;
 
   const grouped = await prisma.dailyMetric.groupBy({
     by: ['key'],
@@ -298,14 +331,54 @@ export async function getSyncStatus(prisma: PrismaClient): Promise<SyncStatus> {
 }
 
 /**
- * Start the background poller. No-op unless HEALTH_PULL_URL is set.
- * Interval clamps to ≥5 min; first poll runs shortly after boot.
+ * Start the background poller. Health pull is now PER-USER: instead of
+ * polling one global URL on a fixed timer, a single lightweight tick (every
+ * minute) finds every user who has a healthPullUrl set and pulls each from
+ * THEIR own URL/token whenever their personal cadence (healthPullMinutes,
+ * clamped ≥5) has elapsed. Resilient by construction — pullNow never throws
+ * and each user is fired independently, so one phone being away (or one
+ * user's misconfig) never stalls the others. New/changed/removed config is
+ * picked up on the next tick without a restart. No-op in test.
  */
+const POLL_TICK_MS = 60_000;
 export function startHealthPull(prisma: PrismaClient): void {
-  const url = config.health.pullUrl;
-  if (!url || config.nodeEnv === 'test') return;
-  const everyMs = Math.max(5, config.health.pullMinutes) * 60_000;
-  logger.info(`[healthSync] pull mode armed: ${url} every ${Math.round(everyMs / 60_000)}min`);
-  setTimeout(() => void pullNow(prisma), 15_000);
-  setInterval(() => void pullNow(prisma), everyMs);
+  if (config.nodeEnv === 'test') return;
+  logger.info('[healthSync] per-user pull scheduler armed (tick 60s)');
+
+  const tick = async () => {
+    let users: Array<{
+      userId: string; healthPullUrl: string | null; healthPullToken: string | null;
+      healthPullMinutes: number; healthBackfillDays: number;
+    }>;
+    try {
+      users = await prisma.userSettings.findMany({
+        where: { healthPullUrl: { not: null } },
+        select: {
+          userId: true, healthPullUrl: true, healthPullToken: true,
+          healthPullMinutes: true, healthBackfillDays: true,
+        },
+      });
+    } catch (err: any) {
+      logger.warn(`[healthSync] scheduler tick failed to read users: ${err?.message ?? err}`);
+      return;
+    }
+
+    const now = Date.now();
+    for (const u of users) {
+      const state = pollState(u.userId);
+      const everyMs = Math.max(5, u.healthPullMinutes) * 60_000;
+      const due = state.lastAttemptAt === null || (now - state.lastAttemptAt) >= everyMs;
+      if (!due) continue;
+      state.lastAttemptAt = now;
+      // Fire-and-forget; pullNow swallows its own errors, but guard anyway so a
+      // single rejection can never bubble out of the detached promise.
+      void pullNow(prisma, u.userId, {
+        pullUrl: u.healthPullUrl, pullToken: u.healthPullToken, backfillDays: u.healthBackfillDays,
+      }).catch(() => {});
+    }
+  };
+
+  // First sweep shortly after boot, then once a minute.
+  setTimeout(() => void tick(), 15_000);
+  setInterval(() => void tick(), POLL_TICK_MS);
 }

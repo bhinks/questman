@@ -8,8 +8,8 @@
  * so rules and the UI speak freedom units end-to-end.
  *
  * Design:
- *   - One fetch per generation run covers every outdoor habit, because
- *     the hub has a single location (config.weather.lat/lon). The
+ *   - One fetch per generation run covers every outdoor habit for a user,
+ *     since a user has a single location (UserSettings.weatherLat/Lon). The
  *     snapshot is cached in-process keyed by (lat, lon, localDay) so a
  *     day's repeated /quests/today calls reuse it.
  *   - When location is unset or the API is unreachable, getSnapshot()
@@ -21,7 +21,6 @@
  *   { outdoor: true, dryDaysRequired?, maxRainTodayIn?,
  *     minTempF?, maxTempF?, maxWindMph? }
  */
-import { config } from '../config';
 import { logger } from '../utils/logger';
 import { startOfLocalDay } from '../utils/dates';
 
@@ -115,13 +114,15 @@ let cache: CacheEntry | null = null;
 
 export class WeatherService {
   /**
-   * Today's snapshot for the hub location, or null if location is
-   * unconfigured or the provider is unreachable. Cached for 2 hours
-   * (and never across a day rollover).
+   * Today's snapshot for the given location, or null if no location is
+   * supplied or the provider is unreachable. Location is now PER-USER
+   * (UserSettings.weatherLat/weatherLon) — callers pass the relevant
+   * user's coordinates; an unset pair degrades exactly as the old global
+   * code did (returns null, gating falls back to interval-only). Cached
+   * for 2 hours keyed by (lat, lon, localDay), never across a rollover.
    */
-  async getSnapshot(): Promise<WeatherSnapshot | null> {
-    const { lat, lon } = config.weather;
-    if (lat === undefined || lon === undefined) return null;
+  async getSnapshot(lat?: number | null, lon?: number | null): Promise<WeatherSnapshot | null> {
+    if (lat === undefined || lat === null || lon === undefined || lon === null) return null;
 
     const dayKey = `${lat},${lon}:${startOfLocalDay().getTime()}`;
     if (cache && cache.dayKey === dayKey && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {

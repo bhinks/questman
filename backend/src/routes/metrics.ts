@@ -25,7 +25,6 @@ import { GamificationService } from '../services/GamificationService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay } from '../utils/dates';
 import { QuestCandidate } from '../services/anthropic';
-import { config } from '../config';
 import { pullNow, getSyncStatus } from '../services/healthSync';
 import { buildTrainingSeries } from './workouts';
 
@@ -345,32 +344,50 @@ export async function buildVitalsCandidates(
 // server (services/healthSync.ts). The Biomonitor's SYNC button.
 // ---------------------------------------------------------------------
 
-/** GET /api/metrics/pull — pull-mode status (UI hides the button if off). */
-router.get('/pull', asyncHandler(async (_req: AuthRequest, res) => {
-  res.json({ configured: !!config.health.pullUrl });
+/** The caller's per-user health-pull config (from their UserSettings row). */
+async function callerHealthConfig(userId: string) {
+  const s = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { healthPullUrl: true, healthPullToken: true, healthBackfillDays: true },
+  });
+  return {
+    pullUrl: s?.healthPullUrl ?? null,
+    pullToken: s?.healthPullToken ?? null,
+    backfillDays: s?.healthBackfillDays ?? 365,
+  };
+}
+
+/** GET /api/metrics/pull — pull-mode status (UI hides the button if off).
+ *  Per-user: reflects whether THIS user has a healthPullUrl set. */
+router.get('/pull', asyncHandler(async (req: AuthRequest, res) => {
+  const cfg = await callerHealthConfig(req.user!.id);
+  res.json({ configured: !!cfg.pullUrl });
 }));
 
-/** POST /api/metrics/pull[?full=1] — pull from the phone right now. Never
- *  throws: an unreachable phone reports { ok:false } rather than a 5xx.
+/** POST /api/metrics/pull[?full=1] — pull from THIS user's phone right now.
+ *  Never throws: an unreachable phone reports { ok:false } rather than a 5xx.
  *  `full=1` forces a deep historic backfill instead of the incremental window. */
 router.post('/pull', asyncHandler(async (req: AuthRequest, res) => {
   const backfill = req.query.full === '1' || req.query.full === 'true';
-  res.json(await pullNow(prisma, { backfill }));
+  const cfg = await callerHealthConfig(req.user!.id);
+  res.json(await pullNow(prisma, req.user!.id, cfg, { backfill }));
 }));
 
-/** GET /api/metrics/sync-status — Biomonitor PHONE UPLINK telemetry: whether
- *  pull mode is configured, when it last synced, and how far back the stored
- *  history reaches (overall + per stream). */
-router.get('/sync-status', asyncHandler(async (_req: AuthRequest, res) => {
-  res.json(await getSyncStatus(prisma));
+/** GET /api/metrics/sync-status — Biomonitor PHONE UPLINK telemetry for THIS
+ *  user: whether pull mode is configured, when it last synced, and how far
+ *  back the stored history reaches (overall + per stream). */
+router.get('/sync-status', asyncHandler(async (req: AuthRequest, res) => {
+  res.json(await getSyncStatus(prisma, req.user!.id));
 }));
 
-/** POST /api/metrics/sync — "SYNC NOW": deep historic backfill from the phone,
- *  then the refreshed reach. Never throws; an unreachable phone reports
- *  { ok:false } and the last known status. */
-router.post('/sync', asyncHandler(async (_req: AuthRequest, res) => {
-  const result = await pullNow(prisma, { backfill: true });
-  res.json({ ...result, status: await getSyncStatus(prisma) });
+/** POST /api/metrics/sync — "SYNC NOW": deep historic backfill from THIS
+ *  user's phone, then the refreshed reach. Never throws; an unreachable phone
+ *  reports { ok:false } and the last known status. */
+router.post('/sync', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const cfg = await callerHealthConfig(userId);
+  const result = await pullNow(prisma, userId, cfg, { backfill: true });
+  res.json({ ...result, status: await getSyncStatus(prisma, userId) });
 }));
 
 export default router;

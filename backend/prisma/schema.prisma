@@ -176,6 +176,29 @@ model UserSettings {
   displayChroma      Float   @default(2)    // chroma-split offset, 0–4px
   displayCrt         Int     @default(75)   // CRT intensity %, 0–100 → scan/sweep alphas
 
+  // Per-user integrations (previously GLOBAL env values mapped to one hub
+  // user; now owned per account). Each is opt-in: a user with nothing set
+  // simply gets no weather card / no agenda / no phone pull — there is NO
+  // global fallback (a blank user never pulls someone else's phone).
+  //   - location: feeds WeatherService (outdoor-quest gating + the Today
+  //     weather card). Both lat AND lon must be set to be "configured".
+  //   - calendarIcsUrls: comma-separated private ICS feed URLs (same format
+  //     as the retired CALENDAR_ICS_URL env), read by CalendarService.
+  //   - health pull: the phone's local Health Connect server URL/token the
+  //     background poller GETs on its own cadence (healthPullMinutes), with a
+  //     first-pull historic backfill window (healthBackfillDays).
+  //   - ingestToken: a high-entropy per-user secret the phone bridge puts in
+  //     the /api/ingest secret-URL (looked up like an API key). Uniquely
+  //     indexed so the token alone resolves the owning user.
+  weatherLat         Float?
+  weatherLon         Float?
+  calendarIcsUrls    String?   // comma-separated ICS URLs
+  healthPullUrl      String?
+  healthPullToken    String?
+  healthPullMinutes  Int     @default(30)
+  healthBackfillDays Int     @default(365)
+  ingestToken        String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -56,18 +56,34 @@ const entrySchema = z.object({
 const bodySchema = z.object({ entries: z.array(entrySchema).min(1).max(5000) });
 
 /**
- * Resolve the target user. Token path maps to the hub user (single-user
- * system): HUB_USER_EMAIL when set, else the oldest account.
+ * Resolve the target user from the ingest credentials.
+ *
+ * Token path (per-user secret-URL, the primary path now): the token is a
+ * high-entropy, uniquely-indexed per-user secret (UserSettings.ingestToken),
+ * so an exact-match lookup resolves the owning user directly — like an API
+ * key. A request authenticates as, and writes only to, whoever owns the token.
+ *
+ * Legacy fallback: the old GLOBAL config.ingestToken still maps to the hub
+ * user (constant-time compared), so a phone bridge configured before this
+ * change keeps working until it's reissued a per-user URL.
  */
 async function resolveUserId(req: express.Request): Promise<string> {
   // Header where possible; `?token=` for webhook apps with no header UI.
   const headerToken = req.headers['x-ingest-token'];
   const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
   const token = typeof headerToken === 'string' ? headerToken : queryToken;
-  if (typeof token === 'string' && config.ingestToken && tokenMatches(token, config.ingestToken)) {
-    const userId = await resolveHubUserId(prisma);
-    if (!userId) throw new AppError('No hub user to ingest for', 401);
-    return userId;
+  if (typeof token === 'string' && token.length > 0) {
+    // Per-user secret-URL token — exact-match lookup against the unique index.
+    const owner = await prisma.userSettings.findFirst({
+      where: { ingestToken: token }, select: { userId: true },
+    });
+    if (owner) return owner.userId;
+    // Fallback: legacy global INGEST_TOKEN → hub user.
+    if (config.ingestToken && tokenMatches(token, config.ingestToken)) {
+      const userId = await resolveHubUserId(prisma);
+      if (!userId) throw new AppError('No hub user to ingest for', 401);
+      return userId;
+    }
   }
 
   const bearer = req.headers.authorization?.replace('Bearer ', '');

@@ -19,6 +19,7 @@ import { api } from '../lib/api';
 import type { DisplaySettings, SettingsResponse } from '../lib/api';
 import { AiCalibrationPanel } from './AiCalibration';
 import { ApiKeyPanel } from './ApiKeyPanel';
+import { IntegrationsPanel } from './IntegrationsPanel';
 import { Icon } from './Icon';
 
 /** Documented baselines from the handoff ("ship as defaults"). */
@@ -132,6 +133,9 @@ export function CalibrationView() {
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {/* ---- AI Calibration (neural governor) — sits above display tuning ---- */}
       <AiCalibrationPanel />
+
+      {/* ---- Per-user integrations: location, calendar & health ---- */}
+      <IntegrationsPanel />
 
       {/* ---- API Access (external bearer-token API) ---- */}
       <ApiKeyPanel />

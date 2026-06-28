@@ -753,8 +753,25 @@ export interface RrSettings {
   rrOverrunAntiGoalId: string | null; // soft-gate target anti-goal (null = inert)
 }
 
-/** The full /api/settings payload: display + AI calibration + R&R blocks. */
-export interface AppSettings extends DisplaySettings, AiSettings, RrSettings {}
+// ---- Per-user integrations: location, calendar, phone-health-pull --------
+// Formerly GLOBAL env values mapped to one hub user; now owned per account.
+// A blank user simply gets no weather card / no agenda / no phone pull —
+// there is NO global fallback.
+export interface IntegrationSettings {
+  weatherLat: number | null;     // -90..90 (both lat+lon needed to be "configured")
+  weatherLon: number | null;     // -180..180
+  calendarIcsUrls: string | null; // comma-separated private ICS feed URLs
+  healthPullUrl: string | null;   // the phone's local Health Connect server URL
+  healthPullToken: string | null; // optional bearer for that local server
+  healthPullMinutes: number;      // poll cadence (>=5)
+  healthBackfillDays: number;     // first-pull historic window (2..3650)
+  // Read-only / managed like an API key (not settable via PUT):
+  ingestToken: string | null;     // per-user secret in the /api/ingest URL
+  ingestUrl: string | null;       // convenience URL to paste into the phone bridge
+}
+
+/** The full /api/settings payload: display + AI + R&R + integration blocks. */
+export interface AppSettings extends DisplaySettings, AiSettings, RrSettings, IntegrationSettings {}
 export interface SettingsResponse { settings: AppSettings; }
 
 // ---- intelligence layer (phase 6): Handler, insights, weekly debrief -----

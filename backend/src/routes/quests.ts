@@ -6,7 +6,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { QuestEngine } from '../services/QuestEngine';
 import { GamificationService, type PlayerSnapshot } from '../services/GamificationService';
 import { WeatherService } from '../services/WeatherService';
-import { calendarService } from '../services/CalendarService';
+import { CalendarService, calendarService } from '../services/CalendarService';
 import { eddiesForReward } from '../utils/economy';
 import { startOfLocalDay, daysAgoLocal } from '../utils/dates';
 import { config } from '../config';
@@ -513,7 +513,10 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
   // before.
   let calendarBusyMin = 0;
   if (!req.query.budget) {
-    const cal = await calendarService.getToday().catch(() => null);
+    const calUrls = CalendarService.parseUrls(settings?.calendarIcsUrls);
+    const cal = calUrls.length > 0
+      ? await calendarService.getToday(calUrls).catch(() => null)
+      : null;
     if (cal) calendarBusyMin = Math.min(cal.busyMin, defaultBudget);
   }
   const budgetMin = (req.query.budget
@@ -539,7 +542,7 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
     .map(q => ({ id: q.id, rule: WeatherService.parseRule(q.habit?.weatherRule ?? null) }))
     .filter((x): x is { id: string; rule: NonNullable<ReturnType<typeof WeatherService.parseRule>> } => x.rule !== null);
   if (outdoorRules.length > 0) {
-    const snap = await weather.getSnapshot();
+    const snap = await weather.getSnapshot(settings?.weatherLat ?? null, settings?.weatherLon ?? null);
     niceToday = WeatherService.isNiceDay(snap);
     for (const { id, rule } of outdoorRules) {
       outdoorIds.add(id);

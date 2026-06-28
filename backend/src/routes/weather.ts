@@ -1,11 +1,13 @@
 /**
- * Weather — read-only forecast for the hub location, for the Today page.
- * Backed by the same WeatherService (2h snapshot cache) that gates
- * outdoor quests, so this adds no extra API load beyond the cache TTL.
+ * Weather — read-only forecast for the CALLER's location, for the Today page.
+ * Location is now per-user (UserSettings.weatherLat/weatherLon); this is
+ * backed by the same WeatherService (2h snapshot cache) that gates outdoor
+ * quests, so it adds no extra API load beyond the cache TTL.
  */
 import express from 'express';
+import { prisma } from '../server';
+import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
-import { config } from '../config';
 import { WeatherService, describeWeatherCode, hourLabel } from '../services/WeatherService';
 
 const router = express.Router();
@@ -19,20 +21,24 @@ const RAIN_TIP_AMOUNT_IN = 0.02;
 /**
  * GET /api/weather/today
  *
- * `{ configured: false }` when no HUB_LAT/HUB_LON is set (the client
- * hides the weather card). Otherwise `{ configured: true, weather }`
+ * `{ configured: false }` when the caller has no weatherLat/weatherLon set
+ * (the client hides the weather card). Otherwise `{ configured: true, weather }`
  * with today's forecast in US units — `weather` is null if the provider
  * was unreachable.
  */
-router.get('/today', asyncHandler(async (_req, res) => {
-  const configured =
-    config.weather.lat !== undefined && config.weather.lon !== undefined;
-  if (!configured) {
+router.get('/today', asyncHandler(async (req: AuthRequest, res) => {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId: req.user!.id },
+    select: { weatherLat: true, weatherLon: true },
+  });
+  const lat = settings?.weatherLat ?? null;
+  const lon = settings?.weatherLon ?? null;
+  if (lat === null || lon === null) {
     res.json({ configured: false, weather: null });
     return;
   }
 
-  const snap = await weather.getSnapshot();
+  const snap = await weather.getSnapshot(lat, lon);
   if (!snap) {
     res.json({ configured: true, weather: null });
     return;
