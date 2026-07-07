@@ -28,7 +28,7 @@ import { AiSettings, completeJson, modelFor } from './llm';
 export interface QuestCandidate {
   /** Stable id Claude must echo back. We synthesize this per-batch. */
   candidateId: string;
-  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'bill';
+  source: 'habit' | 'goal' | 'workout' | 'finance' | 'project' | 'media' | 'npc' | 'vitals' | 'bill' | 'steam';
   sourceId: string | null;
   moduleKey: string;        // "habits"|"fitness"|"chores"|"finance"|"projects"|"media"|"social"|"vitals"
   baseTitle: string;
@@ -40,6 +40,9 @@ export interface QuestCandidate {
   context?: string;
   /** Best weather window for outdoor habits, e.g. "1–3pm". Themable. */
   bestWindow?: string;
+  /** Outdoor candidate on a genuinely nice day (dry, mild, calm) — the
+   *  selection should strongly prefer it so the day isn't wasted. */
+  niceDay?: boolean;
   // --- Planner attributes (roadmap §5), persisted onto the Quest ---
   /** Estimated minutes to complete; feeds the day-planner time budget. */
   estMinutes?: number;
@@ -120,9 +123,13 @@ export async function generateThemedQuests(
       ].join(' ');
       const ctxLine = c.context ? `\n     context: ${c.context}` : '';
       const windowLine = c.bestWindow ? `\n     best outdoor window: ${c.bestWindow} (weave this timing into the description)` : '';
-      return `${i + 1}. ${c.baseTitle}\n     ${meta}${ctxLine}${windowLine}`;
+      const niceLine = c.niceDay ? '\n     ☀ NICE DAY: outdoor conditions are ideal today — strongly prefer this candidate' : '';
+      return `${i + 1}. ${c.baseTitle}\n     ${meta}${ctxLine}${windowLine}${niceLine}`;
     }),
     '',
+    ...(candidates.some(c => c.niceDay)
+      ? ['It is a genuinely nice day out (dry, mild, calm). Include at least one ☀ NICE DAY outdoor candidate in your selection — a good day must not go to waste.', '']
+      : []),
     'Select 3–5 of these and theme them. Echo each candidateId verbatim.',
   ].join('\n');
 

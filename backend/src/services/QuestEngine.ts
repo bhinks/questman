@@ -21,6 +21,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { startOfLocalDay, daysAgoLocal, isSameLocalDay, startOfIsoWeek } from '../utils/dates';
+import { outdoorRotationElapsed } from '../utils/outdoorSchedule';
 import { isoWeekKey, eddiesForReward } from '../utils/economy';
 import { AppError } from '../middleware/errorHandler';
 import { GamificationService } from './GamificationService';
@@ -699,19 +700,34 @@ export class QuestEngine {
 
     for (const h of habits) {
       if (completedToday.has(h.id)) continue;
-      if (!isHabitDueToday(h as any, date)) continue;
       // Min-interval throttle: skip if it was done too recently.
       if (!this.intervalOk(h, date)) continue;
 
-      // Outdoor habits: gate on weather, and capture the best window so
-      // Claude can theme the timing into the quest.
+      // Outdoor habits: the weather rule gates, and — when we have real
+      // weather — also SCHEDULES: a passing day makes the item due once its
+      // rotation has elapsed, even off its scheduled weekday. Otherwise a
+      // weekly outdoor chore was only considered on its exact weekday AND
+      // only if that day's weather passed, which in practice meant rules
+      // like "needs a dry day" could go weeks without ever firing.
       let bestWindow: string | undefined;
+      let niceDay = false;
       const rule = WeatherService.parseRule(h.weatherRule);
       if (rule) {
         const verdict = this.weather.evaluate(rule, snapshot);
         if (!verdict.ok) continue;
+        const dueByCalendar = isHabitDueToday(h as any, date);
+        // No snapshot (no location / provider down) → calendar-only, as before.
+        if (!dueByCalendar && !(snapshot && outdoorRotationElapsed(h, date))) continue;
         bestWindow = verdict.bestWindow;
+        niceDay = WeatherService.isNiceDay(snapshot);
+      } else {
+        if (!isHabitDueToday(h as any, date)) continue;
       }
+
+      const context = [
+        h.currentStreak >= 3 ? `${h.currentStreak}-day streak at risk` : null,
+        niceDay ? 'genuinely nice day out — ideal conditions for this outdoor task' : null,
+      ].filter(Boolean).join('; ') || undefined;
 
       const moduleKey = h.kind === 'chore' ? 'chores' : 'habits';
       out.push({
@@ -722,10 +738,9 @@ export class QuestEngine {
         baseTitle: h.title,
         difficulty: h.difficulty as 'easy' | 'medium' | 'hard',
         xpReward: h.baseXp,
-        context: h.currentStreak >= 3
-          ? `${h.currentStreak}-day streak at risk`
-          : undefined,
+        context,
         bestWindow,
+        niceDay: niceDay || undefined,
         // Planner attributes: time estimate + per-day target as a check-in
         // counter. Chores are punt-able (carry over); daily habits aren't
         // (a missed day is a missed day).
@@ -844,6 +859,7 @@ export class QuestEngine {
     const CAP = cap;
     const within = (c: QuestCandidate): number => {
       if (c.mustDo) return 0;
+      if (c.niceDay) return 0; // don't waste a nice day — outdoor work leads its module
       if (c.source === 'habit' && c.context?.includes('streak at risk')) return 0;
       return 1;
     };
@@ -870,6 +886,13 @@ export class QuestEngine {
     // Guarantee must-do candidates make the cut.
     for (const c of cands) {
       if (c.mustDo && !out.includes(c)) out.push(c);
+    }
+    // Don't waste a nice day: if outdoor conditions are ideal, at least one
+    // weather-gated candidate always makes the board (mirrors the must-do
+    // guarantee, capped at one so a sunny day can't flood the plan).
+    if (!out.some(c => c.niceDay)) {
+      const sunny = cands.find(c => c.niceDay);
+      if (sunny) out.push(sunny);
     }
     return out;
   }

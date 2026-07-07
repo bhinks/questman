@@ -191,7 +191,11 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
       color: data.color ?? null,
       cadence: data.cadence,
       schedule: data.schedule ? JSON.stringify(data.schedule) : null,
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      // A one-off with no explicit date is due NOW, not never: isHabitDueToday
+      // returns false for a null-dueDate 'once', so without this default the
+      // item would never surface as due or become a quest (mirrors /quick).
+      dueDate: data.dueDate ? new Date(data.dueDate)
+        : data.cadence === 'once' ? startOfLocalDay() : null,
       targetPerDay: data.targetPerDay,
       baseXp: data.baseXp,
       difficulty: data.difficulty,

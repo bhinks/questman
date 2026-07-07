@@ -109,8 +109,12 @@ const FETCH_TIMEOUT_MS = 4000;
 // "rain at 2pm" tips reasonably fresh without hammering the API.
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 
-interface CacheEntry { dayKey: string; fetchedAt: number; snapshot: WeatherSnapshot | null; }
-let cache: CacheEntry | null = null;
+interface CacheEntry { fetchedAt: number; snapshot: WeatherSnapshot | null; }
+// Keyed by (lat, lon, localDay) — a Map so multiple users at different
+// coordinates don't evict each other every call. Cleared past a small cap
+// (day rollovers naturally strand old keys; correctness comes from the key).
+const cache = new Map<string, CacheEntry>();
+const CACHE_MAX_ENTRIES = 32;
 
 export class WeatherService {
   /**
@@ -125,8 +129,9 @@ export class WeatherService {
     if (lat === undefined || lat === null || lon === undefined || lon === null) return null;
 
     const dayKey = `${lat},${lon}:${startOfLocalDay().getTime()}`;
-    if (cache && cache.dayKey === dayKey && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-      return cache.snapshot;
+    const hit = cache.get(dayKey);
+    if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) {
+      return hit.snapshot;
     }
 
     let snapshot: WeatherSnapshot | null = null;
@@ -136,7 +141,8 @@ export class WeatherService {
       logger.warn(`[weather] fetch failed, degrading to interval-only: ${err?.message ?? err}`);
       snapshot = null;
     }
-    cache = { dayKey, fetchedAt: Date.now(), snapshot };
+    if (cache.size >= CACHE_MAX_ENTRIES) cache.clear();
+    cache.set(dayKey, { fetchedAt: Date.now(), snapshot });
     return snapshot;
   }
 
@@ -144,32 +150,44 @@ export class WeatherService {
    * Evaluate a parsed rule against a snapshot. With no snapshot the
    * weather axis is treated as satisfied (interval-only fallback), so
    * outdoor habits still surface when the provider is down.
+   *
+   * Two tiers of gate:
+   *  - dryDaysRequired is HARD: a wet yard stays wet all day; no window
+   *    can waive it.
+   *  - rain/temp/wind are DAY-AGGREGATE checks (day's total rain, daily
+   *    high, daily max wind), so an evening shower or a 4pm heat spike
+   *    would fail a chore the morning was perfect for. A failing day
+   *    therefore still passes when an acceptable HOURLY window exists —
+   *    the window scan applies the same thresholds hour by hour.
    */
   evaluate(rule: WeatherRule, snap: WeatherSnapshot | null): WeatherEvaluation {
     if (!snap) return { ok: true, reasons: [] };
 
-    const reasons: string[] = [];
+    const hard: string[] = [];
     if (rule.dryDaysRequired !== undefined && snap.dryDayStreak < rule.dryDaysRequired) {
-      reasons.push(`needs ${rule.dryDaysRequired} dry day(s), has ${snap.dryDayStreak}`);
-    }
-    if (rule.maxRainTodayIn !== undefined && snap.rainTodayIn > rule.maxRainTodayIn) {
-      reasons.push(`rain ${snap.rainTodayIn.toFixed(2)}in > ${rule.maxRainTodayIn}in`);
-    }
-    if (rule.minTempF !== undefined && snap.tempMaxF < rule.minTempF) {
-      reasons.push(`high ${snap.tempMaxF.toFixed(0)}°F < ${rule.minTempF}°F`);
-    }
-    if (rule.maxTempF !== undefined && snap.tempMaxF > rule.maxTempF) {
-      reasons.push(`high ${snap.tempMaxF.toFixed(0)}°F > ${rule.maxTempF}°F`);
-    }
-    if (rule.maxWindMph !== undefined && snap.windMaxMph > rule.maxWindMph) {
-      reasons.push(`wind ${snap.windMaxMph.toFixed(0)}mph > ${rule.maxWindMph}mph`);
+      hard.push(`needs ${rule.dryDaysRequired} dry day(s), has ${snap.dryDayStreak}`);
     }
 
-    const ok = reasons.length === 0;
+    const soft: string[] = [];
+    if (rule.maxRainTodayIn !== undefined && snap.rainTodayIn > rule.maxRainTodayIn) {
+      soft.push(`rain ${snap.rainTodayIn.toFixed(2)}in > ${rule.maxRainTodayIn}in`);
+    }
+    if (rule.minTempF !== undefined && snap.tempMaxF < rule.minTempF) {
+      soft.push(`high ${snap.tempMaxF.toFixed(0)}°F < ${rule.minTempF}°F`);
+    }
+    if (rule.maxTempF !== undefined && snap.tempMaxF > rule.maxTempF) {
+      soft.push(`high ${snap.tempMaxF.toFixed(0)}°F > ${rule.maxTempF}°F`);
+    }
+    if (rule.maxWindMph !== undefined && snap.windMaxMph > rule.maxWindMph) {
+      soft.push(`wind ${snap.windMaxMph.toFixed(0)}mph > ${rule.maxWindMph}mph`);
+    }
+
+    const window = hard.length === 0 ? this.bestWindow(rule, snap) : undefined;
+    const ok = hard.length === 0 && (soft.length === 0 || window !== undefined);
     return {
       ok,
-      reasons,
-      bestWindow: ok ? this.bestWindow(rule, snap) : undefined,
+      reasons: ok ? [] : [...hard, ...soft],
+      bestWindow: ok ? window : undefined,
     };
   }
 
@@ -288,7 +306,7 @@ export class WeatherService {
 }
 
 // ---------------------------------------------------------------------
-// Pure parsing helpers (exported-free; unit-testable in isolation)
+// Pure parsing helpers (unit-testable in isolation)
 // ---------------------------------------------------------------------
 
 /**
@@ -296,8 +314,12 @@ export class WeatherService {
  * timezone=auto, US units) into a WeatherSnapshot. TOMORROW is the last
  * daily entry, TODAY the one before it; the 7 entries before today are
  * the dry-streak candidates.
+ *
+ * A response with NO daily entries throws — the caller's catch degrades
+ * to a null snapshot (permissive gating). Silently coercing the missing
+ * fields to 0 would instead fail every minTempF rule for the day.
  */
-function parseOpenMeteo(json: any): WeatherSnapshot {
+export function parseOpenMeteo(json: any): WeatherSnapshot {
   const daily = json?.daily ?? {};
   const precip: number[] = daily.precipitation_sum ?? [];
   const tmax: number[] = daily.temperature_2m_max ?? [];
@@ -305,6 +327,7 @@ function parseOpenMeteo(json: any): WeatherSnapshot {
   const wmax: number[] = daily.wind_speed_10m_max ?? [];
   const codes: number[] = daily.weather_code ?? [];
   const dates: string[] = daily.time ?? [];
+  if (dates.length === 0) throw new Error('Open-Meteo response has no daily data');
 
   // forecast_days=2 → [.. 7 past days, today, tomorrow]. Guard the
   // degenerate single-day response by treating the last entry as today.

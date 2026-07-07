@@ -577,8 +577,10 @@ router.get('/plan', asyncHandler(async (req: AuthRequest, res) => {
     if (q.source === 'bill') s += 800;
     // Tomorrow's forecast blocks this outdoor quest → today's the day.
     if (lastClearIds.has(q.id)) s += 1_200;
-    // It's a genuinely nice day out — float outdoor tasks up so we don't waste it.
-    if (niceToday && outdoorIds.has(q.id)) s += 800;
+    // It's a genuinely nice day out — float outdoor tasks up so we don't
+    // waste it. Weighted above bills and short carry-overs (weather is the
+    // one deadline that ignores the to-do list), below multi-day neglect.
+    if (niceToday && outdoorIds.has(q.id)) s += 1_500;
     if (windowOpenNow(meta)) s += 1_000;
     s += q.xpReward; // higher reward ranks higher
     // The GENERIC "log a workout" filler (source workout, no sourceId) is a
