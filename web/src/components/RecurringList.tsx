@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { Habit, Module } from '../lib/api';
+import type { Habit, Module, Project } from '../lib/api';
 import { useFocusTotals, fmtFocusMin } from '../lib/useFocusTotals';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -329,12 +329,20 @@ const XP_DEFAULT_VALUES = new Set(Object.values(XP_DEFAULTS));
  * throttle, and weather gating are all available in both.
  */
 export function HabitForm({
-  kind, moduleId, habit, onClose,
-}: { kind: 'habit' | 'chore'; moduleId: string; habit?: Habit; onClose: () => void }) {
+  kind, moduleId, habit, defaultProjectId, onClose,
+}: { kind: 'habit' | 'chore'; moduleId: string; habit?: Habit; defaultProjectId?: string | null; onClose: () => void }) {
   const qc = useQueryClient();
   const isEdit = !!habit;
 
   const [title, setTitle] = useState(habit?.title ?? '');
+  // Chores can be filed into a project ("Operations" rotation) at creation;
+  // null = Uncategorized. Habits don't carry a project.
+  const [projectId, setProjectId] = useState<string | null>(habit ? habit.projectId : (defaultProjectId ?? null));
+  const projectsQ = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api.get<{ projects: Project[] }>('/api/projects').then(r => r.projects),
+    enabled: kind === 'chore',
+  });
   const [baseXp, setBaseXp] = useState<number>(habit?.baseXp ?? XP_DEFAULTS.easy);
   const [cadence, setCadence] = useState<'daily' | 'weekly' | 'custom' | 'once'>(
     habit?.cadence ?? (kind === 'chore' ? 'weekly' : 'daily'),
@@ -381,6 +389,7 @@ export function HabitForm({
       : null,
     minIntervalDays: minIntervalDays === '' ? null : minIntervalDays,
     weatherRule: outdoor ? { outdoor: true, ...weather } : null,
+    ...(kind === 'chore' ? { projectId } : {}),
   });
 
   const save = useMutation({
@@ -441,6 +450,14 @@ export function HabitForm({
             style={{ ...inputStyle, width: 100 }}
           />
         </label>
+        {kind === 'chore' && (
+          <Select label="PROJECT" value={projectId ?? ''} onChange={v => setProjectId(v || null)}
+            options={[
+              { value: '', label: 'Uncategorized' },
+              ...(projectsQ.data ?? []).map(p => ({ value: p.id, label: p.name })),
+            ]}
+          />
+        )}
       </div>
 
       {needsDayPicker && (

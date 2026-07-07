@@ -5,8 +5,10 @@
  * not habits — they land in Operations' Uncategorized bucket and pay a small
  * server-owned reward; they don't gate the day's clear.
  *
- * Controlled: render with `open`; closes on Escape / backdrop. `onAdded` fires
- * after a successful capture (the host uses it to jump to Today).
+ * Controlled: render with `open`; closes on Escape / backdrop / DONE. A
+ * successful capture clears the field and KEEPS the palette open (with a
+ * brief "logged" tick) so several to-dos can be seeded without reopening.
+ * `onAdded` fires per capture (the host uses it to land on Today).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -20,15 +22,22 @@ export function QuickCapture({ open, onClose, onAdded }: {
 }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState('');
+  const [lastAdded, setLastAdded] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const add = useMutation({
     mutationFn: (t: string) => api.post('/api/habits/quick', { title: t }),
-    onSuccess: () => {
+    onSuccess: (_res, t) => {
       qc.invalidateQueries({ queryKey: ['quests', 'today'] });
       qc.invalidateQueries({ queryKey: ['habits'] });
+      // Stay open for the next entry — seeding several to-dos shouldn't mean
+      // reopening N times. Escape / backdrop / DONE still close.
       setTitle('');
-      onClose();
+      setLastAdded(t);
+      if (tickTimer.current) clearTimeout(tickTimer.current);
+      tickTimer.current = setTimeout(() => setLastAdded(null), 2500);
+      inputRef.current?.focus();
       onAdded?.();
     },
   });
@@ -37,9 +46,11 @@ export function QuickCapture({ open, onClose, onAdded }: {
   useEffect(() => {
     if (!open) return;
     setTitle('');
+    setLastAdded(null);
     const id = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(id);
   }, [open]);
+  useEffect(() => () => { if (tickTimer.current) clearTimeout(tickTimer.current); }, []);
 
   if (!open) return null;
 
@@ -103,9 +114,16 @@ export function QuickCapture({ open, onClose, onAdded }: {
           }}
         />
 
+        {lastAdded && (
+          <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 10.5, letterSpacing: '0.08em', color: 'var(--lime)' }}>
+            <Icon name="check" size={12} style={{ flex: 'none' }} />
+            <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>LOGGED — {lastAdded}</span>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
           <button className="btn btn-ghost" onClick={onClose} disabled={add.isPending}>
-            CANCEL
+            DONE
           </button>
           <button
             className="btn btn-primary"

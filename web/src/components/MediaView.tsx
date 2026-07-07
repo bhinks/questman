@@ -24,7 +24,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type {
-  MediaItem, MediaPace, MediaPaceResponse, MediaSessionResult, MediaEstimate, AntiGoal,
+  MediaItem, MediaPace, MediaPaceResponse, MediaSessionResult, AntiGoal,
 } from '../lib/api';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -595,6 +595,13 @@ function MediaCard({
     } else {
       controls.push(<button key="mv" className="btn btn-ghost" style={ctrlBtn} onClick={() => onLog({ minutes: 15 })}>+15M</button>);
     }
+    // Exact entry ("I'm on page 214") — PUTs absolute unitsDone, no charge.
+    controls.push(<SetProgress key="set"
+      unit={it.type === 'show' ? 'EP' : it.type === 'book' ? 'PG' : 'MIN'}
+      max={(it.type === 'show' || it.type === 'book')
+        ? (it.totalUnits ?? undefined)
+        : (endlessGame ? undefined : it.estMinutes ?? undefined)}
+      onSet={onCorrect} />);
   }
 
   return (
@@ -673,6 +680,27 @@ function Stepper({ minus, plus, label }: { minus: () => void; plus: () => void; 
   );
 }
 
+/** Set absolute progress in the item's natural unit (Enter or SET commits). */
+function SetProgress({ unit, max, onSet }: { unit: string; max?: number; onSet: (n: number) => void }) {
+  const [val, setVal] = useState('');
+  const commit = () => {
+    const n = Math.round(Number(val));
+    if (val.trim() === '' || !Number.isFinite(n) || n < 0) return;
+    onSet(max != null ? Math.min(max, n) : n);
+    setVal('');
+  };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <input type="number" min={0} max={max} value={val} placeholder={unit}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); }}
+        title={`Set exact ${unit.toLowerCase()} (Enter to save)`}
+        style={{ width: 54, padding: '4px 6px', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none', textAlign: 'right' }} />
+      <button className="btn btn-ghost" style={{ ...ctrlBtn, padding: '4px 8px' }} disabled={val.trim() === ''} onClick={commit}>SET</button>
+    </span>
+  );
+}
+
 /* ---------- cover placeholder (no real cover art — generated tile) ---------- */
 function Cover({ it, w = 46, h = 66 }: { it: MediaItem; w?: number; h?: number }) {
   const m = TYPE_META[it.type];
@@ -696,36 +724,25 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
   const [type, setType] = useState<MediaType>('book');
   const [title, setTitle] = useState('');
   const [endless, setEndless] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const [est, setEst] = useState<MediaEstimate | null>(null);
-
-  const m = TYPE_META[type];
-
-  const lookup = useMutation({
-    mutationFn: () => api.post<{ estimate: MediaEstimate | null }>('/api/media/lookup', { type, title: title.trim() }),
-    onSuccess: (res) => {
-      const e = res.estimate;
-      if (!e) { setEst(null); setNote('No match — add manually, set length later.'); return; }
-      setEst(e);
-      setNote(`Matched via ${e.externalSource ?? 'lookup'} — ${estimateText(type, e)}`);
-    },
-    onError: () => { setEst(null); setNote('Lookup failed — add manually.'); },
-  });
+  const [inProgress, setInProgress] = useState(false);
 
   const create = useMutation({
     mutationFn: () => {
       const endlessGame = type === 'game' && endless;
-      const meta: Record<string, unknown> = { ...(est?.meta ?? {}) };
-      if (endlessGame) meta.endless = true;
+      // Length/units/ids are left null on purpose: POST /api/media runs the
+      // estimator server-side to fill them (skipped for endless games), so a
+      // single ADD click does the whole job — no separate estimate step.
       return api.post('/api/media', {
         type,
         title: title.trim(),
-        status: 'backlog',
-        estMinutes: endlessGame ? null : (est?.estMinutes ?? null),
-        totalUnits: endlessGame ? null : (est?.totalUnits ?? null),
-        externalId: est?.externalId ?? null,
-        externalSource: endlessGame ? 'manual' : (est?.externalSource ?? null),
-        meta: Object.keys(meta).length ? meta : null,
+        // "Already in progress" skips the queue — a half-read book shouldn't
+        // need an R&R credit before its progress can be logged.
+        status: inProgress ? 'active' : 'backlog',
+        estMinutes: null,
+        totalUnits: null,
+        externalId: null,
+        externalSource: endlessGame ? 'manual' : null,
+        meta: endlessGame ? { endless: true } : null,
       });
     },
     onSuccess: () => { onDone(); onClose(); },
@@ -736,49 +753,52 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker">TYPE</span>
-          <select value={type} onChange={e => { setType(e.target.value as MediaType); setNote(null); setEst(null); setEndless(false); }} style={addInput}>
+          <select value={type} onChange={e => { setType(e.target.value as MediaType); setEndless(false); }} style={addInput}>
             <option value="book">Book</option><option value="movie">Movie</option><option value="show">Show</option><option value="game">Game</option>
           </select>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 200 }}>
           <span className="kicker">TITLE</span>
-          <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Dune, Severance, Hades" style={addInput} />
+          <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && title.trim() && !create.isPending && create.mutate()}
+            placeholder="e.g. Dune, Severance, Hades" style={addInput} />
         </label>
-        <button className="btn" disabled={!title.trim() || lookup.isPending || (type === 'game' && endless)} onClick={() => { setNote(null); lookup.mutate(); }} style={{ color: m.color }}>
-          <Icon name="spark" size={14} /> {lookup.isPending ? 'SCANNING…' : 'AUTO-ESTIMATE'}
-        </button>
         <button className="btn btn-primary" disabled={!title.trim() || create.isPending} onClick={() => create.mutate()}>
           <Icon name="plus" size={13} /> {create.isPending ? 'ADDING…' : 'ADD'}
         </button>
         <button className="btn btn-ghost" onClick={onClose}>CANCEL</button>
       </div>
-      {type === 'game' && (
-        <button onClick={() => { setEndless(e => !e); setNote(null); setEst(null); }} className="mono"
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={() => setInProgress(p => !p)} className="mono"
           style={{
-            alignSelf: 'flex-start', fontSize: 10, letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
-            border: endless ? '1px solid var(--lime)' : '1px solid var(--line-2)',
-            background: endless ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
-            color: endless ? 'var(--lime)' : 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 10, letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
+            border: inProgress ? '1px solid var(--cyan)' : '1px solid var(--line-2)',
+            background: inProgress ? 'color-mix(in srgb, var(--cyan) 14%, transparent)' : 'var(--panel-2)',
+            color: inProgress ? 'var(--cyan)' : 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 6,
           }}>
-          <Icon name={endless ? 'check' : 'close'} size={11} /> ENDLESS — NO FINISH LINE (LOG SESSIONS)
+          <Icon name={inProgress ? 'check' : 'close'} size={11} /> ALREADY IN PROGRESS — SKIP THE QUEUE
         </button>
-      )}
-      {note && <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>{note}</div>}
+        {type === 'game' && (
+          <button onClick={() => setEndless(e => !e)} className="mono"
+            style={{
+              fontSize: 10, letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
+              border: endless ? '1px solid var(--lime)' : '1px solid var(--line-2)',
+              background: endless ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
+              color: endless ? 'var(--lime)' : 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+            <Icon name={endless ? 'check' : 'close'} size={11} /> ENDLESS — NO FINISH LINE (LOG SESSIONS)
+          </button>
+        )}
+      </div>
+      <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>
+        {type === 'game' && endless
+          ? 'Endless titles skip estimation — progress is logged per session.'
+          : 'Pages / runtime / episodes auto-estimate on ADD.'}
+      </div>
     </div>
   );
 }
 const addInput: React.CSSProperties = { padding: '8px 12px', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, outline: 'none' };
-
-/** Human summary of an AUTO-ESTIMATE result for the add form note. */
-function estimateText(type: MediaType, e: MediaEstimate): string {
-  switch (type) {
-    case 'book':  return e.pages != null ? `${e.pages} pages` : 'no page count';
-    case 'movie': return e.runtimeMin != null ? fmtMin(e.runtimeMin) : 'no runtime';
-    case 'show':  return e.episodes != null ? `${e.episodes} eps · ${e.perEpMin ?? 45}m each` : 'no episode count';
-    case 'game':  return e.gameHours != null ? `~${e.gameHours}h main story` : 'no length';
-    default: return '';
-  }
-}
 
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (

@@ -13,7 +13,9 @@
  * chore's cadence + lastCompletedOn. (Keyword/convert suggestions deferred.)
  *
  * NEW opens a typed editor: PROJECT, RECURRING CHORE (the real HabitForm),
- * or ONE-OFF TASK. Chores/tasks land in Uncategorized; move them after.
+ * or ONE-OFF TASK. Both can be filed into a project at creation (optional
+ * PROJECT select; default Uncategorized), and each project card's rotation
+ * has its own ADD CHORE that pre-files into that project.
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -261,11 +263,11 @@ function MilestoneRow({ milestone, busy, onToggle, onDelete }: { milestone: Mile
 
 /* ---------- project card ---------- */
 function ProjectCard({
-  project, chores, projects, showSugg,
+  project, chores, projects, choresModuleId, showSugg,
   editingChoreId, choreBusyId, onToggleChore, onMoveChore, onEditChore, onDeleteChore, onCloseEditChore,
   onEdit, onDelete,
 }: {
-  project: Project; chores: Habit[]; projects: Project[]; showSugg: boolean;
+  project: Project; chores: Habit[]; projects: Project[]; choresModuleId?: string; showSugg: boolean;
   editingChoreId: string | null; choreBusyId: string | null;
   onToggleChore: (c: Habit) => void; onMoveChore: (id: string, pid: string | null) => void;
   onEditChore: (id: string) => void; onDeleteChore: (c: Habit) => void; onCloseEditChore: () => void;
@@ -273,6 +275,7 @@ function ProjectCard({
 }) {
   const qc = useQueryClient();
   const [addingTask, setAddingTask] = useState(false);
+  const [addingChore, setAddingChore] = useState(false);
   const [addingMilestone, setAddingMilestone] = useState(false);
 
   const tasks = project.tasks ?? [];
@@ -336,7 +339,7 @@ function ProjectCard({
       <section className="panel-inset" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <SectionLabel icon="repeat" color="var(--teal)" count={rotation.length}>ROTATION · RECURRING</SectionLabel>
         {rotation.length === 0
-          ? <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>No recurring upkeep attached. Move a chore here from Uncategorized.</div>
+          ? <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>No recurring upkeep attached. Add one below, or move a chore here from Uncategorized.</div>
           : rotation.map(c => (
               <ChoreRow key={c.id} chore={c} projects={projects} showSugg={showSugg}
                 editing={editingChoreId === c.id} choreBusy={choreBusyId === c.id}
@@ -344,6 +347,9 @@ function ProjectCard({
                 onEdit={() => onEditChore(c.id)} onDelete={() => onDeleteChore(c)}
                 onCloseEdit={onCloseEditChore} />
             ))}
+        {choresModuleId && (addingChore
+          ? <HabitForm kind="chore" moduleId={choresModuleId} defaultProjectId={project.id} onClose={() => setAddingChore(false)} />
+          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 11, padding: '5px 10px' }} onClick={() => setAddingChore(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD CHORE</button>)}
       </section>
 
       {/* milestones */}
@@ -437,7 +443,17 @@ function MilestoneForm({ projectId, onClose }: { projectId: string; onClose: () 
   const [dueDate, setDueDate] = useState('');
   const [bonusXp, setBonusXp] = useState<number>(50);
   const create = useMutation({
-    mutationFn: () => api.post(`/api/projects/${projectId}/milestones`, { title: title.trim(), dueDate: dueDate ? new Date(dueDate).toISOString() : null, bonusXp }),
+    mutationFn: () => {
+      // Parse the date-only input on LOCAL calendar fields — new Date('yyyy-mm-dd')
+      // is UTC midnight, which renders as the previous day west of UTC
+      // (same rule as TransactionEditor's date field).
+      let dueIso: string | null = null;
+      if (dueDate) {
+        const [y, m, d] = dueDate.split('-').map(Number);
+        dueIso = new Date(y, (m || 1) - 1, d || 1).toISOString();
+      }
+      return api.post(`/api/projects/${projectId}/milestones`, { title: title.trim(), dueDate: dueIso, bonusXp });
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); onClose(); },
   });
   const submit = () => { if (title.trim()) create.mutate(); };
@@ -452,16 +468,21 @@ function MilestoneForm({ projectId, onClose }: { projectId: string; onClose: () 
   );
 }
 
-/** One-off task = a chore with cadence "once". Lands in Uncategorized. */
+/** One-off task = a chore with cadence "once". Files into the chosen
+ *  project at creation (default Uncategorized). */
 function TaskDefForm({ moduleId, onClose }: { moduleId: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState('');
   const [estMinutes, setEstMinutes] = useState<number | ''>('');
   const [baseXp, setBaseXp] = useState<number>(10);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  // Same key as the page's projects query — served from cache on this screen.
+  const projectsQ = useQuery({ queryKey: ['projects'], queryFn: () => api.get<{ projects: Project[] }>('/api/projects').then(r => r.projects) });
   const create = useMutation({
     mutationFn: () => api.post('/api/habits', {
       moduleId, kind: 'chore', title: title.trim(), cadence: 'once',
       difficulty: 'easy', baseXp, estMinutes: estMinutes === '' ? null : estMinutes,
+      projectId,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['habits', 'chore'] }); onClose(); },
   });
@@ -477,6 +498,13 @@ function TaskDefForm({ moduleId, onClose }: { moduleId: string; onClose: () => v
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="kicker">XP</span>
           <input type="number" min={0} max={500} value={baseXp} onChange={e => setBaseXp(Math.max(0, Math.min(500, Number(e.target.value))))} style={{ ...inputStyle, width: 80 }} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className="kicker">PROJECT</span>
+          <select value={projectId ?? ''} onChange={e => setProjectId(e.target.value || null)} style={inputStyle}>
+            <option value="">Uncategorized</option>
+            {(projectsQ.data ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
         </label>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -572,7 +600,7 @@ export function OperationsView() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 14, alignItems: 'start' }}>
           {projects.map(p => editingProject?.id === p.id
             ? <ProjectForm key={p.id} project={p} onClose={() => setEditingProject(null)} />
-            : <ProjectCard key={p.id} project={p} chores={chores} projects={projects} showSugg
+            : <ProjectCard key={p.id} project={p} chores={chores} projects={projects} choresModuleId={choresModuleId} showSugg
                 editingChoreId={editingChoreId} choreBusyId={busyChoreId}
                 onToggleChore={toggleChore} onMoveChore={moveChore}
                 onEditChore={setEditingChoreId} onDeleteChore={setPendingDeleteChore} onCloseEditChore={() => setEditingChoreId(null)}
