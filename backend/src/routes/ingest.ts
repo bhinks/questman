@@ -23,7 +23,7 @@
  *   POST /health-connect  — native receiver for the health-connect-webhook
  *                           Android app (Pixel Watch → Health Connect →
  *                           this). Maps its snake_case payload onto
- *                           Questman's DailyMetric keys.
+ *                           Daymon's DailyMetric keys.
  */
 import express from 'express';
 import { z } from 'zod';

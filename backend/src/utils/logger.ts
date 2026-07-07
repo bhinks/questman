@@ -11,7 +11,7 @@ const logFormat = winston.format.combine(
 export const logger = winston.createLogger({
   level: config.nodeEnv === 'production' ? 'info' : 'debug',
   format: logFormat,
-  defaultMeta: { service: 'questman-backend' },
+  defaultMeta: { service: 'daymon-backend' },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(

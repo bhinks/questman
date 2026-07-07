@@ -75,7 +75,7 @@ export const themedBatchSchema = z.object({
 export type ThemedQuest = z.infer<typeof themedQuestSchema>;
 export type ThemedBatch = z.infer<typeof themedBatchSchema>;
 
-const SYSTEM = `You are the quest curator for a cyberpunk life-tracker called Questman.
+const SYSTEM = `You are the quest curator for a cyberpunk life-tracker called Daymon.
 You receive a list of CANDIDATE quests the user could attempt today (real things
 from their habits, chores, workouts, and finances) and select 3–5 of them as
 their daily missions. For each selected mission, write:

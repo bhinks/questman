@@ -1,9 +1,9 @@
 ---
 name: screenshot-capture
-description: Regenerate the Questman README screenshots (docs/screenshots/*.png) from the live running app. Use when asked to update, refresh, recapture, or fix the docs/marketing screenshots, or after UI changes that should be reflected there.
+description: Regenerate the Daymon (formerly Questman) README screenshots (docs/screenshots/*.png) from the live running app. Use when asked to update, refresh, recapture, or fix the docs/marketing screenshots, or after UI changes that should be reflected there.
 ---
 
-# Questman screenshot capture
+# Daymon screenshot capture
 
 Regenerates `docs/screenshots/*.png` by driving the **live app** with headless
 Chromium (puppeteer). Output matches the existing **1170×720 @2×** framing
@@ -50,7 +50,7 @@ cp shots/*.png ../../../docs/screenshots/      # from the skill dir
 ## How it works / gotchas
 
 - **Auth:** logs in via `POST /api/auth/login` as the demo account
-  (`demo@questman.app` / `demo123`) and injects the JWT into
+  (`demo@daymon.app` / `demo123`) and injects the JWT into
   `localStorage['questman.auth.token']`, then reloads.
 - **Navigation:** the SPA has no URL routes (`activeTab` is React state), so the
   script clicks deck items by their visible **label** (e.g. `Shop`,

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const CONFIG = {
   base: process.env.BASE || 'http://localhost:8080', // dev mode: http://localhost:5173
-  login: { email: 'demo@questman.app', password: 'demo123' },
+  login: { email: 'demo@daymon.app', password: 'demo123' },
   tokenKey: 'questman.auth.token',
   viewport: { width: 1170, height: 720, deviceScaleFactor: 2 }, // matches existing docs/screenshots
   outDir: fileURLToPath(new URL('./shots/', import.meta.url)),

@@ -1,5 +1,5 @@
 /**
- * Dress the seeded demo account (demo@questman.app) with a lived-in
+ * Dress the seeded demo account (demo@daymon.app) with a lived-in
  * history so README screenshots look like a real runner's hub: XP/eddie
  * ledgers, streaks, owned cosmetics, projects, media, a workout plan,
  * focus sessions, a boss, and today's sleep metric.
@@ -26,7 +26,7 @@ function localMidnight(): Date {
 }
 
 async function main() {
-  const user = await prisma.user.findUniqueOrThrow({ where: { email: 'demo@questman.app' } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { email: 'demo@daymon.app' } });
   const userId = user.id;
   const modules = Object.fromEntries(
     (await prisma.module.findMany({ where: { userId } })).map(m => [m.key, m.id]),

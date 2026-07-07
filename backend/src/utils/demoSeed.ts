@@ -14,7 +14,10 @@ import { provisionLifeHub } from './provision';
 
 /** The dedicated demo account. Login is via the DEMO button (a minted token),
  *  not a password, so the stored hash is throwaway. */
-export const DEMO_EMAIL = 'demo@questman.app';
+export const DEMO_EMAIL = 'demo@daymon.app';
+/** Pre-rename demo address — reseeding also sweeps this so an instance that
+ *  ran as Questman doesn't keep an orphaned demo account. */
+const LEGACY_DEMO_EMAIL = 'demo@questman.app';
 export const DEMO_NAME = 'V';
 
 const d = (daysAgo: number): Date => {
@@ -26,7 +29,7 @@ const d = (daysAgo: number): Date => {
 export async function seedDemoUser(prisma: PrismaClient): Promise<{ id: string; email: string; name: string | null }> {
   // Full reset: deleting the account cascades every owned row (all User
   // relations are onDelete: Cascade), so we always rebuild from a clean slate.
-  await prisma.user.deleteMany({ where: { email: DEMO_EMAIL } });
+  await prisma.user.deleteMany({ where: { email: { in: [DEMO_EMAIL, LEGACY_DEMO_EMAIL] } } });
 
   const password = await bcrypt.hash(`demo-${Date.now()}-${Math.round(Math.random() * 1e9)}`, 10);
   const user = await prisma.user.create({

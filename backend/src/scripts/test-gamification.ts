@@ -18,7 +18,7 @@ async function main() {
 
   // Resolve the demo user
   const user = await prisma.user.findUniqueOrThrow({
-    where: { email: 'demo@questman.app' },
+    where: { email: 'demo@daymon.app' },
     select: { id: true },
   });
 

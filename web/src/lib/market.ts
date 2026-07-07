@@ -19,7 +19,7 @@ import type { HandlerPersona } from './api';
  *  the returning v1 themes (back on sale, repriced into the v2 curve);
  *  keys match index.css [data-theme] blocks. */
 export const SKIN_META: Record<string, { name: string; colors: [string, string, string] }> = {
-  default:     { name: 'QUESTMAN OS',      colors: ['#1ce2ff', '#9d6bff', '#ff2e9a'] },
+  default:     { name: 'DAYMON OS'   ,      colors: ['#1ce2ff', '#9d6bff', '#ff2e9a'] },
   matrix:      { name: 'MATRIX',           colors: ['#43ff8e', '#8bff43', '#2ff5a6'] },
   arctic:      { name: 'ARCTIC',           colors: ['#8fd8ff', '#c9e6ff', '#a6c8ff'] },
   toxic:       { name: 'TOXIC',            colors: ['#b4ff39', '#d8ff4d', '#6dff6d'] },

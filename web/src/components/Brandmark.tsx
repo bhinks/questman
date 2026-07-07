@@ -54,7 +54,7 @@ export function Brandmark({ size = 'md' }: BrandmarkProps) {
         color: 'var(--text)',
         letterSpacing: '-0.02em'
       }}>
-        Quest<span style={{ color: 'var(--cyan)' }}>man</span>
+        Day<span style={{ color: 'var(--cyan)' }}>mon</span>
       </div>
     </div>
   );

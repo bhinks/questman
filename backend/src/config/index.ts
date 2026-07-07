@@ -66,14 +66,14 @@ const configSchema = z.object({
   // Single-user self-hosted hub: public signup is off by default.
   allowRegistration: z.boolean().default(false),
 
-  // Service-to-service admin key (e.g. for NovaHQ to manage Questman users
+  // Service-to-service admin key (e.g. for NovaHQ to manage Daymon users
   // without a browser session). Must be 16+ chars. When set, requests carrying
   // "X-Admin-Key: <key>" on /api/admin/* are treated as authenticated admin calls.
   // Unset = API key auth disabled (admin endpoints require a logged-in admin user).
   adminApiKey: z.string().min(16).optional(),
 
   // Shared secret for HinksID SSO. When set, NovaHQ can redirect users to
-  // GET /api/auth/sso?token=<signed-jwt> to start a Questman session without
+  // GET /api/auth/sso?token=<signed-jwt> to start a Daymon session without
   // typing a password. The token must be a short-lived JWT signed with this
   // secret by NovaHQ. Must be 16+ chars. Unset = SSO disabled.
   hinksIdSsoSecret: z.string().min(16).optional(),

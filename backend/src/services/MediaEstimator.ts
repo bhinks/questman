@@ -269,7 +269,7 @@ async function estimateGameHltb(title: string): Promise<MediaEstimate | null> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (compatible; Questman/1.0)',
+      'User-Agent': 'Mozilla/5.0 (compatible; Daymon/1.0)',
       Referer: 'https://howlongtobeat.com/',
       Origin: 'https://howlongtobeat.com',
     },

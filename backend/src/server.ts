@@ -240,7 +240,7 @@ process.on('SIGINT', gracefulShutdown);
 // Start server
 const PORT = config.port || 3001;
 server.listen(PORT, () => {
-  logger.info(`🚀 Questman backend running on port ${PORT}`);
+  logger.info(`🚀 Daymon backend running on port ${PORT}`);
   logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📊 Database: ${config.database.url}`);
   // One-time: migrate the old global integration env (location, calendar,

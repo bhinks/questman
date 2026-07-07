@@ -1,5 +1,5 @@
 # =====================================================================
-# Questman — local self-hosted deployment.
+# Daymon — local self-hosted deployment.
 #
 #   docker compose up --build
 #
@@ -14,9 +14,12 @@
 # =====================================================================
 
 # Pin the compose project name so it's independent of the parent
-# directory (which is still /mnt/d/projects/findash until the outer
-# rename). Without this, container/network/volume names would be
-# prefixed `findash_` not `questman_`.
+# directory. Deliberately STILL `questman` after the Daymon rename: the
+# project name prefixes the data volume (questman_questman-data), so
+# renaming it would strand the live database. Same for the container
+# names, the volume below, and the /data/questman.db path — legacy
+# identifiers, kept for continuity. Migrate them only as a deliberate
+# data-move (docker volume clone + compose down/up), not as a find/replace.
 name: questman
 
 services:

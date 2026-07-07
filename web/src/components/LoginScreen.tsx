@@ -72,7 +72,7 @@ export function LoginScreen() {
 
             {/* Boot terminal */}
             <div className="ncx-term" style={{ margin: '14px 0 20px' }}>
-              <div>&gt; init questman.os <span className="ok">[OK]</span></div>
+              <div>&gt; init daymon.os <span className="ok">[OK]</span></div>
               <div>&gt; mount /vault/local <span className="ok">[ENCRYPTED]</span></div>
               <div>&gt; scan ice <span className="ok">[NONE DETECTED]</span></div>
               <div>
@@ -97,7 +97,7 @@ export function LoginScreen() {
                   autoComplete="username"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="runner@questman.local"
+                  placeholder="runner@daymon.local"
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

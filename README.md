@@ -1,11 +1,11 @@
-# Questman
+# Daymon
 
-A gamified personal **life hub** with a cyberpunk aesthetic. Questman turns the
+A gamified personal **life hub** with a cyberpunk aesthetic. Daymon turns the
 scattered inputs of a day — quests, habits, chores, projects, workouts, vitals,
 media, finances, and the people you keep up with — into one ranked daily board,
 and wraps it in an XP/eddies economy so doing the work actually feels like
-playing. Self-hosted, single-user, dockerized. Short for *Quest Manager*, with a
-nod to the Walkman.
+playing. Self-hosted, single-user, dockerized. The name is *day* + *daemon* — the
+background process that runs your days.
 
 ![The Today board — priority contract, day-planner ledger, weather scan, power cell, and session log](docs/screenshots/today.png)
 *TODAY: the day's quests ranked by the planner, an AI Handler briefing, a
@@ -98,7 +98,7 @@ blocks on an external feed.
 | `ANTHROPIC_API_KEY` | create a key in the Anthropic Console (<https://platform.claude.com/>). The key alone enables nothing; you still flip the switches in SYS // CALIBRATION. |
 | `ANTHROPIC_MODEL` | defaults to `claude-opus-4-8`; `claude-sonnet-4-6` or `claude-haiku-4-5` for lighter/cheaper use |
 
-Prefer to keep AI fully on-box? Point Questman at a local **[Ollama](https://ollama.com)**
+Prefer to keep AI fully on-box? Point Daymon at a local **[Ollama](https://ollama.com)**
 node instead (URL + model, set in the AI Calibration panel) — zero cloud egress.
 A daily token cap (also in-panel) backstops cost.
 
@@ -177,7 +177,7 @@ docker compose down -v            # stop + wipe the data volume (fresh slate)
 ```
 
 Dev mode (no Docker): `npm run dev` in both `backend/` and `web/` — backend on
-`:3001`, Vite on `:5173`. A seeded **demo account** (`demo@questman.app` /
+`:3001`, Vite on `:5173`. A seeded **demo account** (`demo@daymon.app` /
 `demo123`) exists for clicking around without your real data; run
 `npm run db:seed` in `backend/` to (re)create it.
 

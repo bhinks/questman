@@ -1,5 +1,5 @@
 /**
- * Typed fetch wrapper for the Questman backend.
+ * Typed fetch wrapper for the Daymon backend.
  *
  * In dev we hit http://localhost:3001 directly (CORS configured to
  * allow http://localhost:5173 with credentials). In Docker/prod, nginx

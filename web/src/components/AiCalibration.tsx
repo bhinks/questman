@@ -1,7 +1,7 @@
 /**
  * AiCalibration — SYS // CALIBRATION's AI panel (the "neural governor").
  *
- * Questman's AI layer is flavor, never load-bearing — this panel is where the
+ * Daymon's AI layer is flavor, never load-bearing — this panel is where the
  * user decides exactly how much of it runs and what it may see:
  *
  *   - MASTER BREAKER: aiEnabled. Off = zero LLM calls anywhere; every AI

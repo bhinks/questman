@@ -205,7 +205,7 @@ router.post('/demo', asyncHandler(async (req, res) => {
 // HinksID SSO entry point. NovaHQ mints a short-lived JWT signed with the shared
 // HINKSID_SSO_SECRET and POSTs it here via an auto-submitting form, so the token
 // never rides a URL (no access-log / browser-history exposure). We verify the
-// signature, resolve the account by the NORMALIZED email claim, issue a Questman
+// signature, resolve the account by the NORMALIZED email claim, issue a Daymon
 // session cookie, and redirect into the SPA. For emailless HinksID identities
 // NovaHQ derives a STABLE synthetic email from the immutable HinksID id, so a
 // recycled username can never collide onto another person's account.
@@ -240,9 +240,9 @@ router.post('/sso', asyncHandler(async (req, res) => {
 
   // Find the account by email, or AUTO-PROVISION one on first SSO. Brent's call:
   // an unknown HinksID identity self-onboards rather than 403 (the family hub is
-  // admin-curated at NovaHQ, so Questman trusts a validly-signed identity). Mirrors
+  // admin-curated at NovaHQ, so Daymon trusts a validly-signed identity). Mirrors
   // /register — a full life-hub user — but with a random, unusable password, since
-  // SSO users never sign in with a Questman password.
+  // SSO users never sign in with a Daymon password.
   let user = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true, tokenVersion: true },
