@@ -49,6 +49,8 @@ export function TransactionsView({
   const [search, setSearch] = useState('');
   // Group the log by normalized vendor name instead of a flat chronological list.
   const [groupByVendor, setGroupByVendor] = useState(false);
+  // Manual ledger entry form — cash/Venmo spend the imports never see.
+  const [adding, setAdding] = useState(false);
 
   // Categories for the bulk RECATEGORIZE picker (shared cache).
   const catsQ = useQuery({
@@ -117,6 +119,23 @@ export function TransactionsView({
     onSuccess: () => qc.invalidateQueries({ queryKey: ['transactions'] }),
   });
 
+  /** A row was added or recategorized — refresh the log + budget math. */
+  const invalidateLedger = () => {
+    qc.invalidateQueries({ queryKey: ['transactions'] });
+    qc.invalidateQueries({ queryKey: ['budgets'] });
+    qc.invalidateQueries({ queryKey: ['budgets', 'history'] });
+  };
+
+  // Inline per-row recategorize — PUTs the category directly, no modal round-trip.
+  const recat = useMutation({
+    mutationFn: (vars: { id: string; categoryId: string | null }) =>
+      api.put(`/api/transactions/${vars.id}`, { categoryId: vars.categoryId }),
+    onSuccess: invalidateLedger,
+    onError: () => {
+      window.alert('Category change failed — please try again.');
+    },
+  });
+
   const bulk = useMutation({
     mutationFn: (vars: { operation: BulkOp; data?: Record<string, unknown> }) =>
       api.post('/api/transactions/bulk', {
@@ -178,13 +197,23 @@ export function TransactionsView({
     groupByVendor, onGroupByVendor: setGroupByVendor,
     normalizing: normalizeMut.isPending,
     onNormalize: () => normalizeMut.mutate(),
+    onAdd: () => setAdding(true),
   };
+
+  const addForm = adding && (
+    <AddTransactionForm
+      categories={catsQ.data ?? []}
+      onClose={() => setAdding(false)}
+      onDone={invalidateLedger}
+    />
+  );
 
   if (transactions.length === 0) {
     return (
       <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
         <Header total={0} excluded={0} accounts={[]} account="" onAccount={setAccountFilter} {...filterProps} />
-        <Empty>NO TRANSACTIONS LOADED — import a statement to populate the log.</Empty>
+        {addForm}
+        <Empty>NO TRANSACTIONS LOADED — import a statement or ADD TRANSACTION to populate the log.</Empty>
       </div>
     );
   }
@@ -194,6 +223,7 @@ export function TransactionsView({
     return (
       <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
         <Header total={0} excluded={0} accounts={accounts} account={accountFilter} onAccount={setAccountFilter} {...filterProps} />
+        {addForm}
         <Empty>
           {anyFilter
             ? 'NO RECORDS MATCH THESE FILTERS — adjust or clear them to see the rest of the log.'
@@ -213,6 +243,8 @@ export function TransactionsView({
         onAccount={setAccountFilter}
         {...filterProps}
       />
+
+      {addForm}
 
       <BulkBar
         count={selected.size}
@@ -238,8 +270,10 @@ export function TransactionsView({
                       key={t.id}
                       tx={t}
                       selected={selected.has(t.id)}
+                      categories={catsQ.data ?? []}
                       onToggle={() => toggleOne(t.id)}
                       onEdit={() => onEdit(t)}
+                      onCategory={categoryId => recat.mutate({ id: t.id, categoryId })}
                     />
                   ))}
                 </div>
@@ -278,8 +312,10 @@ export function TransactionsView({
                   key={t.id}
                   tx={t}
                   selected={selected.has(t.id)}
+                  categories={catsQ.data ?? []}
                   onToggle={() => toggleOne(t.id)}
                   onEdit={() => onEdit(t)}
+                  onCategory={categoryId => recat.mutate({ id: t.id, categoryId })}
                 />
               ))}
             </div>
@@ -308,7 +344,7 @@ export function TransactionsView({
 function Header({
   total, excluded, accounts, account, onAccount,
   search, onSearch, monthFilter, categoryFilter, onClearMonth, onClearCategory,
-  groupByVendor, onGroupByVendor, normalizing, onNormalize,
+  groupByVendor, onGroupByVendor, normalizing, onNormalize, onAdd,
 }: {
   total: number;
   excluded: number;
@@ -325,6 +361,7 @@ function Header({
   onGroupByVendor: (v: boolean) => void;
   normalizing: boolean;
   onNormalize: () => void;
+  onAdd: () => void;
 }) {
   const hasChips = !!(monthFilter || categoryFilter);
   return (
@@ -342,6 +379,14 @@ function Header({
           </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            onClick={onAdd}
+            title="Record a manual transaction — cash, Venmo, anything imports miss"
+            style={{ padding: '7px 12px', fontSize: 11, color: 'var(--lime)' }}
+          >
+            <Icon name="plus" size={12} /> ADD TRANSACTION
+          </button>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Icon name="search" size={12} style={{ position: 'absolute', left: 9, color: 'var(--text-faint)', pointerEvents: 'none' }} />
             <input
@@ -454,6 +499,163 @@ function FilterChip({ label, value, onClear }: { label: string; value: string; o
     </span>
   );
 }
+
+/* ---------------------------------------------------------- manual entry -- */
+
+/** Local YYYY-MM-DD for the date input default (today). Local fields, not
+ *  toISOString(), so a late-night entry doesn't land on tomorrow's UTC day. */
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Compact inline form for a manual ledger entry (cash / Venmo / anything the
+ *  statement imports never see). POSTs the existing /api/transactions endpoint,
+ *  which auto-categorizes when no category is picked. */
+function AddTransactionForm({
+  categories, onClose, onDone,
+}: {
+  categories: FinanceCategory[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [date, setDate] = useState(todayLocal());
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [kind, setKind] = useState<'expense' | 'income'>('expense');
+  const [categoryId, setCategoryId] = useState('');
+
+  const amountNum = parseFloat(amount);
+  const valid = date !== '' && description.trim().length > 0 && Number.isFinite(amountNum) && amountNum > 0;
+
+  const create = useMutation({
+    mutationFn: () => {
+      // Parse the date on LOCAL calendar fields — new Date('YYYY-MM-DD')
+      // is UTC midnight, a day off in a negative-offset zone.
+      const [y, m, d] = date.split('-').map(Number);
+      return api.post('/api/transactions', {
+        date: new Date(y, (m || 1) - 1, d || 1).toISOString(),
+        description: description.trim(),
+        // Ledger sign convention (matches imports): expenses negative, income positive.
+        amount: kind === 'expense' ? -Math.abs(amountNum) : Math.abs(amountNum),
+        // Omitting categoryId lets the backend auto-categorize.
+        ...(categoryId ? { categoryId } : {}),
+      });
+    },
+    onSuccess: () => { onDone(); onClose(); },
+  });
+
+  const submit = () => { if (valid && !create.isPending) create.mutate(); };
+
+  return (
+    <div className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="kicker" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--lime)' }}>
+        <Icon name="plus" size={13} style={{ color: 'var(--lime)' }} />
+        MANUAL LEDGER ENTRY
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
+          <span className="kicker">DATE</span>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            style={addInputStyle}
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 2, minWidth: 200 }}>
+          <span className="kicker">DESCRIPTION</span>
+          <input
+            autoFocus
+            placeholder="e.g. Venmo — split dinner"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+            style={addInputStyle}
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 110 }}>
+          <span className="kicker">AMOUNT ($)</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+            style={addInputStyle}
+          />
+        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className="kicker">TYPE</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <KindToggle active={kind === 'expense'} color="var(--red)" onClick={() => setKind('expense')}>
+              EXPENSE
+            </KindToggle>
+            <KindToggle active={kind === 'income'} color="var(--lime)" onClick={() => setKind('income')}>
+              INCOME
+            </KindToggle>
+          </div>
+        </div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 150 }}>
+          <span className="kicker">CATEGORY</span>
+          <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={addInputStyle}>
+            <option value="">— auto —</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {create.isError && (
+          <span className="mono" style={{ fontSize: 11, color: 'var(--red)', marginRight: 'auto' }}>
+            COULDN&rsquo;T ADD — TRY AGAIN
+          </span>
+        )}
+        <button className="btn btn-ghost" onClick={onClose} disabled={create.isPending}>CANCEL</button>
+        <button className="btn btn-primary" disabled={!valid || create.isPending} onClick={submit}>
+          {create.isPending ? 'ADDING…' : 'ADD TRANSACTION'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KindToggle({
+  active, color, onClick, children,
+}: { active: boolean; color: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost"
+      onClick={onClick}
+      style={{
+        padding: '7px 12px', fontSize: 11,
+        color: active ? color : 'var(--text-dim)',
+        border: active ? `1px solid color-mix(in srgb, ${color} 45%, transparent)` : undefined,
+        background: active ? `color-mix(in srgb, ${color} 10%, transparent)` : undefined,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const addInputStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  background: '#070811',
+  border: '1px solid var(--line-2)',
+  borderRadius: 0,
+  color: 'var(--text)',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 13,
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+};
 
 /* -------------------------------------------------------------- bulk bar -- */
 
@@ -587,12 +789,14 @@ function VendorGroupHeader({ name, total, count }: { name: string; total: number
 /* ------------------------------------------------------------------- row -- */
 
 function Row({
-  tx, selected, onToggle, onEdit,
+  tx, selected, categories, onToggle, onEdit, onCategory,
 }: {
   tx: Transaction;
   selected: boolean;
+  categories: FinanceCategory[];
   onToggle: () => void;
   onEdit: () => void;
+  onCategory: (categoryId: string | null) => void;
 }) {
   const excluded = !!tx.excluded;
   const income = tx.amount >= 0;
@@ -647,9 +851,28 @@ function Row({
       </div>
 
       <div style={{ ...cell, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: 160 }}>
-        <span style={{ color: tx.category ? 'var(--text-dim)' : 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {tx.category || 'Uncategorized'}
-        </span>
+        {categories.length === 0 ? (
+          <span style={{ color: tx.category ? 'var(--text-dim)' : 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {tx.category || 'Uncategorized'}
+          </span>
+        ) : (
+          /* Inline recategorize — PUTs the change directly, no editor round-trip. */
+          <select
+            value={tx.categoryId ?? ''}
+            onChange={e => onCategory(e.target.value || null)}
+            title="Recategorize this transaction"
+            style={{
+              flex: 1, minWidth: 0,
+              padding: '3px 4px', fontSize: 11, fontFamily: 'var(--font-mono)',
+              background: '#070811', border: '1px solid var(--line-2)',
+              color: tx.categoryId ? 'var(--text-dim)' : 'var(--text-faint)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="">Uncategorized</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
         {tx.account && (
           <span
             className="mono"

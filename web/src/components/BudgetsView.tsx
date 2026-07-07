@@ -21,7 +21,7 @@
  * Design system only — .panel / .panel-inset / .hud / kicker / mono / .btn /
  * .btn-ghost / .btn-primary / .fade-up and CSS color vars. Never hardcodes hex.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -229,6 +229,33 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
 /* -------------------------------------------------------------- envelopes -- */
 
 function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
+  const qc = useQueryClient();
+  // Inline click-to-edit cap — null means not editing. Commits on Enter/blur
+  // via the same PUT /api/budgets/:categoryId the MANAGE section uses.
+  const [capDraft, setCapDraft] = useState<string | null>(null);
+  const cancelEditRef = useRef(false);
+
+  const saveCap = useMutation({
+    mutationFn: (cap: number) => api.put(`/api/budgets/${item.categoryId}`, { cap }),
+    onSuccess: () => {
+      setCapDraft(null);
+      qc.invalidateQueries({ queryKey: ['budgets'] });
+      qc.invalidateQueries({ queryKey: ['budgets', 'history'] });
+      qc.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+
+  const commitCap = () => {
+    if (capDraft == null || saveCap.isPending) return;
+    const cap = Number(capDraft.trim());
+    // Invalid or unchanged input just closes the editor — no PUT.
+    if (capDraft.trim() === '' || !Number.isFinite(cap) || cap < 0 || cap === item.cap) {
+      setCapDraft(null);
+      return;
+    }
+    saveCap.mutate(cap);
+  };
+
   const accent = STATUS_COLOR[item.status];
   const fillPct = Math.min(100, Math.max(0, item.pct));
   const over = item.status === 'over';
@@ -282,8 +309,47 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
 
         {/* spend / cap + remaining + pct */}
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            {money(item.spent)} <span style={{ color: 'var(--text-faint)' }}>/ {money(item.cap)}</span>
+          <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {money(item.spent)}{' '}
+            {capDraft == null ? (
+              <button
+                type="button"
+                className="mono"
+                onClick={() => setCapDraft(String(item.cap))}
+                title="Click to edit this envelope's monthly cap"
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 12, color: 'var(--text-faint)',
+                  textDecoration: 'underline dotted', textUnderlineOffset: 3,
+                }}
+              >
+                / {money(item.cap)}
+              </button>
+            ) : (
+              <input
+                autoFocus
+                type="number"
+                min={0}
+                step={1}
+                value={capDraft}
+                disabled={saveCap.isPending}
+                onChange={e => setCapDraft(e.target.value)}
+                onKeyDown={e => {
+                  // Enter commits via the single blur path; Escape discards.
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                  if (e.key === 'Escape') { cancelEditRef.current = true; e.currentTarget.blur(); }
+                }}
+                onBlur={() => {
+                  if (cancelEditRef.current) { cancelEditRef.current = false; setCapDraft(null); return; }
+                  commitCap();
+                }}
+                style={{
+                  ...inputStyle,
+                  width: 80, textAlign: 'right', padding: '2px 6px', fontSize: 12,
+                  ...(saveCap.isError ? { borderColor: 'var(--red)' } : {}),
+                }}
+              />
+            )}
           </span>
           <span
             className="mono"

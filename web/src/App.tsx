@@ -252,8 +252,13 @@ function HubApp() {
       // A category/exclude/link change shifts budget math too.
       qc.invalidateQueries({ queryKey: ['budgets'] });
       qc.invalidateQueries({ queryKey: ['budgets', 'history'] });
+      // Close only once the server confirms — a failed save keeps the
+      // editor (and the user's edits) open with the error shown inline.
+      setEditingTransaction(null);
     },
-    onError: (err: any) => setErrors([err?.message ?? 'Save failed']),
+    // The editor renders this failure inline (saveError prop) — marking it
+    // locally-handled keeps the global mutation toast from double-reporting.
+    onError: () => {},
   });
 
   // Category display + the drill-filter come straight from the server's
@@ -343,15 +348,16 @@ function HubApp() {
   };
 
   const handleEditTransaction = (transaction: Transaction) => {
+    editMutation.reset(); // don't carry a stale error into a fresh edit
     setEditingTransaction(transaction);
   };
 
   const handleSaveTransaction = (updatedTransaction: Transaction) => {
     editMutation.mutate(updatedTransaction);
-    setEditingTransaction(null);
   };
 
   const handleCancelEdit = () => {
+    editMutation.reset();
     setEditingTransaction(null);
   };
 
@@ -580,6 +586,8 @@ function HubApp() {
           onSave={handleSaveTransaction}
           onCancel={handleCancelEdit}
           categories={availableCategories}
+          saving={editMutation.isPending}
+          saveError={editMutation.error ? ((editMutation.error as Error).message || 'Save failed') : null}
         />
       )}
     </AppShell>

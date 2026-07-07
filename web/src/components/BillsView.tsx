@@ -31,6 +31,7 @@ import type {
   Cadence,
 } from '../lib/api';
 import { Icon } from './Icon';
+import { ConfirmDialog } from './ConfirmDialog';
 
 const CADENCE_LABEL: Record<Cadence, string> = {
   weekly: '/wk',
@@ -394,6 +395,8 @@ function BillCard({
   onChanged: () => void;
 }) {
   const qc = useQueryClient();
+  // Delete sits right beside PAID/edit — always confirm before killing.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const pay = useMutation({
     mutationFn: () => api.post(`/api/recurring/${bill.id}/pay`),
@@ -402,6 +405,7 @@ function BillCard({
   const remove = useMutation({
     mutationFn: () => api.del(`/api/recurring/${bill.id}`),
     onSuccess: () => {
+      setConfirmingDelete(false);
       qc.invalidateQueries({ queryKey: ['recurring'] });
       qc.invalidateQueries({ queryKey: ['recurring', 'audit'] });
       onChanged();
@@ -507,7 +511,7 @@ function BillCard({
         <button
           className="btn btn-ghost"
           disabled={remove.isPending}
-          onClick={() => remove.mutate()}
+          onClick={() => setConfirmingDelete(true)}
           title="Delete bill permanently"
           aria-label={`Delete ${bill.name}`}
           style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-faint)' }}
@@ -515,6 +519,17 @@ function BillCard({
           <Icon name="close" size={14} />
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        danger
+        title="Delete bill?"
+        message={<>This permanently removes <strong style={{ color: 'var(--text)' }}>{bill.name}</strong> from your tracked bills. This can&rsquo;t be undone.</>}
+        confirmLabel="DELETE"
+        busy={remove.isPending}
+        onConfirm={() => remove.mutate()}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

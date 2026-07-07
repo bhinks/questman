@@ -34,15 +34,18 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
     }
   };
 
-  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  // No useCallback([]) here — that froze the first render's handleFile
+  // closure (stale onFileProcessed/setIsLoading), deadening the drop zone
+  // after the first upload re-rendered the parent.
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragActive(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFile(files[0]);
     }
-  }, []);
+  };
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -62,6 +65,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
     if (e.target.files && e.target.files.length > 0) {
       handleFile(e.target.files[0]);
     }
+    e.target.value = ''; // allow re-selecting the same file
   };
 
   return (

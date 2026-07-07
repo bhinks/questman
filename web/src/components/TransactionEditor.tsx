@@ -10,6 +10,10 @@ interface TransactionEditorProps {
   onSave: (updated: Transaction) => void;
   onCancel: () => void;
   categories?: string[]; // legacy prop, unused — categories are fetched by id now
+  /** Parent save-mutation state: the modal stays open on failure so the
+   *  user's edits survive; the error renders inline. */
+  saving?: boolean;
+  saveError?: string | null;
 }
 
 const labelStyle: React.CSSProperties = {
@@ -28,8 +32,12 @@ const fieldStyle: React.CSSProperties = {
  * (drop transfers from totals), and PROJECT / CHORE links (spend rollups).
  * Category/project/chore lists are fetched here so the modal is self-contained.
  */
-export function TransactionEditor({ transaction, onSave, onCancel }: TransactionEditorProps) {
+export function TransactionEditor({ transaction, onSave, onCancel, saving = false, saveError = null }: TransactionEditorProps) {
   const [t, setT] = useState<Transaction>({ ...transaction });
+  // Amount drafts as a raw string so clearing the field to retype doesn't
+  // coerce to $0 mid-edit; parsed + validated on submit instead.
+  const [amountDraft, setAmountDraft] = useState(String(transaction.amount));
+  const [amountError, setAmountError] = useState(false);
 
   const catQ = useQuery({
     queryKey: ['categories'],
@@ -57,7 +65,9 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(t);
+    const amount = parseFloat(amountDraft);
+    if (!Number.isFinite(amount)) { setAmountError(true); return; }
+    onSave({ ...t, amount });
   };
 
   return (
@@ -180,9 +190,14 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
             </div>
             <div>
               <label style={labelStyle}>AMOUNT</label>
-              <input type="number" step="0.01" value={t.amount}
-                onChange={(e) => setT(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
-                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }} />
+              <input type="number" step="0.01" value={amountDraft}
+                onChange={(e) => { setAmountDraft(e.target.value); setAmountError(false); }}
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', ...(amountError ? { borderColor: 'var(--red)' } : {}) }} />
+              {amountError && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+                  Enter a valid amount.
+                </div>
+              )}
             </div>
           </div>
 
@@ -206,9 +221,25 @@ export function TransactionEditor({ transaction, onSave, onCancel }: Transaction
             </label>
           </div>
 
+          {saveError && (
+            <div
+              className="mono"
+              style={{
+                fontSize: 12, color: 'var(--red)', lineHeight: 1.5,
+                padding: '10px 12px',
+                background: 'color-mix(in srgb, var(--red) 8%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',
+              }}
+            >
+              SAVE FAILED — {saveError}. Your edits are still here — retry or cancel.
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
             <button type="button" onClick={onCancel} className="btn" style={{ padding: '10px 20px' }}>Cancel</button>
-            <button type="submit" className="btn-primary" style={{ padding: '10px 20px' }}>Save Changes</button>
+            <button type="submit" className="btn-primary" disabled={saving} style={{ padding: '10px 20px' }}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
           </div>
         </div>
       </form>
