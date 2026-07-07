@@ -30,6 +30,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { startOfLocalDay } from '../utils/dates';
 import { DEMO_EMAIL } from '../utils/demoSeed';
+import { completeVitalsQuestForToday } from './vitalsQuest';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -264,6 +265,10 @@ export async function pullNow(
     if (!parsed.success) throw new Error('payload failed validation');
 
     const { written, days: dayCount } = await ingestHealthConnectPayload(prisma, userId, parsed.data);
+    // Synced vitals count as logged — clear today's pending vitals check-in
+    // so the user isn't asked to re-SUBMIT data the phone already delivered.
+    // Best-effort: a quest/XP hiccup must never fail the pull.
+    await completeVitalsQuestForToday(prisma, userId).catch(() => {});
     if (state.lastFailLogged || state.lastOkAt === null) {
       logger.info(`[healthSync] phone reachable — pull sync active (user ${userId})`);
     }

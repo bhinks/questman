@@ -14,9 +14,10 @@
  * `?token=` query param for webhook apps that can't set custom headers
  * (secret-URL pattern, same trust model as the calendar ICS URL). Values
  * upsert on the (userId, date, key) unique, so re-sending a window is
- * idempotent. Bulk-historical by design: it does NOT auto-complete
- * today's vitals quest (PUT /api/metrics stays the interactive path
- * that does).
+ * idempotent. POST /metrics is bulk-historical by design: it does NOT
+ * auto-complete today's vitals quest. POST /health-connect DOES — a phone
+ * push that lands today's vitals clears the pending check-in
+ * (services/vitalsQuest.ts), same as the interactive PUT /api/metrics.
  *
  * Two endpoints:
  *   POST /metrics         — generic {entries:[{date,key,value}]} rows.
@@ -44,6 +45,7 @@ import { logger } from '../utils/logger';
 import {
   healthConnectSchema, ingestHealthConnectPayload, resolveHubUserId,
 } from '../services/healthSync';
+import { completeVitalsQuestForToday } from '../services/vitalsQuest';
 
 const router = express.Router();
 
@@ -150,6 +152,10 @@ router.post('/health-connect', asyncHandler(async (req, res) => {
   const userId = await resolveUserId(req);
   const body = healthConnectSchema.parse(req.body ?? {});
   const { written, days } = await ingestHealthConnectPayload(prisma, userId, body);
+  // Phone-pushed vitals count as logged — clear today's pending vitals quest
+  // (idempotent; historic-only payloads no-op inside the helper). Best-effort:
+  // a quest/XP hiccup must never fail the ingest.
+  await completeVitalsQuestForToday(prisma, userId).catch(() => {});
   logger.info(`[ingest] health-connect: ${written} value(s) across ${days} day(s) for user ${userId}`);
   res.json({ written, days });
 }));

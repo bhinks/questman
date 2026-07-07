@@ -22,7 +22,7 @@ import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { GamificationService } from '../services/GamificationService';
-import { eddiesForReward } from '../utils/economy';
+import { completeVitalsQuest } from '../services/vitalsQuest';
 import { startOfLocalDay } from '../utils/dates';
 import { QuestCandidate } from '../services/anthropic';
 import { pullNow, getSyncStatus } from '../services/healthSync';
@@ -261,31 +261,12 @@ router.put('/', asyncHandler(async (req: AuthRequest, res) => {
       });
     }
 
-    // Closed loop: clear the pending "log your daily vitals" quest. Generic
-    // check-in → no sourceId, so match on source + questDate + status only.
-    const q = await tx.quest.findFirst({
-      where: { userId, source: 'vitals', sourceId: null, questDate: day, status: 'pending' },
-    });
-    if (q) {
-      await tx.quest.update({
-        where: { id: q.id },
-        data: { status: 'completed', progress: 1, currentCount: q.targetCount },
-      });
-      await tx.questCompletion.create({
-        data: {
-          userId, questId: q.id, xpAwarded: q.xpReward,
-          meta: JSON.stringify({ trigger: 'vitals-log' }),
-        },
-      });
-      player = await game().awardXp(userId, {
-        amount: q.xpReward,
-        eddies: eddiesForReward(q.xpReward, q.difficulty),
-        reason: 'quest_complete',
-        module: 'vitals',
-        refType: 'quest',
-        refId: q.id,
-      }, tx);
-      questAutoCompleted = { id: q.id, xpReward: q.xpReward };
+    // Closed loop: clear the pending "log your daily vitals" quest (shared
+    // helper — the phone-sync paths trigger the same completion).
+    const done = await completeVitalsQuest(tx, game(), userId, day, 'vitals-log');
+    if (done) {
+      player = done.player;
+      questAutoCompleted = done.questAutoCompleted;
     }
   });
 

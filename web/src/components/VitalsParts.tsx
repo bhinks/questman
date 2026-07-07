@@ -174,10 +174,16 @@ export function useVitalsReadout() {
     + (hasBp && isFilled('bpSys') && isFilled('bpDia') ? 1 : 0);
   const totalCount = metricDefs.length + (hasBp ? 1 : 0);
   const submitted = logQ.data?.submitted ?? false;
+  // A field cleared after being logged is a real edit (an un-log: the submit
+  // sends null and the server deletes the row), so SUBMIT must stay enabled
+  // for it even when nothing else is filled.
+  const hasClears = Object.entries(draft).some(
+    ([k, raw]) => (raw === '' || raw == null) && (logQ.data?.values ?? {})[k] !== undefined,
+  );
 
   return {
     defsQ, logQ, defs, enabled, metricDefs, bpSysDef, bpDiaDef, hasBp,
-    draft, setVal, isFilled, loggedCount, totalCount, submitted, submit,
+    draft, setVal, isFilled, loggedCount, totalCount, submitted, submit, hasClears,
   };
 }
 
@@ -325,6 +331,17 @@ export function MetricTile({ def, meta, value, onChange, logged }: {
   def: MetricDef; meta: MetricMeta; value: string; onChange: (v: string) => void; logged: boolean;
 }) {
   const isScale = def.kind === 'scale';
+  // Water accumulates through the day — +/− steppers beat recalling the
+  // running total and overwriting it.
+  const stepper = def.key === 'water';
+  const stepBy = (delta: number) => {
+    const cur = value === '' ? 0 : Number(value);
+    if (Number.isNaN(cur)) return;
+    const next = Math.round((cur + delta) * 100) / 100;
+    if (next < (def.min ?? 0)) return;
+    if (def.max != null && next > def.max) return;
+    onChange(String(next));
+  };
   return (
     <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -335,13 +352,23 @@ export function MetricTile({ def, meta, value, onChange, logged }: {
       {isScale ? (
         <ScalePicker lo={def.min ?? 1} hi={def.max ?? 5} value={value} onChange={onChange} color={meta.color} />
       ) : (
-        <div style={{ position: 'relative' }}>
-          <input type="number" inputMode={def.kind === 'integer' ? 'numeric' : 'decimal'}
-            step={def.kind === 'integer' ? 1 : 'any'} min={def.min ?? undefined} max={def.max ?? undefined}
-            placeholder="—" value={value} onChange={e => onChange(e.target.value)}
-            style={{ ...tileInput, color: value === '' ? 'var(--text-ghost)' : meta.color }} />
-          {logged && (
-            <Icon name="check" size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--lime)' }} />
+        <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <input type="number" inputMode={def.kind === 'integer' ? 'numeric' : 'decimal'}
+              step={def.kind === 'integer' ? 1 : 'any'} min={def.min ?? undefined} max={def.max ?? undefined}
+              placeholder="—" value={value} onChange={e => onChange(e.target.value)}
+              style={{ ...tileInput, color: value === '' ? 'var(--text-ghost)' : meta.color }} />
+            {logged && (
+              <Icon name="check" size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--lime)' }} />
+            )}
+          </div>
+          {stepper && (
+            <>
+              <button type="button" className="btn btn-ghost" style={{ padding: '0 11px', fontSize: 16, flex: 'none' }}
+                onClick={() => stepBy(-1)} aria-label={`${def.label} minus 1`}>−</button>
+              <button type="button" className="btn btn-ghost" style={{ padding: '0 11px', fontSize: 16, flex: 'none' }}
+                onClick={() => stepBy(1)} aria-label={`${def.label} plus 1`}>+</button>
+            </>
           )}
         </div>
       )}
@@ -352,6 +379,7 @@ export function MetricTile({ def, meta, value, onChange, logged }: {
 /* combined systolic/diastolic tile (spans 2 columns) */
 export function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; onSys: (v: string) => void; onDia: (v: string) => void }) {
   const logged = sys !== '' && dia !== '';
+  const diaRef = useRef<HTMLInputElement>(null);
   return (
     <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, gridColumn: 'span 2' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -360,10 +388,15 @@ export function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; o
         <span style={{ marginLeft: 'auto' }}><SourceTag source="phone" /></span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input type="number" inputMode="numeric" placeholder="SYS" value={sys} onChange={e => onSys(e.target.value)}
+        <input type="number" inputMode="numeric" placeholder="SYS" value={sys}
+          onChange={e => {
+            onSys(e.target.value);
+            // 3 digits is a complete systolic reading — hop straight to DIA.
+            if (e.target.value.length === 3) diaRef.current?.focus();
+          }}
           style={{ ...tileInput, color: sys === '' ? 'var(--text-ghost)' : 'var(--magenta)', textAlign: 'center' }} />
         <span className="ncx-val" style={{ fontSize: 22, color: 'var(--text-faint)' }}>/</span>
-        <input type="number" inputMode="numeric" placeholder="DIA" value={dia} onChange={e => onDia(e.target.value)}
+        <input ref={diaRef} type="number" inputMode="numeric" placeholder="DIA" value={dia} onChange={e => onDia(e.target.value)}
           style={{ ...tileInput, color: dia === '' ? 'var(--text-ghost)' : 'var(--cyan)', textAlign: 'center' }} />
         {logged && <Icon name="check" size={15} style={{ color: 'var(--lime)', flex: 'none' }} />}
       </div>

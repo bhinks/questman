@@ -18,7 +18,7 @@
  * The vitals readout/sync/trend pieces live in VitalsParts (shared); the
  * workout half lives here. Both wire to the real endpoints — no mocks.
  */
-import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { api } from '../lib/api';
@@ -122,6 +122,17 @@ export function HealthView() {
     queryFn: () => api.get<{ workouts: Workout[] }>('/api/workouts?limit=20').then(r => r.workouts),
   });
   const workouts = recentQ.data ?? [];
+  // Distinct exercise names harvested from the cached recent workouts — feeds
+  // the logger's <datalist> so names autocomplete instead of being retyped.
+  const exerciseNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const w of workouts) {
+      for (const ex of w.exercises ?? []) {
+        if (typeof ex?.exercise === 'string' && ex.exercise) names.add(ex.exercise);
+      }
+    }
+    return [...names].sort();
+  }, [workouts]);
   const weekCut = Date.now() - 7 * 86_400_000;
   const wk = workouts.filter(w => new Date(w.performedAt).getTime() >= weekCut);
   const week: WeekVol = {
@@ -163,7 +174,7 @@ export function HealthView() {
           <div className="hgrid">
             <VitalsReadout v={v} />
             <div className="hcol">
-              <WorkoutLogger ref={loggerRef} />
+              <WorkoutLogger ref={loggerRef} exerciseNames={exerciseNames} />
               <WeekVolume week={week} />
             </div>
           </div>
@@ -222,9 +233,15 @@ function VitalsReadout({ v }: { v: ReturnType<typeof useVitalsReadout> }) {
   const loading = defsQ.isLoading || logQ.isLoading;
   const error = defsQ.isError || logQ.isError;
   const noMetrics = !loading && !error && v.enabled.length === 0;
+  // Clear-only edits (un-logging a value) count as a submittable change too.
+  const canSubmit = v.loggedCount > 0 || v.hasClears;
 
   return (
-    <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <form
+      className="panel"
+      style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}
+      onSubmit={e => { e.preventDefault(); if (!v.submit.isPending && canSubmit) v.submit.mutate(); }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
         {logQ.data && <span className="ncx-serial">LOG {format(new Date(logQ.data.date), 'yyyy.MM.dd')}</span>}
@@ -262,7 +279,7 @@ function VitalsReadout({ v }: { v: ReturnType<typeof useVitalsReadout> }) {
             ))}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="btn btn-primary" disabled={v.submit.isPending || v.loggedCount === 0} onClick={() => v.submit.mutate()}>
+            <button type="submit" className="btn btn-primary" disabled={v.submit.isPending || !canSubmit}>
               {v.submit.isPending ? 'TRANSMITTING…' : v.submitted ? 'UPDATE LOG' : 'SUBMIT LOG'}
             </button>
             {v.submit.isSuccess && v.submit.data?.questAutoCompleted && (
@@ -278,7 +295,7 @@ function VitalsReadout({ v }: { v: ReturnType<typeof useVitalsReadout> }) {
           </div>
         </>
       )}
-    </section>
+    </form>
   );
 }
 
@@ -290,7 +307,7 @@ export interface WorkoutLoggerHandle {
   prefill: (plan: WorkoutPlan) => void;
 }
 
-const WorkoutLogger = forwardRef<WorkoutLoggerHandle>(function WorkoutLogger(_props, ref) {
+const WorkoutLogger = forwardRef<WorkoutLoggerHandle, { exerciseNames: string[] }>(function WorkoutLogger({ exerciseNames }, ref) {
   const qc = useQueryClient();
   const [type, setType] = useState<WorkoutType>('strength');
   const [intensity, setIntensity] = useState<Intensity>('moderate');
@@ -407,7 +424,7 @@ const WorkoutLogger = forwardRef<WorkoutLoggerHandle>(function WorkoutLogger(_pr
             <textarea placeholder="How did it feel?" value={notes} onChange={e => setNotes(e.target.value)} rows={2}
               style={{ ...inputStyle, resize: 'vertical' }} />
           </label>
-          <ExercisesEditor exercises={exercises} setExercises={setExercises} />
+          <ExercisesEditor exercises={exercises} setExercises={setExercises} exerciseNames={exerciseNames} />
         </div>
       )}
 
@@ -509,19 +526,37 @@ function RecentWorkouts({ workouts, loading }: { workouts: Workout[]; loading: b
 
 /**
  * One recent-workout card — color-coded by type. Collapsed shows the gist;
- * clicking expands it (full-width) to detail + editable notes + delete.
+ * clicking expands it (full-width) to a full edit — title / type / minutes /
+ * intensity / notes, same controls as the create form — plus delete.
  */
 function WorkoutCard({
   workout: w, expanded, onToggle, onDelete,
 }: { workout: Workout; expanded: boolean; onToggle: () => void; onDelete: () => void }) {
   const qc = useQueryClient();
   const [notes, setNotes] = useState(w.notes ?? '');
-  const dirty = notes !== (w.notes ?? '');
+  const [title, setTitle] = useState(w.title ?? '');
+  const [type, setType] = useState<WorkoutType>(coerceType(w.type));
+  const [durationMin, setDurationMin] = useState<string>(w.durationMin != null ? String(w.durationMin) : '');
+  const [intensity, setIntensity] = useState<Intensity | null>(w.intensity ?? null);
+  const dirty = notes !== (w.notes ?? '')
+    || title !== (w.title ?? '')
+    || type !== coerceType(w.type)
+    || durationMin !== (w.durationMin != null ? String(w.durationMin) : '')
+    || intensity !== (w.intensity ?? null);
   const tm = TYPE_META[w.type] ?? TYPE_META.other;
   const ic = w.intensity ? INTENSITY_COLOR[w.intensity] : 'var(--text-dim)';
 
-  const saveNotes = useMutation({
-    mutationFn: () => api.put(`/api/workouts/${w.id}`, { notes: notes.trim() || null }),
+  const save = useMutation({
+    mutationFn: () => {
+      const mins = Number(durationMin);
+      return api.put(`/api/workouts/${w.id}`, {
+        title: title.trim() || null,
+        type,
+        durationMin: durationMin !== '' && Number.isFinite(mins) && mins >= 0 ? Math.round(mins) : null,
+        intensity,
+        notes: notes.trim() || null,
+      });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workouts', 'recent'] }),
   });
 
@@ -546,15 +581,54 @@ function WorkoutCard({
         <Icon name="chevD" size={13} style={{ color: 'var(--text-faint)', flex: 'none', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </div>
 
-      {/* expanded detail */}
+      {/* expanded detail — every create-form field stays editable in place */}
       {expanded && (
         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--line)' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Detail label="TYPE" value={w.type} />
-            {w.durationMin != null && <Detail label="DURATION" value={`${w.durationMin} min`} />}
-            {w.intensity && <Detail label="INTENSITY" value={w.intensity} />}
-            {w.caloriesEst != null && <Detail label="CALORIES" value={`~${w.caloriesEst}`} />}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="kicker" style={{ fontSize: 9 }}>TYPE</span>
+              <select value={type} onChange={e => setType(e.target.value as WorkoutType)} style={ctrl}>
+                {SESSION_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="kicker" style={{ fontSize: 9 }}>MINUTES</span>
+              <input type="number" inputMode="numeric" min={0} max={720} value={durationMin}
+                onChange={e => setDurationMin(e.target.value)} style={ctrl} />
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="kicker" style={{ fontSize: 9 }}>INTENSITY</span>
+              <div style={{ display: 'flex', gap: 0, boxShadow: 'inset 0 0 0 1px var(--line-2)' }}>
+                {INTENSITIES.map(o => {
+                  const on = intensity === o.value;
+                  const c = INTENSITY_COLOR[o.value];
+                  return (
+                    <button key={o.value} type="button" onClick={() => setIntensity(o.value)} className="mono"
+                      style={{
+                        flex: 1, padding: '8px 0', fontSize: 11, letterSpacing: '0.1em', cursor: 'pointer', border: 'none', borderRadius: 0,
+                        background: on ? `color-mix(in srgb, ${c} 18%, transparent)` : 'transparent',
+                        color: on ? c : 'var(--text-dim)', fontWeight: on ? 700 : 500,
+                        boxShadow: on ? `inset 0 0 0 1px ${c}` : 'none',
+                      }}>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="kicker" style={{ fontSize: 9 }}>TITLE (OPTIONAL)</span>
+            <input value={title} onChange={e => setTitle(e.target.value)}
+              placeholder='e.g. "Push day", "5k run"' style={ctrl} />
+          </label>
+
+          {w.caloriesEst != null && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Detail label="CALORIES" value={`~${w.caloriesEst}`} />
+            </div>
+          )}
 
           {w.exercises && w.exercises.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -586,8 +660,8 @@ function WorkoutCard({
               <Icon name="close" size={13} style={{ marginRight: 4 }} /> DELETE
             </button>
             {dirty && (
-              <button onClick={() => saveNotes.mutate()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} disabled={saveNotes.isPending}>
-                {saveNotes.isPending ? 'SAVING…' : 'SAVE NOTES'}
+              <button onClick={() => save.mutate()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} disabled={save.isPending}>
+                {save.isPending ? 'SAVING…' : 'SAVE'}
               </button>
             )}
           </div>
@@ -841,8 +915,8 @@ function PlanForm({
 /* EXERCISES EDITOR (optional, inside the compact logger)                */
 /* ===================================================================== */
 function ExercisesEditor({
-  exercises, setExercises,
-}: { exercises: ExerciseRow[]; setExercises: (e: ExerciseRow[]) => void }) {
+  exercises, setExercises, exerciseNames,
+}: { exercises: ExerciseRow[]; setExercises: (e: ExerciseRow[]) => void; exerciseNames: string[] }) {
   const addExercise = () => setExercises([...exercises, { exercise: '', sets: [{}] }]);
   const removeExercise = (i: number) => setExercises(exercises.filter((_, idx) => idx !== i));
   const updateExercise = (i: number, fn: (e: ExerciseRow) => ExerciseRow) =>
@@ -856,11 +930,15 @@ function ExercisesEditor({
           <Icon name="plus" size={12} /> ADD
         </button>
       </div>
+      <datalist id="qm-exercise-names">
+        {exerciseNames.map(n => <option key={n} value={n} />)}
+      </datalist>
       {exercises.map((ex, i) => (
         <div key={i} className="panel-inset" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               placeholder="Exercise (e.g. Bench Press)"
+              list="qm-exercise-names"
               value={ex.exercise}
               onChange={e => updateExercise(i, x => ({ ...x, exercise: e.target.value }))}
               style={{ ...inputStyle, flex: 1 }}
@@ -903,9 +981,15 @@ function SetsEditor({ ex, onChange }: { ex: ExerciseRow; onChange: (x: ExerciseR
             }}
             style={{ ...inputStyle, width: 64 }}
           />
+          <button type="button" className="btn btn-ghost" style={{ padding: '4px 6px' }}
+            onClick={() => update(ex.sets.filter((_, idx) => idx !== j))} aria-label="Remove set">
+            <Icon name="close" size={11} />
+          </button>
         </div>
       ))}
-      <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => update([...ex.sets, {}])}>
+      {/* clone the previous set as the starting values — 4×10@60 shouldn't mean 8 retypes */}
+      <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }}
+        onClick={() => update([...ex.sets, { ...ex.sets[ex.sets.length - 1] }])}>
         <Icon name="plus" size={11} /> SET
       </button>
     </div>
