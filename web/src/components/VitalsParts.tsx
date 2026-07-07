@@ -68,7 +68,7 @@ const CHART_STYLE: ChartStyle = 'bars';
 const SHOW_BAND = true;
 export const CARD_MIN = 320;
 
-const CARD: React.CSSProperties = { padding: 16, display: 'flex', flexDirection: 'column', gap: 12 };
+export const CARD: React.CSSProperties = { padding: 16, display: 'flex', flexDirection: 'column', gap: 12 };
 
 export const tileInput: React.CSSProperties = {
   width: '100%', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0,
@@ -372,7 +372,7 @@ export function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; o
 }
 
 /* ---------- trend cards (each fetches its own history) ---------- */
-function CardHead({ meta, label }: { meta: MetricMeta; label: string }) {
+export function CardHead({ meta, label }: { meta: MetricMeta; label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div className="ncx-chip" style={{ width: 30, height: 30, color: meta.color }}>

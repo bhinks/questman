@@ -40,6 +40,10 @@ const META: Record<string, MetricMeta> = {
   // Training (daily workout minutes) is a synthetic stream derived from logged
   // workouts — it only appears in the Health trends grid, never the readout.
   training:   { color: 'var(--lime)',    icon: 'spark',  source: 'manual', good: 'up' },
+  // Bedtime (signed hours vs the wake day's midnight, written by the health
+  // uplink). Def-less like training: charts via the Sleep Schedule card only,
+  // never the readout tiles.
+  sleepStart: { color: 'var(--violet)',  icon: 'moon',   source: 'phone',  good: null },
 };
 
 const FALLBACK_PALETTE = [

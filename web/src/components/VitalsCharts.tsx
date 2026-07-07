@@ -16,7 +16,7 @@ export interface SeriesPoint { date: Date; value: number }
 export type ChartStyle = 'area' | 'line' | 'bars';
 
 /** Measure an element's pixel width so charts render crisp (not stretched). */
-function useWidth(initial = 360): [React.RefObject<HTMLDivElement | null>, number] {
+export function useWidth(initial = 360): [React.RefObject<HTMLDivElement | null>, number] {
   const ref = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(initial);
   useLayoutEffect(() => {
@@ -72,7 +72,7 @@ function DeltaPill({ delta, good, unit }: { delta: number | null; good: 'up' | '
   );
 }
 
-function FootStat({ label, value }: { label: string; value: React.ReactNode }) {
+export function FootStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span className="ncx-serial">{label}</span>
@@ -81,7 +81,7 @@ function FootStat({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function ChartEmpty({ height }: { height: number }) {
+export function ChartEmpty({ height }: { height: number }) {
   return (
     <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
       no readings in window

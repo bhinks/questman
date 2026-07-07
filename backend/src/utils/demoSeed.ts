@@ -158,6 +158,9 @@ export async function seedDemoUser(prisma: PrismaClient): Promise<{ id: string; 
   });
   const vitals: Array<{ key: string; vals: number[] }> = [
     { key: 'sleepHours', vals: [7.5, 6, 8, 7, 6.5] },
+    // Bedtime, signed hours vs the wake day's midnight (see healthSync):
+    // 23:24, 01:06, 22:48, 23:42, 00:18 — enough drift to make the card honest.
+    { key: 'sleepStart', vals: [-0.6, 1.1, -1.2, -0.3, 0.3] },
     { key: 'mood', vals: [4, 3, 5, 4, 4] },
     { key: 'steps', vals: [8200, 5400, 11000, 9300, 7600] },
   ];

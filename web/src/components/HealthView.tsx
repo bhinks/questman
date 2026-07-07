@@ -33,6 +33,7 @@ import {
   MetricTrendCard, BpTrendCard, TrainingTrendCard, ConfigPanel,
   WINDOWS, CARD_MIN,
 } from './VitalsParts';
+import { SleepScheduleCard } from './SleepCard';
 
 type WorkoutType = 'strength' | 'cardio' | 'mobility' | 'sport' | 'other';
 type Intensity = 'low' | 'moderate' | 'high';
@@ -200,6 +201,9 @@ export function HealthView() {
 
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN}px, 1fr))`, gap: 14, alignItems: 'start' }}>
               {v.hasBp && <BpTrendCard key="bp" sysDef={v.bpSysDef!} diaDef={v.bpDiaDef!} days={days} />}
+              {/* Fixed 10-night window by design (bedtime alignment is a
+                  short read); hides itself until bedtimes have synced. */}
+              <SleepScheduleCard key="sleep-schedule" />
               <TrainingTrendCard key="training" days={days} />
               {v.metricDefs.map((def, i) => (
                 <MetricTrendCard key={def.key} def={def} meta={metaFor(def.key, i)} days={days} />

@@ -15,6 +15,10 @@
  *   - steps / hydration: summed per local day, intervals bucketed by their
  *     midpoint so UTC-expressed day aggregates land on the right local day.
  *   - sleep: credited to the local day the session ENDED (the wake-up day).
+ *     Alongside the summed hours, the night's BEDTIME is stored as
+ *     'sleepStart': signed hours relative to the wake day's local midnight
+ *     (22:30 → -1.5, 00:45 → +0.75), so the series is continuous across
+ *     midnight. Longest session of the day wins (a nap never sets bedtime).
  *   - weight / blood pressure / resting HR: latest reading of the day wins.
  *   - weight + water are converted to the user's MetricDef units so synced
  *     values match hand-logged ones. Raw heart_rate samples are ignored.
@@ -32,7 +36,7 @@ type Db = PrismaClient | Prisma.TransactionClient;
 const isoTime = z.string().min(10).max(40);
 export const healthConnectSchema = z.object({
   steps: z.array(z.object({ count: z.number().finite(), start_time: isoTime, end_time: isoTime }).passthrough()).optional(),
-  sleep: z.array(z.object({ session_end_time: isoTime, duration_seconds: z.number().finite() }).passthrough()).optional(),
+  sleep: z.array(z.object({ session_end_time: isoTime, duration_seconds: z.number().finite(), session_start_time: isoTime.optional() }).passthrough()).optional(),
   resting_heart_rate: z.array(z.object({ bpm: z.number().finite(), time: isoTime }).passthrough()).optional(),
   weight: z.array(z.object({ kilograms: z.number().finite(), time: isoTime }).passthrough()).optional(),
   blood_pressure: z.array(z.object({ systolic: z.number().finite(), diastolic: z.number().finite(), time: isoTime }).passthrough()).optional(),
@@ -113,8 +117,22 @@ export async function ingestHealthConnectPayload(
   };
 
   for (const s of body.steps ?? []) add(dayOfInterval(s.start_time, s.end_time), 'steps', s.count);
-  // Sleep belongs to the day you WOKE UP — bucket by session end.
-  for (const s of body.sleep ?? []) add(dayOf(s.session_end_time), 'sleepHours', s.duration_seconds / 3600);
+  // Sleep belongs to the day you WOKE UP — bucket by session end. Each night
+  // also records its bedtime ('sleepStart', signed hours vs the wake day's
+  // local midnight); with several sessions on one day the longest one sets
+  // the bedtime, so a nap never masquerades as the night's start.
+  const longestSleep = new Map<number, number>(); // wake dayMs → duration_seconds
+  for (const s of body.sleep ?? []) {
+    const day = dayOf(s.session_end_time);
+    add(day, 'sleepHours', s.duration_seconds / 3600);
+    if (!day || s.duration_seconds <= 0 || s.duration_seconds > 24 * 3600) continue;
+    const endMs = new Date(s.session_end_time).getTime();
+    const startExplicit = s.session_start_time ? new Date(s.session_start_time).getTime() : NaN;
+    const startMs = !isNaN(startExplicit) ? startExplicit : endMs - s.duration_seconds * 1000;
+    if ((longestSleep.get(day.getTime()) ?? 0) >= s.duration_seconds) continue;
+    longestSleep.set(day.getTime(), s.duration_seconds);
+    put(day, 'sleepStart', (startMs - day.getTime()) / 3_600_000);
+  }
   for (const s of body.resting_heart_rate ?? []) putLatest(dayOf(s.time), 'restingHr', Math.round(s.bpm), s.time);
   for (const s of body.weight ?? []) putLatest(dayOf(s.time), 'weight', r1(weightFromKg(s.kilograms)), s.time);
   for (const s of body.blood_pressure ?? []) {
@@ -126,6 +144,7 @@ export async function ingestHealthConnectPayload(
   // Round summed floats once, after accumulation.
   for (const rec of values.values()) {
     if (rec.sleepHours != null) rec.sleepHours = r2(rec.sleepHours);
+    if (rec.sleepStart != null) rec.sleepStart = r2(rec.sleepStart);
     if (rec.water != null) rec.water = r1(rec.water);
     if (rec.steps != null) rec.steps = Math.round(rec.steps);
   }
@@ -278,7 +297,7 @@ export async function pullNow(
 /** Short display labels for the uplink stream readout (bp* collapse to BP). */
 const STREAM_LABELS: Record<string, string> = {
   steps: 'STEPS', restingHr: 'HEART', bpSys: 'BP', bpDia: 'BP',
-  sleepHours: 'SLEEP', weight: 'WEIGHT', water: 'WATER', workHours: 'FOCUS', mood: 'MOOD',
+  sleepHours: 'SLEEP', sleepStart: 'SLEEP', weight: 'WEIGHT', water: 'WATER', workHours: 'FOCUS', mood: 'MOOD',
 };
 
 export interface SyncStatus {
