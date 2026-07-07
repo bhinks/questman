@@ -278,6 +278,33 @@ router.post('/:id/skip', asyncHandler(async (req: AuthRequest, res) => {
 }));
 
 /**
+ * POST /api/quests/:id/defer — push a pending quest to tomorrow, free.
+ * The "not today" valve: no token, no XP, no status change — the quest
+ * just moves to tomorrow's board. originDate is left alone, so the
+ * planner's neglect boost ranks it up when it resurfaces. Tomorrow's
+ * generator can't dup it: the Quest @@unique([userId, questDate, source,
+ * sourceId]) guard skips a fresh candidate for the same source.
+ */
+router.post('/:id/defer', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const quest = await prisma.quest.findFirst({
+    where: { id: req.params.id, userId },
+  });
+  if (!quest) throw new AppError('Quest not found', 404);
+  if (quest.status !== 'pending') {
+    throw new AppError(`Cannot defer a ${quest.status} quest`, 400);
+  }
+
+  const tomorrow = startOfLocalDay();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const updated = await prisma.quest.update({
+    where: { id: quest.id },
+    data: { questDate: tomorrow },
+  });
+  res.json({ quest: updated });
+}));
+
+/**
  * POST /api/quests/:id/reroll — swap a quest for a different one.
  * Consumes a REROLL TOKEN, but only if a fresh alternative exists (else
  * the token is NOT spent and we say so).

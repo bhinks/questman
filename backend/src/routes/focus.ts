@@ -1,9 +1,10 @@
 /**
  * Focus-timer routes — the JACK IN deep-work chamber.
  *
- *   GET  /targets   → everything a session can be logged against (active
- *                     projects, habits, chores, workout plans), flattened
- *                     to { type, id, label } options for the picker.
+ *   GET  /targets   → everything a session can be logged against (today's
+ *                     pending quests, active projects, habits, chores,
+ *                     workout plans), flattened to { type, id, label }
+ *                     options for the picker.
  *   POST /sessions  → persist a FINISHED session (the timer itself runs
  *                     client-side). Quest targets also accumulate
  *                     Quest.actualMinutes so estimate accuracy keeps
@@ -20,6 +21,7 @@ import { z } from 'zod';
 import { prisma } from '../server';
 import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { startOfLocalDay } from '../utils/dates';
 
 const router = express.Router();
 
@@ -28,7 +30,14 @@ const router = express.Router();
 /** GET /targets → { targets: [{ type, id, label }] } for the focus picker. */
 router.get('/targets', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
-  const [projects, habits, plans] = await Promise.all([
+  const [quests, projects, habits, plans] = await Promise.all([
+    prisma.quest.findMany({
+      // Today's open contracts — so a run can be attributed to the quest
+      // it's actually burning down (and feed Quest.actualMinutes).
+      where: { userId, questDate: startOfLocalDay(), status: 'pending' },
+      select: { id: true, title: true },
+      orderBy: { title: 'asc' },
+    }),
     prisma.project.findMany({
       where: { userId, status: 'active' },
       select: { id: true, name: true },
@@ -49,6 +58,7 @@ router.get('/targets', asyncHandler(async (req: AuthRequest, res) => {
 
   res.json({
     targets: [
+      ...quests.map(q => ({ type: 'quest' as const, id: q.id, label: q.title })),
       ...projects.map(p => ({ type: 'project' as const, id: p.id, label: p.name })),
       ...habits.map(h => ({ type: h.kind === 'chore' ? 'chore' as const : 'habit' as const, id: h.id, label: h.title })),
       ...plans.map(w => ({ type: 'workout' as const, id: w.id, label: w.title })),

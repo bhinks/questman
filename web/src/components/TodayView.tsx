@@ -14,12 +14,13 @@
  *     SIDE JOBS (over-budget quests), SESSION LOG (today's XP ledger
  *     interleaved with today's focus runs)
  */
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { PlayerSnapshot, Quest, TodayResponse, WeatherToday, DayPlan, PlanQuest, LedgerEntry, FocusSession, HandlerLatestResponse, HandlerPersona } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Icon } from './Icon';
+import { ConfirmDialog } from './ConfirmDialog';
 import { CityFeed } from './TodayFeed';
 import type { FocusSeed } from './FocusView';
 import { personaMeta } from '../lib/market';
@@ -254,12 +255,14 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
     queryFn: () => api.get<{ sessions: FocusSession[] }>('/api/focus/sessions?limit=40').then(r => r.sessions),
   });
 
-  const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ['player'] });
-    qc.invalidateQueries({ queryKey: ['quests', 'today'] });
-    qc.invalidateQueries({ queryKey: ['quests', 'plan'] });
-    qc.invalidateQueries({ queryKey: ['player', 'stats'] });
-  };
+  // Returns the refetch promise so callers can await fresh cache state
+  // (the +1 batcher holds its optimistic pips until this resolves).
+  const invalidateAll = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ['player'] }),
+    qc.invalidateQueries({ queryKey: ['quests', 'today'] }),
+    qc.invalidateQueries({ queryKey: ['quests', 'plan'] }),
+    qc.invalidateQueries({ queryKey: ['player', 'stats'] }),
+  ]);
 
   // Cross-client sync.
   useEffect(() => {
@@ -276,13 +279,65 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
     mutationFn: (id: string) => api.post(`/api/quests/${id}/complete`),
     onSuccess: invalidateAll,
   });
+  // Rapid +1 taps batch into ONE request: a POST per tap raced the server's
+  // guarded write and the losers' {noop:true} responses silently dropped
+  // ticks. Each tap bumps the pips optimistically; ~400ms after the last tap
+  // the summed delta ships as a single POST (schema cap: delta ≤ 100). The
+  // bump is held until the refetch lands (onSettled awaits it), so a noop /
+  // race / error all reconcile the pips back to server truth.
+  const [tickBoost, setTickBoost] = useState<Record<string, number>>({});
+  const queuedTicks = useRef<Record<string, number>>({});
+  const inFlightTicks = useRef<Record<string, number>>({});
+  const tickTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const syncTickBoost = () => {
+    const boost: Record<string, number> = { ...inFlightTicks.current };
+    for (const [id, n] of Object.entries(queuedTicks.current)) boost[id] = (boost[id] ?? 0) + n;
+    setTickBoost(boost);
+  };
   const progressQuest = useMutation({
-    mutationFn: (id: string) => api.post(`/api/quests/${id}/progress`, { delta: 1 }),
-    onSuccess: invalidateAll,
+    mutationFn: ({ id, delta }: { id: string; delta: number }) =>
+      api.post(`/api/quests/${id}/progress`, { delta }),
+    onSettled: async (_res, _err, { id, delta }) => {
+      await invalidateAll();
+      const left = (inFlightTicks.current[id] ?? 0) - delta;
+      if (left > 0) inFlightTicks.current[id] = left; else delete inFlightTicks.current[id];
+      syncTickBoost();
+    },
   });
+  const queueProgress = (id: string) => {
+    queuedTicks.current[id] = (queuedTicks.current[id] ?? 0) + 1;
+    syncTickBoost();
+    clearTimeout(tickTimers.current[id]);
+    tickTimers.current[id] = setTimeout(() => {
+      delete tickTimers.current[id];
+      const delta = Math.min(100, queuedTicks.current[id] ?? 0);
+      delete queuedTicks.current[id];
+      if (delta > 0) {
+        inFlightTicks.current[id] = (inFlightTicks.current[id] ?? 0) + delta;
+        progressQuest.mutate({ id, delta });
+      }
+      syncTickBoost();
+    }, 400);
+  };
+  // Don't strand taps still batching if the view unmounts mid-debounce.
+  useEffect(() => () => {
+    Object.values(tickTimers.current).forEach(clearTimeout);
+    for (const [id, n] of Object.entries(queuedTicks.current)) {
+      if (n > 0) void api.post(`/api/quests/${id}/progress`, { delta: Math.min(100, n) });
+    }
+    queuedTicks.current = {};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // SKIP burns a token, so it confirms first — every skip button routes here.
+  const [pendingSkip, setPendingSkip] = useState<{ id: string; title: string } | null>(null);
   const skipQuest = useMutation({
     // Skipping spends a skip token, so refresh the player HUD too.
     mutationFn: (id: string) => api.post(`/api/quests/${id}/skip`),
+    onSuccess: () => { setPendingSkip(null); invalidateAll(); },
+  });
+  const deferQuest = useMutation({
+    // Free "not today": push the contract to tomorrow — no token, no XP.
+    mutationFn: (id: string) => api.post(`/api/quests/${id}/defer`),
     onSuccess: invalidateAll,
   });
   const rerollQuest = useMutation({
@@ -488,8 +543,16 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9, justifyContent: 'center' }}>
-                      {/* De-tasked (polish pass §1b): JACK IN lives on the
-                          chamber strip now — COMPLETE is the card's action. */}
+                      {/* JACK IN runs the chamber against THIS contract (the
+                          FocusSeed becomes the run's quest target, so the
+                          minutes land on Quest.actualMinutes). */}
+                      <button
+                        className="btn"
+                        style={{ padding: '11px 26px' }}
+                        onClick={() => onJackIn({ type: 'quest', id: priority.id, label: priority.title })}
+                      >
+                        <Icon name="zap" size={13} /> JACK IN
+                      </button>
                       <button className="btn" style={{ padding: '11px 26px' }} onClick={() => completeQuest.mutate(priority.id)}>
                         <Icon name="check" size={13} /> COMPLETE
                       </button>
@@ -500,7 +563,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                           style={{ padding: '5px 10px', fontSize: 10 }}
                           disabled={(player.skipTokens ?? 0) <= 0 || skipQuest.isPending}
                           title={player.skipTokens > 0 ? `Skip (${player.skipTokens} tokens)` : 'No skip tokens — buy more in the Shop'}
-                          onClick={() => skipQuest.mutate(priority.id)}
+                          onClick={() => setPendingSkip({ id: priority.id, title: priority.title })}
                         >
                           SKIP
                         </button>
@@ -552,11 +615,13 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                   index={i}
                   skipTokens={player.skipTokens}
                   rerollTokens={player.rerollTokens}
+                  tickBoost={tickBoost[q.id] ?? 0}
                   weatherTag={lastClearIds.has(q.id) ? 'last-clear' : niceDayIds.has(q.id) ? 'nice-day' : null}
                   onNavigate={onNavigate}
                   onComplete={id => completeQuest.mutate(id)}
-                  onProgress={id => progressQuest.mutate(id)}
-                  onSkip={id => skipQuest.mutate(id)}
+                  onProgress={queueProgress}
+                  onSkip={id => setPendingSkip({ id, title: q.title })}
+                  onDefer={id => deferQuest.mutate(id)}
                   onReroll={id => rerollQuest.mutate(id)}
                 />
               ))}
@@ -630,7 +695,10 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                 <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>
                   NONE — THE PLAN COVERS EVERYTHING
                 </div>
-              ) : sideJobs.map(q => (
+              ) : sideJobs.map(q => {
+                // Boosted count: taps still batching client-side show as checked.
+                const shown = Math.min(q.targetCount, q.currentCount + (tickBoost[q.id] ?? 0));
+                return (
                 <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--text-dim)', padding: '5px 0' }}>
                   <Icon name={moduleIcon(q.module.key)} size={14} style={{ color: 'var(--text-faint)', flex: 'none' }} />
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</span>
@@ -639,10 +707,10 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                   <button
                     className="btn btn-ghost"
                     style={{ padding: '3px 7px', fontSize: 10, flex: 'none' }}
-                    title={q.targetCount > 1 ? `Check in (${q.currentCount}/${q.targetCount})` : 'Complete'}
-                    onClick={() => (q.targetCount > 1 ? progressQuest.mutate(q.id) : completeQuest.mutate(q.id))}
+                    title={q.targetCount > 1 ? `Check in (${shown}/${q.targetCount})` : 'Complete'}
+                    onClick={() => (q.targetCount > 1 ? queueProgress(q.id) : completeQuest.mutate(q.id))}
                   >
-                    {q.targetCount > 1 ? `+1 · ${q.currentCount}/${q.targetCount}` : <Icon name="check" size={11} />}
+                    {q.targetCount > 1 ? `+1 · ${shown}/${q.targetCount}` : <Icon name="check" size={11} />}
                   </button>
                   {/* Same token-gated relief the in-plan contracts get. */}
                   <button
@@ -650,7 +718,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                     style={{ padding: '3px 6px', fontSize: 9.5, flex: 'none' }}
                     disabled={(player.skipTokens ?? 0) <= 0 || skipQuest.isPending}
                     title={player.skipTokens > 0 ? `Skip (${player.skipTokens} tokens)` : 'No skip tokens — buy more in the Shop'}
-                    onClick={() => skipQuest.mutate(q.id)}
+                    onClick={() => setPendingSkip({ id: q.id, title: q.title })}
                   >
                     SKIP
                   </button>
@@ -664,7 +732,8 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                     RR
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="panel" style={{ padding: '15px 18px' }}>
@@ -708,6 +777,18 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
           </div>
         </div>
       )}
+
+      {/* Skips spend a token — confirm before burning one. */}
+      <ConfirmDialog
+        open={pendingSkip !== null}
+        danger
+        title="Burn a skip token?"
+        message={pendingSkip && <>Skips <strong style={{ color: 'var(--text)' }}>{pendingSkip.title}</strong> for today — streak safe, no XP. Spends 1 of your {player.skipTokens} skip tokens.</>}
+        confirmLabel="SKIP IT"
+        busy={skipQuest.isPending}
+        onConfirm={() => pendingSkip && skipQuest.mutate(pendingSkip.id)}
+        onCancel={() => setPendingSkip(null)}
+      />
     </div>
   );
 }
@@ -722,22 +803,26 @@ function Splash({ children, color }: { children: React.ReactNode; color?: string
 
 /** One CONTRACT LEDGER row. Numbering starts at 02 (01 is the priority). */
 function LedgerRow({
-  quest, index, skipTokens, rerollTokens, weatherTag, onNavigate, onComplete, onProgress, onSkip, onReroll,
+  quest, index, skipTokens, rerollTokens, tickBoost, weatherTag, onNavigate, onComplete, onProgress, onSkip, onDefer, onReroll,
 }: {
   quest: Quest;
   index: number;
   skipTokens: number;
   rerollTokens: number;
+  tickBoost: number;
   weatherTag: 'last-clear' | 'nice-day' | null;
   onNavigate: (tab: string) => void;
   onComplete: (id: string) => void;
   onProgress: (id: string) => void;
   onSkip: (id: string) => void;
+  onDefer: (id: string) => void;
   onReroll: (id: string) => void;
 }) {
   const done = quest.status === 'completed';
   const skipped = quest.status === 'skipped';
   const isCounter = quest.targetCount > 1;
+  // Optimistic pips: +1 taps still batching client-side count as checked.
+  const shown = Math.min(quest.targetCount, quest.currentCount + tickBoost);
 
   // Days this quest has been carried forward (0 = generated today).
   const carriedDays = quest.originDate
@@ -754,7 +839,7 @@ function LedgerRow({
           quest.estMinutes != null ? `EST ${quest.estMinutes}M` : null,
           quest.source === 'bill' ? 'DUE' : null,
           quest.meta?.bestWindow ? `BEST WINDOW ${quest.meta.bestWindow}` : null,
-          isCounter ? `${quest.currentCount}/${quest.targetCount} CHECKED` : null,
+          isCounter ? `${shown}/${quest.targetCount} CHECKED` : null,
         ].filter(Boolean).join(' · ');
 
   return (
@@ -803,19 +888,19 @@ function LedgerRow({
             {Array.from({ length: quest.targetCount }, (_, j) => (
               <span key={j} style={{
                 width: 11, height: 11, flex: 'none',
-                background: j < quest.currentCount ? 'var(--teal)' : '#10121f',
-                boxShadow: j < quest.currentCount ? '0 0 6px rgba(47,245,214,0.6)' : 'inset 0 0 0 1px var(--line-2)',
+                background: j < shown ? 'var(--teal)' : '#10121f',
+                boxShadow: j < shown ? '0 0 6px rgba(47,245,214,0.6)' : 'inset 0 0 0 1px var(--line-2)',
                 clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
                 transition: 'background .2s, box-shadow .2s',
               }} />
             ))}
           </div>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--teal)' }}>{quest.currentCount}/{quest.targetCount}</span>
+          <span className="mono" style={{ fontSize: 11, color: 'var(--teal)' }}>{shown}/{quest.targetCount}</span>
           <button
             className="btn"
             style={{ padding: '6px 13px', fontSize: 11 }}
             onClick={() => onProgress(quest.id)}
-            disabled={quest.currentCount >= quest.targetCount}
+            disabled={shown >= quest.targetCount}
           >
             +1
           </button>
@@ -837,6 +922,14 @@ function LedgerRow({
             SKIP
           </button>
           <button
+            className="btn"
+            style={{ padding: '6px 11px', fontSize: 10 }}
+            title="Not today — push to tomorrow (free, no token)"
+            onClick={() => onDefer(quest.id)}
+          >
+            → TMRW
+          </button>
+          <button
             className="btn btn-ghost"
             style={{ padding: '6px 9px', fontSize: 10 }}
             title={rerollTokens > 0 ? `Reroll: swap for a different quest (1 token, ${rerollTokens} left)` : 'No reroll tokens — buy more in the Shop'}
@@ -852,7 +945,8 @@ function LedgerRow({
 }
 
 /** Daily energy/battery → POWER CELL. Tap cycles the manual override
- *  (low→med→high→low) via the existing POST /api/player/energy. */
+ *  (low→med→high→low) via the existing POST /api/player/energy;
+ *  shift-tap cycles backwards, so an accidental tap is one click to undo. */
 function EnergyPanel({
   energy, onCycle,
 }: {
@@ -861,14 +955,15 @@ function EnergyPanel({
 }) {
   const tierColor = energy.tier === 'high' ? 'var(--lime)' : energy.tier === 'med' ? 'var(--amber)' : 'var(--red)';
   const next: 'low' | 'med' | 'high' = energy.tier === 'low' ? 'med' : energy.tier === 'med' ? 'high' : 'low';
+  const prev: 'low' | 'med' | 'high' = energy.tier === 'low' ? 'high' : energy.tier === 'med' ? 'low' : 'med';
   const source = energy.source === 'sleep' && energy.sleepHours != null
     ? `${energy.sleepHours}H SLEEP`
     : energy.source === 'override' ? 'MANUAL OVERRIDE' : 'NO DATA';
   return (
     <button
       className="panel"
-      title={`Energy: ${energy.tier.toUpperCase()} (${energy.source}). Click to override → ${next.toUpperCase()}.`}
-      onClick={() => onCycle(next)}
+      title={`Energy: ${energy.tier.toUpperCase()} (${energy.source}). Click to override → ${next.toUpperCase()}; shift-click → ${prev.toUpperCase()}.`}
+      onClick={e => onCycle(e.shiftKey ? prev : next)}
       style={{ display: 'block', width: '100%', padding: '15px 18px', textAlign: 'left', cursor: 'pointer' }}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>

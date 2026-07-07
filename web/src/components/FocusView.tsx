@@ -9,8 +9,11 @@
  *     55/40/25/15 or a custom minute value → counts DOWN and auto-logs
  *     at zero.
  *   - WORKING ON: pre-seeded with the priority contract when launched
- *     from the Today page; otherwise pick a project / habit / chore /
- *     workout plan, or OTHER with freeform text.
+ *     from the Today page; otherwise pick one of today's contracts, a
+ *     project / habit / chore / workout plan, or OTHER with freeform text.
+ *
+ * Both inputs default to the LAST run's setup (localStorage) so a repeat
+ * visit doesn't re-enter everything from scratch.
  *
  * Sessions persist via POST /api/focus/sessions on jack-out (quest targets
  * also accumulate Quest.actualMinutes server-side). ABORT discards. The
@@ -47,6 +50,7 @@ export interface FocusSeed {
 }
 
 const LS_KEY = 'qm-focus-active';
+const LS_SETUP_KEY = 'qm-focus-setup';
 
 /** The running session, mirrored to localStorage for reload-resume. */
 interface ActiveRun {
@@ -94,7 +98,32 @@ function readActiveRun(): ActiveRun | null {
   }
 }
 
+/** Last run's setup, restored as the next visit's defaults. */
+interface SavedSetup {
+  limitChoice: number | 'custom' | null;
+  customMin: string;
+  targetSel: string;
+  otherText: string;
+}
+
+function readSavedSetup(): SavedSetup | null {
+  try {
+    const raw = localStorage.getItem(LS_SETUP_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw);
+    return {
+      limitChoice: typeof j?.limitChoice === 'number' ? j.limitChoice : j?.limitChoice === 'custom' ? 'custom' : null,
+      customMin: typeof j?.customMin === 'string' ? j.customMin : '',
+      targetSel: typeof j?.targetSel === 'string' && j.targetSel ? j.targetSel : 'other',
+      otherText: typeof j?.otherText === 'string' ? j.otherText : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
 const TYPE_GROUPS: Array<[FocusTargetType, string]> = [
+  ['quest', "TODAY'S CONTRACTS"],
   ['project', 'PROJECTS'],
   ['habit', 'HABITS'],
   ['chore', 'CHORES'],
@@ -105,13 +134,16 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
   const qc = useQueryClient();
 
   // ---- setup state ----------------------------------------------------
+  // Defaults restore the last run's setup (localStorage) — re-picking the
+  // limit/target every visit is how runs end up "Unlabeled".
+  const [saved] = useState(readSavedSetup);
   // Limit: null = no limit (count up). 'custom' keeps its own minute text.
-  const [limitChoice, setLimitChoice] = useState<number | 'custom' | null>(null);
-  const [customMin, setCustomMin] = useState('');
+  const [limitChoice, setLimitChoice] = useState<number | 'custom' | null>(saved?.limitChoice ?? null);
+  const [customMin, setCustomMin] = useState(saved?.customMin ?? '');
   // Target select, encoded "type:id" | "other". Seeded launches preselect.
   const seedValue = seed && seed.id ? `${seed.type}:${seed.id}` : null;
-  const [targetSel, setTargetSel] = useState<string>(seedValue ?? 'other');
-  const [otherText, setOtherText] = useState('');
+  const [targetSel, setTargetSel] = useState<string>(seedValue ?? saved?.targetSel ?? 'other');
+  const [otherText, setOtherText] = useState(saved?.otherText ?? '');
 
   // ---- run state -------------------------------------------------------
   // Initialized from localStorage so a reload mid-run resumes seamlessly.
@@ -140,6 +172,14 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
   const targets = targetsQ.data ?? [];
   // null slot = STANDARD ISSUE (the free CHRONO built-in, v2 default face).
   const timerKey = playerQ.data?.equippedTimer ?? 'standard';
+
+  // A restored selection can point at a target that no longer exists
+  // (contract cleared, project archived) — fall back to freeform once the
+  // picker options load rather than jacking in against a dead id.
+  useEffect(() => {
+    if (targetsQ.data == null || targetSel === 'other' || targetSel === seedValue) return;
+    if (!targetsQ.data.some(t => `${t.type}:${t.id}` === targetSel)) setTargetSel('other');
+  }, [targetsQ.data, targetSel, seedValue]);
 
   const logSession = useMutation({
     mutationFn: (body: {
@@ -210,6 +250,8 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
       label = (seedValue === targetSel ? seed?.label : targets.find(t => t.id === targetId)?.label) ?? 'Unlabeled run';
     }
     const next: ActiveRun = { startedAt: Date.now(), limitMin, targetType, targetId, label };
+    // Remember this setup — it becomes the next visit's defaults.
+    localStorage.setItem(LS_SETUP_KEY, JSON.stringify({ limitChoice, customMin, targetSel, otherText } satisfies SavedSetup));
     localStorage.setItem(LS_KEY, JSON.stringify(next));
     setError(null);
     setRun(next);
@@ -293,10 +335,12 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
       </div>
     ) : null;
 
-  // Group the picker options by type once per fetch.
+  // Group the picker options by type once per fetch. A seeded launch renders
+  // its own PRIORITY CONTRACT optgroup, so drop that id here — otherwise the
+  // same target appears twice in the select.
   const grouped = useMemo(() => TYPE_GROUPS
-    .map(([type, title]) => ({ type, title, opts: targets.filter(t => t.type === type) }))
-    .filter(g => g.opts.length > 0), [targets]);
+    .map(([type, title]) => ({ type, title, opts: targets.filter(t => t.type === type && `${t.type}:${t.id}` !== seedValue) }))
+    .filter(g => g.opts.length > 0), [targets, seedValue]);
 
   return (
     <div className="qm-focus">
