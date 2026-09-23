@@ -1,5 +1,4 @@
 import express from 'express';
-import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -7,12 +6,30 @@ import { prisma } from '../server';
 import { config } from '../config';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { authMiddleware, AuthRequest, AUTH_COOKIE } from '../middleware/auth';
+import { ssoClaimUpdates, droppedClaimKeys, parseAllowedModuleKeys } from '../middleware/requireModule';
+import { logger } from '../utils/logger';
 import { provisionLifeHub } from '../utils/provision';
 import { seedDemoUser } from '../utils/demoSeed';
 
 const router = express.Router();
 
 const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/**
+ * Stored as the `password` of every account /sso creates. It is not a bcrypt
+ * hash, so bcrypt.compare() in /login always answers false (a 60-char check
+ * in bcryptjs, no throw) and the account can never sign in with a Daymon
+ * password. It doubles as the marker that a row is SSO-bound: the role claim
+ * promotes only such rows (see /sso). The same pattern as Django's "!" unusable
+ * password. A dedicated `ssoSub` column would be the cleaner binding; that is
+ * a schema change outside this route.
+ */
+export const SSO_UNUSABLE_PASSWORD = '!sso';
+
+/** True for a row whose password is the SSO marker (never a real hash). */
+export function isSsoBoundPassword(password: string): boolean {
+  return password === SSO_UNUSABLE_PASSWORD;
+}
 
 /** True when the request reached us over HTTPS (directly or via a proxy). */
 function isSecureReq(req: express.Request): boolean {
@@ -210,7 +227,11 @@ router.post('/demo', asyncHandler(async (req, res) => {
 // NovaHQ derives a STABLE synthetic email from the immutable HinksID id, so a
 // recycled username can never collide onto another person's account.
 //
-// NovaHQ token payload: { sub: string, email: string, name?: string, iat, exp }
+// NovaHQ token payload:
+//   { sub, email, name?, iat, exp, modules?: string[] | null, role?: "admin" | "user" }
+// `modules` and `role` are the HinksID admin's controls (creative-hub brief 2.15
+// and 3.6): applied on EVERY SSO login, so a change in the NovaHQ admin panel
+// lands the next time the member clicks the Questman card.
 router.post('/sso', asyncHandler(async (req, res) => {
   if (!config.hinksIdSsoSecret) {
     throw new AppError('SSO is not configured on this instance', 501);
@@ -223,11 +244,12 @@ router.post('/sso', asyncHandler(async (req, res) => {
     throw new AppError('Missing SSO token', 400);
   }
 
-  let payload: { email?: string; name?: string };
+  type SsoPayload = { email?: string; name?: string; modules?: unknown; role?: unknown };
+  let payload: SsoPayload;
   try {
     // Shared secret (not JWT_SECRET) so neither side can forge the other's tokens;
     // pin HS256 + a max age so a captured token can't outlive its short window.
-    payload = jwt.verify(token, config.hinksIdSsoSecret, { algorithms: ['HS256'], maxAge: '10m' }) as { email?: string; name?: string };
+    payload = jwt.verify(token, config.hinksIdSsoSecret, { algorithms: ['HS256'], maxAge: '10m' }) as SsoPayload;
   } catch {
     throw new AppError('Invalid or expired SSO token', 401);
   }
@@ -245,17 +267,25 @@ router.post('/sso', asyncHandler(async (req, res) => {
   // SSO users never sign in with a Daymon password.
   let user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, tokenVersion: true },
+    select: { id: true, email: true, tokenVersion: true, password: true, role: true },
   });
+  const createdNow = !user;
 
   if (!user) {
-    const unusablePassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
     user = await prisma.user.create({
       data: {
         email,
-        password: unusablePassword,
-        name: payload.name || email.split('@')[0],
+        password: SSO_UNUSABLE_PASSWORD,
+        name: (typeof payload.name === 'string' ? payload.name.trim().slice(0, 80) : '') || email.split('@')[0],
         role: 'user',
+        // Defense in depth (brief 2.20: a plain member is a kid until an admin
+        // says otherwise): a brand-new non-admin account minted by a token that
+        // carries no `modules` claim starts chores-only. The claim patch below
+        // overrides this whenever the claim is present; existing accounts are
+        // never touched by this default.
+        ...(!('modules' in payload) && payload.role !== 'admin'
+          ? { allowedModuleKeys: JSON.stringify(['chores']) }
+          : {}),
         settings: {
           create: {
             currency: 'USD',
@@ -266,10 +296,38 @@ router.post('/sso', asyncHandler(async (req, res) => {
           },
         },
       },
-      select: { id: true, email: true, tokenVersion: true },
+      select: { id: true, email: true, tokenVersion: true, password: true, role: true },
     });
     // Default categories only for a brand-new account (createMany isn't idempotent).
     await createDefaultCategories(user.id);
+  }
+
+  // HinksID claims, applied on every SSO login. `modules` absent leaves the
+  // allowlist untouched; null clears it (all modules); an array is validated
+  // against the module key list (unknown keys dropped, fail closed to "[]").
+  // `role: "admin"` promotes; any other value writes nothing (never demotes).
+  const claimPatch = ssoClaimUpdates(payload);
+  const dropped = droppedClaimKeys(payload.modules);
+  if (dropped.length > 0) {
+    logger.warn({ msg: '[sso] unknown module keys dropped from claim', email, dropped });
+  }
+  // The email lookup above is the only binding between a HinksID identity and
+  // a Questman row, so the admin promotion is limited to rows SSO itself made
+  // (created just now, or carrying the SSO password marker). A row that got
+  // this email any other way (a local password account, an admin-panel edit)
+  // keeps its role and the event is logged for the admin to sort out. PUT /me
+  // already refuses email changes from non-admins; this is the second lock.
+  if (claimPatch.role === 'admin' && user.role !== 'admin') {
+    const ssoBound = createdNow || isSsoBoundPassword(user.password);
+    if (!ssoBound) {
+      delete claimPatch.role;
+      logger.warn({ msg: '[sso] admin role claim ignored: account is not SSO-bound', email, userId: user.id });
+    } else {
+      logger.info({ msg: '[sso] promoted to admin by HinksID role claim', email, userId: user.id });
+    }
+  }
+  if (Object.keys(claimPatch).length > 0) {
+    await prisma.user.update({ where: { id: user.id }, data: claimPatch });
   }
   // provisionLifeHub is idempotent and "safe to call on every login" (provision.ts):
   // running it on every SSO self-heals the module/profile/metric set, so a row that
@@ -299,22 +357,44 @@ router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => 
       email: true,
       name: true,
       role: true,
+      allowedModuleKeys: true,
       createdAt: true,
       settings: true
     }
   });
 
-  res.json({ user });
+  // allowedModuleKeys goes out parsed (string[] or null) so the SPA can trim
+  // its chrome for a restricted member without a second request. The server
+  // gates regardless (requireModule).
+  res.json({
+    user: user
+      ? { ...user, allowedModuleKeys: parseAllowedModuleKeys(user.allowedModuleKeys) }
+      : user,
+  });
 }));
 
-// Update user profile
-router.put('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
-  const updateSchema = z.object({
-    name: z.string().min(1).optional(),
-    email: z.string().email().optional()
-  });
+/** Body schema for PUT /me. `email` is admin-only (see the route). */
+export const profileUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional()
+});
 
-  const data = updateSchema.parse(req.body);
+// Update user profile. The email is the SSO binding key (/sso resolves the
+// account by it), so a non-admin may not rewrite it: a member who renamed
+// themselves to another HinksID identity's address would receive that
+// identity's next SSO login, claims included. Admins edit any address through
+// /api/admin/users; here they may still fix their own. The SPA never sends
+// `email` on this route.
+router.put('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
+  const data = profileUpdateSchema.parse(req.body);
+
+  if (data.email !== undefined && req.user!.role !== 'admin') {
+    throw new AppError('Email changes are admin-only', 403);
+  }
+  if (data.email !== undefined && data.email !== req.user!.email) {
+    const clash = await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } });
+    if (clash && clash.id !== req.user!.id) throw new AppError('Email already in use', 409);
+  }
 
   const user = await prisma.user.update({
     where: { id: req.user!.id },

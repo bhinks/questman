@@ -10,6 +10,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
+import { requireModule, requireUnrestricted, restrictSettingsWrite, restrictWrittenKeys, RESTRICTED_HANDLER_KEYS, ROUTE_GATES } from './middleware/requireModule';
 import { rateLimit } from './middleware/rateLimit';
 import { startHealthPull, resolveHubUserId } from './services/healthSync';
 import { WebSocketService } from './services/WebSocketService';
@@ -106,15 +107,24 @@ const sensitiveLimiter = rateLimit({
   message: 'Too many requests to this endpoint — try again later.',
 });
 
+// Per-user module allowlist gate for the domain routers. The route -> keys map
+// lives in middleware/requireModule.ts (ROUTE_GATES) so a test can check every
+// key against the module seeds; a route missing from the map mounts ungated.
+const gate = (route: string) => {
+  const keys = ROUTE_GATES[route];
+  if (!keys) throw new Error(`no module gate defined for ${route}`);
+  return requireModule(...keys);
+};
+
 // API Routes
 app.use('/api/auth', sensitiveLimiter, authRoutes);
-app.use('/api/transactions', authMiddleware, transactionRoutes);
-app.use('/api/categories', authMiddleware, categoryRoutes);
-app.use('/api/import', authMiddleware, importRoutes);
+app.use('/api/transactions', authMiddleware, gate('/api/transactions'), transactionRoutes);
+app.use('/api/categories', authMiddleware, gate('/api/categories'), categoryRoutes);
+app.use('/api/import', authMiddleware, gate('/api/import'), importRoutes);
 app.use('/api/player', authMiddleware, playerRoutes);
 app.use('/api/modules', authMiddleware, moduleRoutes);
-app.use('/api/habits', authMiddleware, habitRoutes);
-app.use('/api/workouts', authMiddleware, workoutRoutes);
+app.use('/api/habits', authMiddleware, gate('/api/habits'), habitRoutes);
+app.use('/api/workouts', authMiddleware, gate('/api/workouts'), workoutRoutes);
 app.use('/api/goals', authMiddleware, goalRoutes);
 app.use('/api/quests', authMiddleware, questRoutes);
 app.use('/api/weather', authMiddleware, weatherRoutes);
@@ -122,26 +132,38 @@ app.use('/api/calendar', authMiddleware, calendarRoutes);
 // Ingest does its own auth (JWT OR the INGEST_TOKEN header) so phone-side
 // automations can push health metrics without a short-lived login token.
 app.use('/api/ingest', sensitiveLimiter, ingestRoutes);
-app.use('/api/projects', authMiddleware, projectRoutes);
-app.use('/api/media', authMiddleware, mediaRoutes);
-app.use('/api/metrics', authMiddleware, metricRoutes);
-app.use('/api/npcs', authMiddleware, npcRoutes);
+app.use('/api/projects', authMiddleware, gate('/api/projects'), projectRoutes);
+app.use('/api/media', authMiddleware, gate('/api/media'), mediaRoutes);
+app.use('/api/metrics', authMiddleware, gate('/api/metrics'), metricRoutes);
+app.use('/api/npcs', authMiddleware, gate('/api/npcs'), npcRoutes);
 app.use('/api/shop', authMiddleware, shopRoutes);
 app.use('/api/achievements', authMiddleware, achievementRoutes);
 app.use('/api/bosses', authMiddleware, bossRoutes);
 app.use('/api/antigoals', authMiddleware, antigoalRoutes);
+// Handler: the Today ticker, Shop and level-up overlay read it for every
+// member, but a restricted member may only equip an owned persona on the PUT;
+// the `enabled` breaker stays with unrestricted accounts (as on /api/settings).
+app.use('/api/handler/persona', authMiddleware, restrictWrittenKeys(RESTRICTED_HANDLER_KEYS));
 app.use('/api/handler', authMiddleware, handlerRoutes);
-app.use('/api/insights', authMiddleware, insightRoutes);
+app.use('/api/insights', authMiddleware, gate('/api/insights'), insightRoutes);
 app.use('/api/debrief', authMiddleware, debriefRoutes);
-app.use('/api/budgets', authMiddleware, budgetRoutes);
-app.use('/api/recurring', authMiddleware, recurringRoutes);
-app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/budgets', authMiddleware, gate('/api/budgets'), budgetRoutes);
+app.use('/api/recurring', authMiddleware, gate('/api/recurring'), recurringRoutes);
+// Settings: a restricted member may only write the display and R&R knobs
+// (restrictSettingsWrite; the AI, Ollama, calendar and health-pull fields are
+// server-side spend or server-side fetches). Rotating the ingest token and
+// model discovery are unrestricted-only, mounted before the router so they
+// answer first.
+app.use('/api/settings/ingest-token', authMiddleware, requireUnrestricted());
+app.use('/api/settings/models', authMiddleware, requireUnrestricted());
+app.use('/api/settings', authMiddleware, restrictSettingsWrite(), settingsRoutes);
 app.use('/api/focus', authMiddleware, focusRoutes);
-app.use('/api/steam', authMiddleware, steamRoutes);
+app.use('/api/steam', authMiddleware, gate('/api/steam'), steamRoutes);
 // Admin routes: accept either a logged-in admin JWT or the ADMIN_API_KEY header.
 app.use('/api/admin', adminAuth, adminRoutes);
-// API key management (requires a logged-in session).
-app.use('/api/apikeys', authMiddleware, apikeyRoutes);
+// API key management (requires a logged-in session). Restricted members may
+// not mint a v1 bearer key: /api/v1 authenticates by key and skips the gates.
+app.use('/api/apikeys', authMiddleware, requireUnrestricted(), apikeyRoutes);
 // External REST API v1: authenticated via user-generated API keys (bearer tokens).
 app.use('/api/v1', apiKeyAuth, v1Routes);
 

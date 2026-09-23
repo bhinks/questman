@@ -167,6 +167,37 @@ Sealed domains are partitioned out *before* any prompt is built; a sealed
 calendar is never even fetched. With everything off (the default), the app still
 works fully — quests use rule-based titles and the Handler stays quiet.
 
+## Multi-user (HinksID SSO)
+
+On NovaHQ, members reach Questman through `/auth/sso/questman`, which mints a
+short-lived HS256 token (shared `HINKSID_SSO_SECRET`) carrying `email`, `name`,
+`modules` and `role`. `POST /api/auth/sso` applies those claims on every SSO
+login: `modules` (an array of module keys, `["chores"]` for a non-admin unless
+the member's `questman_modules` pref says otherwise; `null` means every module)
+becomes the user's `allowedModuleKeys`, with unknown keys dropped and logged;
+`role: "admin"` promotes the user and no claim ever demotes one. The
+`requireModule` middleware then gates the domain routers server-side (finance,
+fitness/vitals, habits/chores, projects, media, steam, social) with a 403
+`{"error":"module not enabled"}`, restricted members cannot mint API keys, and
+the SPA trims its chrome to match (Bosses, Handler, the import button and the
+AI/API-key panels of Calibration are hidden; chores live on Operations). The
+trim is enforced too: a restricted member's `PUT /api/settings` may carry only
+the display and R&R knobs (any AI, Ollama, calendar or health-pull field is a
+403), and `POST /api/settings/ingest-token` plus `/api/settings/models` are
+refused outright, `PUT /api/handler/persona` accepts only `persona` from a
+restricted member (the `enabled` breaker is unrestricted-only), and the whole
+integrations panel (weather location, calendar and health pull) is hidden and
+refused for restricted members, not just the AI and API-key panels. A
+brand-new SSO account whose token has no `modules` claim starts chores-only
+unless `role` is `admin`. The email is the SSO binding key, so `PUT
+/api/auth/me` refuses an `email` change from a non-admin (403), and the
+`role: "admin"` promotion applies only to rows SSO itself created (they carry
+an unusable `!sso` password marker instead of a bcrypt hash); a row that got
+its address any other way keeps its role and the login is logged at warn.
+`PUT /api/admin/users/:id` remains the manual override for `allowedModuleKeys`
+and `role`; a change there applies on the next request, while a change in the
+NovaHQ admin panel lands the next time the member clicks the Questman card.
+
 ## Operating
 
 ```sh
@@ -177,7 +208,9 @@ docker compose down -v            # stop + wipe the data volume (fresh slate)
 ```
 
 Dev mode (no Docker): `npm run dev` in both `backend/` and `web/` — backend on
-`:3001`, Vite on `:5173`. A seeded **demo account** (`demo@daymon.app` /
+`:3001`, Vite on `:5173`. Tests: `npm test` in `backend/`; the web nav tests in
+`web/tests/` run on the backend's vitest binary until `web/` gets its own
+runner (`cd web && ../backend/node_modules/.bin/vitest run --root . --dir tests`). A seeded **demo account** (`demo@daymon.app` /
 `demo123`) exists for clicking around without your real data; run
 `npm run db:seed` in `backend/` to (re)create it.
 

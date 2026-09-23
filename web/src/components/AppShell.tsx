@@ -37,6 +37,29 @@ interface AppShellProps {
   onJackIn: () => void;
   /** Open quick-capture (jot a one-off chore from anywhere). */
   onQuickAdd: () => void;
+  /** Module access (owned by App via useModuleAccess, shared with the guard). */
+  access: ModuleAccess;
+}
+
+/**
+ * What this member may see. `restricted` is a non-admin with an allowlist
+ * (HinksID kids by default): they lose Bosses, Handler, the import button
+ * and the AI/API-key parts of Calibration. The server gates every route
+ * regardless (requireModule); this only trims the chrome.
+ */
+export interface ModuleAccess {
+  /**
+   * True once the modules query has succeeded. A failed query is NOT ready:
+   * the deck still trims to what is known, but the tab guard and the bottom
+   * nav hold their baseline shape so a transient /api/modules error never
+   * bounces a member off the tab they are on.
+   */
+  ready: boolean;
+  restricted: boolean;
+  moduleKeys: string[];
+  visibleTabIds: Set<string>;
+  /** Quick-add posts /api/habits/quick (gated on habits or chores server-side). */
+  quickAdd: boolean;
 }
 
 type NavItem = [id: string, label: string, icon: string];
@@ -65,14 +88,18 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
 
 /** The four tabs pinned to the mobile bottom nav (everything else → MORE). */
 const PINNED_TABS: string[] = ['today', 'habits', 'operations', 'health'];
+/** Bottom-nav cells are narrow: short labels for the long tab names. */
+const BOTTOM_LABELS: Record<string, string> = { operations: 'Ops', progress: 'Cred', calibration: 'Config' };
 
 /**
  * Maps module keys (from the server) to the nav tab IDs they unlock.
  * Tabs not listed here are always visible (OPS / PROGRESSION / SYSTEM).
+ * Chores render in Operations (OperationsView reads /api/habits?kind=chore),
+ * so the chores key unlocks that tab, not Habits.
  */
 const MODULE_TO_TABS: Record<string, string[]> = {
   habits:   ['habits'],
-  chores:   ['habits'],
+  chores:   ['operations'],
   fitness:  ['health'],
   vitals:   ['health'],
   projects: ['operations'],
@@ -84,6 +111,87 @@ const MODULE_TO_TABS: Record<string, string[]> = {
 
 /** Tab IDs that are always shown regardless of module access. */
 const ALWAYS_VISIBLE = new Set(['today', 'bosses', 'handler', 'progress', 'shop', 'calibration']);
+/** Restricted members (a non-admin with an allowlist) lose Bosses and Handler. */
+const ALWAYS_VISIBLE_RESTRICTED = new Set(['today', 'progress', 'shop', 'calibration']);
+
+/** Pure: the tab ids a member with these module keys may open. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function visibleTabsFor(moduleKeys: string[], restricted: boolean): Set<string> {
+  const ids = new Set(restricted ? ALWAYS_VISIBLE_RESTRICTED : ALWAYS_VISIBLE);
+  for (const key of moduleKeys) {
+    for (const tabId of MODULE_TO_TABS[key] ?? []) ids.add(tabId);
+  }
+  return ids;
+}
+
+/**
+ * Pure: the bottom-nav cells for a visibility set. Keeps the pinned four
+ * that are visible, then backfills in deck order up to four so a chores-only
+ * kid still gets Today / Ops / Cred / Shop / More.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function pinnedTabsFor(visible: Set<string>): NavItem[] {
+  const byId = new Map<string, NavItem>();
+  for (const g of NAV_GROUPS) for (const item of g.items) byId.set(item[0], item);
+  const ids = PINNED_TABS.filter(id => visible.has(id));
+  for (const g of NAV_GROUPS) {
+    for (const [id] of g.items) {
+      if (ids.length >= 4) break;
+      if (visible.has(id) && !ids.includes(id)) ids.push(id);
+    }
+  }
+  return ids
+    .map(id => byId.get(id))
+    .filter((item): item is NavItem => item !== undefined)
+    .map(([id, label, icon]) => [id, BOTTOM_LABELS[id] ?? label, icon] as NavItem);
+}
+
+/** Pure: quick-add is useful only when the member holds one of its gate keys. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function quickAddFor(moduleKeys: string[], ready: boolean): boolean {
+  if (!ready) return true;
+  return moduleKeys.includes('habits') || moduleKeys.includes('chores');
+}
+
+/**
+ * Module access for the signed-in member. `restricted` comes off the /me
+ * payload already held by AuthContext (role + allowedModuleKeys) when the
+ * session was restored on mount, so the SSO path costs no extra request;
+ * the tab set comes from the shared ['modules'] query. A password login()
+ * or demo() builds `user` without allowedModuleKeys, so only in that case
+ * one /api/auth/me read fills the gap (the server refuses the gated routes
+ * either way; this keeps the chrome honest on the first paint after login).
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useModuleAccess(): ModuleAccess {
+  const { user } = useAuth();
+  const modulesQ = useQuery({
+    queryKey: ['modules'],
+    queryFn: () => api.get<{ modules: Array<{ key: string }> }>('/api/modules').then(r => r.modules),
+    staleTime: 5 * 60_000,
+  });
+  const u = user as (typeof user & { allowedModuleKeys?: unknown }) | null;
+  const needsMe = !!u && u.role !== 'admin' && !('allowedModuleKeys' in u);
+  const meQ = useQuery({
+    // Keyed by the signed-in id so a password logout and a login as another
+    // member inside the stale window never reuse the previous allowlist.
+    queryKey: ['me', 'access', u?.id ?? null],
+    queryFn: () => api.get<{ user: { role: string; allowedModuleKeys: string[] | null } }>('/api/auth/me').then(r => r.user),
+    enabled: needsMe,
+    staleTime: 5 * 60_000,
+  });
+  const allowlist = needsMe ? meQ.data?.allowedModuleKeys : u?.allowedModuleKeys;
+  const restricted = !!u && u.role !== 'admin' && Array.isArray(allowlist);
+  const ready = modulesQ.isSuccess;
+  return useMemo(() => {
+    const moduleKeys = (modulesQ.data ?? []).map(m => m.key);
+    return {
+      ready, restricted, moduleKeys,
+      visibleTabIds: visibleTabsFor(moduleKeys, restricted),
+      quickAdd: quickAddFor(moduleKeys, ready),
+    };
+  }, [modulesQ.data, ready, restricted]);
+}
 
 const SCREEN_TITLES: Record<string, string> = {
   today: 'TODAY // DAY PLAN', bosses: 'OPS // BOSS FIGHTS', handler: 'OPS // HANDLER',
@@ -142,34 +250,29 @@ function PetWidget({ pet }: { pet: PetMeta }) {
   );
 }
 
-export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn, onQuickAdd }: AppShellProps) {
+export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn, onQuickAdd, access }: AppShellProps) {
   const qc = useQueryClient();
   const { user, logout, logoutAll } = useAuth();
   const [uplink, setUplink] = useState(true);
   // Mobile MORE sheet (polish pass §3a): full-deck glass overlay.
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // Module access: fetch which modules this user can see, then derive visible tabs.
-  const modulesQ = useQuery({
-    queryKey: ['modules'],
-    queryFn: () => api.get<{ modules: Array<{ key: string }> }>('/api/modules').then(r => r.modules),
-    staleTime: 5 * 60_000,
-  });
-  const visibleTabIds = useMemo(() => {
-    const ids = new Set(ALWAYS_VISIBLE);
-    for (const m of modulesQ.data ?? []) {
-      for (const tabId of MODULE_TO_TABS[m.key] ?? []) {
-        ids.add(tabId);
-      }
-    }
-    return ids;
-  }, [modulesQ.data]);
+  // Module access (App owns useModuleAccess and passes it down so the deck,
+  // the MORE sheet, the bottom nav and App's tab guard all agree).
+  const { visibleTabIds, restricted, ready, quickAdd } = access;
   const filteredNavGroups = useMemo(() =>
     NAV_GROUPS
       .map(g => ({ ...g, items: g.items.filter(([id]) => visibleTabIds.has(id)) }))
       .filter(g => g.items.length > 0),
     [visibleTabIds],
   );
+  // Until the modules query has settled the bar keeps its classic four cells,
+  // so it never changes shape between the first paint and the answer.
+  const pinnedTabs = useMemo(
+    () => pinnedTabsFor(ready ? visibleTabIds : new Set(PINNED_TABS)),
+    [visibleTabIds, ready],
+  );
+  const pinnedIds = pinnedTabs.map(([id]) => id);
 
   const playerQ = useQuery({
     queryKey: ['player'],
@@ -335,15 +438,19 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
                 }}
               />
               <Clock />
-              {/* Quick-capture a stray chore from anywhere (also bound to "C"). */}
-              <button
-                className="btn btn-ghost icon-btn"
-                onClick={onQuickAdd}
-                title="Quick-add a chore (C)"
-                aria-label="Quick-add a chore"
-              >
-                <Icon name="plus" size={15} />
-              </button>
+              {/* Quick-capture a stray chore from anywhere (also bound to "C").
+                  Hidden when the member holds neither habits nor chores: the
+                  server would 403 the post. */}
+              {quickAdd && (
+                <button
+                  className="btn btn-ghost icon-btn"
+                  onClick={onQuickAdd}
+                  title="Quick-add a chore (C)"
+                  aria-label="Quick-add a chore"
+                >
+                  <Icon name="plus" size={15} />
+                </button>
+              )}
               {/* Jack in from anywhere — demoted to a ghost icon (polish
                   pass §1c): the glowing CTA lives on Today's chamber strip;
                   global access survives without competing with it. */}
@@ -354,17 +461,23 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
               >
                 <Icon name="zap" size={15} />
               </button>
-              <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
-                <Icon name="upload" size={15} />
-              </button>
-              <button
-                className={'btn btn-ghost icon-btn' + (activeTab === 'handler' ? ' active' : '')}
-                onClick={() => onTabChange('handler')}
-                title="Open the Handler feed"
-                aria-label="Open the Handler feed"
-              >
-                <Icon name="bell" size={15} />
-              </button>
+              {/* Import lands on the finance overview: only when that tab is visible. */}
+              {visibleTabIds.has('overview') && (
+                <button className="btn btn-ghost icon-btn" onClick={onUpload} title="Import transactions (CSV/XLSX)">
+                  <Icon name="upload" size={15} />
+                </button>
+              )}
+              {/* The bell opens the Handler feed, which restricted members do not have. */}
+              {!restricted && (
+                <button
+                  className={'btn btn-ghost icon-btn' + (activeTab === 'handler' ? ' active' : '')}
+                  onClick={() => onTabChange('handler')}
+                  title="Open the Handler feed"
+                  aria-label="Open the Handler feed"
+                >
+                  <Icon name="bell" size={15} />
+                </button>
+              )}
             </div>
           </header>
           <div className="content">
@@ -423,9 +536,10 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         </>
       )}
 
-      {/* MOBILE BOTTOM NAV — 4 pinned tabs + MORE (the full deck). */}
+      {/* MOBILE BOTTOM NAV: up to 4 pinned tabs (filtered by module access,
+          backfilled in deck order) + MORE (the full deck). */}
       <nav className="bottom-nav">
-        {([['today', 'Today', 'target'], ['habits', 'Habits', 'check'], ['operations', 'Ops', 'grid'], ['health', 'Health', 'heart']] as NavItem[]).map(([id, label, icon]) => (
+        {pinnedTabs.map(([id, label, icon]) => (
           <button
             key={id}
             onClick={() => { onTabChange(id); setMoreOpen(false); }}
@@ -437,7 +551,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         ))}
         <button
           onClick={() => setMoreOpen(o => !o)}
-          className={`bn-item${moreOpen || !PINNED_TABS.includes(activeTab) ? ' active' : ''}`}
+          className={`bn-item${moreOpen || !pinnedIds.includes(activeTab) ? ' active' : ''}`}
         >
           <Icon name="list" size={20} />
           <span>More</span>

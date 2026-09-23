@@ -1,10 +1,10 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Transaction, SpendingAnalysis } from './types';
 import { analyzeSpending } from './utils/analyzer';
 import { api } from './lib/api';
 import type { ApiTransaction, TransactionListResponse, ImportPreviewResponse, ImportResultResponse, PlayerResponse } from './lib/api';
-import { AppShell } from './components/AppShell';
+import { AppShell, useModuleAccess } from './components/AppShell';
 import { QuickCapture } from './components/QuickCapture';
 import { OverviewCards } from './components/OverviewCards';
 import { PeriodFramingProvider, PeriodBar } from './components/PeriodFraming';
@@ -87,6 +87,17 @@ function HubApp() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState('today');
+  // Module access (server-enforced by requireModule; this trims the chrome and
+  // guards the tab so a hidden one cannot be reached by any setActiveTab path).
+  const access = useModuleAccess();
+  const guardTab = useCallback(
+    (id: string) => (access.ready && !access.visibleTabIds.has(id) ? 'today' : id),
+    [access],
+  );
+  // Render-time guard: whatever the state holds, a hidden tab renders as Today.
+  const tab = guardTab(activeTab);
+  // Setter-time guard for the nav, the bell and TodayView's onNavigate.
+  const navigate = useCallback((id: string) => setActiveTab(guardTab(id)), [guardTab]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   // Finance drill: clicking a month in the burn chart filters the log below.
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -115,12 +126,13 @@ function HubApp() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key !== 'c' && e.key !== 'C') return;
       if (isEditable(e.target)) return;
+      if (!access.quickAdd) return;
       e.preventDefault();
       setQuickOpen(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [access.quickAdd]);
 
   // Player snapshot (shared via react-query cache with TodayView/Shop/etc.).
   // We read it here only to apply the equipped cosmetic theme to the whole
@@ -193,11 +205,14 @@ function HubApp() {
   // Transactions now live in the DB. Pull the full set (single-user hub;
   // a high limit is fine) and map to the presentational shape the finance
   // views already consume.
+  // Only once the finance tab is known to be visible: /api/transactions is
+  // behind requireModule('finance'), so a restricted member never asks.
   const txQuery = useQuery({
     queryKey: ['transactions'],
     queryFn: () =>
       api.get<TransactionListResponse>('/api/transactions?limit=5000&sortBy=date&sortOrder=desc')
         .then(r => r.transactions.map(mapApiTransaction)),
+    enabled: access.ready && access.visibleTabIds.has('overview'),
   });
   const transactions = txQuery.data ?? [];
 
@@ -221,7 +236,7 @@ function HubApp() {
         (r.errors ? ` · ${r.errors} error(s)` : ''),
       );
       qc.invalidateQueries({ queryKey: ['transactions'] });
-      setActiveTab('overview');
+      if (access.visibleTabIds.has('overview')) setActiveTab('overview');
     },
     onError: (err: any) => {
       setImportStatus(null);
@@ -376,10 +391,10 @@ function HubApp() {
   // Finance → Import view. The hub lands on the Today tab.)
 
   const renderTabContent = () => {
-    switch (activeTab) {
+    switch (tab) {
       // --- Life-hub tabs ---
       case 'today':
-        return <TodayView onJackIn={openFocus} onNavigate={setActiveTab} />;
+        return <TodayView onJackIn={openFocus} onNavigate={navigate} />;
 
       case 'habits':
         return <HabitsView />;
@@ -470,7 +485,7 @@ function HubApp() {
         );
       
       case 'calibration':
-        return <CalibrationView />;
+        return <CalibrationView restricted={access.restricted} />;
 
       default:
         return null;
@@ -490,8 +505,9 @@ function HubApp() {
   return (
     <PeriodFramingProvider>
     <AppShell
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
+      activeTab={tab}
+      access={access}
+      onTabChange={navigate}
       onUpload={handleUpload}
       onJackIn={() => openFocus(null)}
       onQuickAdd={() => setQuickOpen(true)}
@@ -506,7 +522,7 @@ function HubApp() {
       />
 
       {/* Keyed by screen so the entrance stagger re-runs on every nav. */}
-      <div key={activeTab} className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div key={tab} className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {renderTabContent()}
       </div>
 

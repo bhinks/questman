@@ -11,6 +11,11 @@
  * App.tsx uses), then persist via PUT /api/settings on commit (pointer-up /
  * key-up). The ["settings"] query is shared with App + AppShell, so it is
  * invalidated after every write.
+ *
+ * `restricted` (a non-admin with a module allowlist, i.e. a HinksID kid by
+ * default) hides the AI governor, the integrations panel (ingest token,
+ * health-pull and calendar URLs the server fetches) and API-key minting; the
+ * three display knobs stay. The server refuses /api/apikeys for them too.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -47,7 +52,7 @@ const SECTION_HEADER: CSSProperties = {
   textTransform: 'uppercase',
 };
 
-export function CalibrationView() {
+export function CalibrationView({ restricted = false }: { restricted?: boolean } = {}) {
   const qc = useQueryClient();
 
   const settingsQ = useQuery({
@@ -131,14 +136,19 @@ export function CalibrationView() {
 
   return (
     <div className="qm-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      {/* ---- AI Calibration (neural governor) — sits above display tuning ---- */}
-      <AiCalibrationPanel />
+      {/* ---- AI Calibration, integrations and API keys: not for restricted members ---- */}
+      {!restricted && (
+        <>
+          {/* AI Calibration (neural governor) sits above display tuning */}
+          <AiCalibrationPanel />
 
-      {/* ---- Per-user integrations: location, calendar & health ---- */}
-      <IntegrationsPanel />
+          {/* Per-user integrations: location, calendar & health */}
+          <IntegrationsPanel />
 
-      {/* ---- API Access (external bearer-token API) ---- */}
-      <ApiKeyPanel />
+          {/* API Access (external bearer-token API) */}
+          <ApiKeyPanel />
+        </>
+      )}
 
       {/* ---- Header ---- */}
       <div className="panel hud" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
