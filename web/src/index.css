@@ -465,6 +465,11 @@ input, textarea, select { font-family: inherit; }
 .no-ticker .ncx-ticker-track { animation: none; }
 @keyframes ncx-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .mobile-brand { display: none; }
+/* ⌂ back to NovaHQ (platform convention, top left) */
+.nv-home { display: inline-flex; align-items: center; justify-content: center; flex: none;
+  min-width: 44px; min-height: 44px; font-size: 1.125rem; color: var(--text); text-decoration: none;
+  align-self: center; }
+.nv-home:hover { color: var(--cyan); }
 .icon-btn { padding: 9px; color: var(--text-dim); }
 .icon-btn:hover { color: var(--text); }
 

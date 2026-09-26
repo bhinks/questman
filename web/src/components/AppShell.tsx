@@ -398,6 +398,8 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         {/* ---- MAIN ---- */}
         <main className="main-col">
           <header className="ncx-topbar">
+            {/* The platform-wide way back to NovaHQ: ⌂ top left, like every other app. */}
+            <a className="nv-home" href="/" aria-label="NovaHQ home" title="Back to NovaHQ">&#8962;</a>
             <div className="mobile-brand">
               <div className="ncx-hex" style={{ width: 28, height: 28, fontSize: '0.6875rem' }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
             </div>
