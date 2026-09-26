@@ -82,14 +82,14 @@ export function CategoryChart({
       <div style={{ display: 'flex', marginBottom: 16, alignItems: 'baseline' }}>
         <span
           className="mono"
-          style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
+          style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
         >
           CATEGORY BREAKDOWN
         </span>
         {asRate && (
           <span
             className="mono"
-            style={{ fontSize: 8.5, letterSpacing: '0.18em', color: 'var(--text-faint)', marginLeft: 8 }}
+            style={{ fontSize: '0.5312rem', letterSpacing: '0.18em', color: 'var(--text-faint)', marginLeft: 8 }}
           >
             AVG {f!.unit}
           </span>
@@ -101,7 +101,7 @@ export function CategoryChart({
             onClick={() => setExpanded(e => !e)}
             title={expanded ? 'Show the top 6 only' : 'Show every category'}
             style={{
-              cursor: 'pointer', fontSize: 9, letterSpacing: '0.12em', padding: '4px 9px', marginRight: 10,
+              cursor: 'pointer', fontSize: '0.5625rem', letterSpacing: '0.12em', padding: '4px 9px', marginRight: 10,
               border: '1px solid var(--line-2)', background: 'var(--panel-2)', color: 'var(--text-dim)',
             }}
           >
@@ -137,7 +137,7 @@ export function CategoryChart({
               <Icon name={categoryIcon(c.category)} size={13} style={{ color }} />
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: '0.75rem',
                   color: selected ? 'var(--cyan)' : 'var(--text-dim)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -160,11 +160,11 @@ export function CategoryChart({
                 className="mono"
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.25 }}
               >
-                <span style={{ fontSize: 11 }}>
+                <span style={{ fontSize: '0.6875rem' }}>
                   {fmtMoney(asRate ? f!.rate(c.amount) : c.amount)}
                 </span>
                 {asRate && (
-                  <span style={{ fontSize: 8.5, color: 'var(--text-faint)' }}>
+                  <span style={{ fontSize: '0.5312rem', color: 'var(--text-faint)' }}>
                     {fmtMoney(c.amount)} TOT
                   </span>
                 )}

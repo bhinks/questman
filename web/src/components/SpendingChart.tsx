@@ -55,14 +55,14 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
         <div style={{ display: 'flex', marginBottom: 16, alignItems: 'center', gap: 10 }}>
           <span
             className="mono"
-            style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
+            style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
           >
             MONTHLY BURN — 12 MO
           </span>
           {avg > 0 && (
             <span
               className="mono"
-              style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-faint)' }}
+              style={{ fontSize: '0.5625rem', letterSpacing: '0.12em', color: 'var(--text-faint)' }}
             >
               AVG {fmtMoney(avg)} / MO
             </span>
@@ -76,7 +76,7 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
                 title="Clear month filter"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-                  fontSize: 9, letterSpacing: '0.12em', padding: '4px 9px',
+                  fontSize: '0.5625rem', letterSpacing: '0.12em', padding: '4px 9px',
                   border: '1px solid color-mix(in srgb, var(--cyan) 45%, transparent)',
                   background: 'color-mix(in srgb, var(--cyan) 14%, transparent)', color: 'var(--cyan)',
                 }}
@@ -84,7 +84,7 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
                 FILTERING {monthYearLabel(selectedMonth!)} ✕
               </button>
             ) : (
-              <span className="mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-ghost)' }}>
+              <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.12em', color: 'var(--text-ghost)' }}>
                 CLICK A MONTH TO FILTER
               </span>
             )
@@ -92,7 +92,7 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
           <button
             key={'bar-' + (chart === 'bar')}
             className={'btn' + (chart === 'bar' ? ' btn-primary' : '')}
-            style={{ padding: '5px 12px', fontSize: 10 }}
+            style={{ padding: '5px 12px', fontSize: '0.625rem' }}
             onClick={() => setChart('bar')}
           >
             BAR
@@ -100,7 +100,7 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
           <button
             key={'line-' + (chart === 'line')}
             className={'btn' + (chart === 'line' ? ' btn-primary' : '')}
-            style={{ padding: '5px 12px', fontSize: 10 }}
+            style={{ padding: '5px 12px', fontSize: '0.625rem' }}
             onClick={() => setChart('line')}
           >
             LINE
@@ -147,7 +147,7 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
                   <span
                     className="mono"
                     style={{
-                      fontSize: 8,
+                      fontSize: '0.5rem',
                       color: hot ? 'var(--cyan)' : hov ? 'var(--text-dim)' : 'var(--text-ghost)',
                       letterSpacing: '0.1em',
                     }}
@@ -229,7 +229,7 @@ export function SpendingChart({ monthlyData, selectedMonth, onSelectMonth }: Spe
                     key={d.month}
                     className="mono"
                     style={{
-                      fontSize: 8,
+                      fontSize: '0.5rem',
                       color: hot ? 'var(--cyan)' : 'var(--text-ghost)',
                       letterSpacing: '0.1em',
                     }}

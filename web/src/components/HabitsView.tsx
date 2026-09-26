@@ -65,7 +65,7 @@ function DaemonCard({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 13.5, fontWeight: 600,
+          fontSize: '0.8438rem', fontWeight: 600,
           color: done ? 'var(--lime)' : 'var(--text)',
           textDecoration: done ? 'line-through' : 'none',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -74,7 +74,7 @@ function DaemonCard({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
           <span className="mono" style={{
-            fontSize: 9, letterSpacing: '0.1em', color: 'var(--cyan)',
+            fontSize: '0.5625rem', letterSpacing: '0.1em', color: 'var(--cyan)',
             display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px',
             border: '1px solid color-mix(in srgb, var(--cyan) 35%, transparent)',
             background: 'color-mix(in srgb, var(--cyan) 8%, transparent)',
@@ -82,17 +82,17 @@ function DaemonCard({
             <Icon name="repeat" size={9} /> {CADENCE_LABEL[habit.cadence]}
           </span>
           {habit.currentStreak > 0 && (
-            <span className="mono" style={{ fontSize: 9.5, color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
               <Icon name="flame" size={10} />{habit.currentStreak}
             </span>
           )}
           {habit.estMinutes != null && (
-            <span className="mono" style={{ fontSize: 9.5, color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
               <Icon name="clock" size={10} />{habit.estMinutes}m
             </span>
           )}
           {focusMin > 0 && (
-            <span className="mono" title={`${focusMin} minutes of logged focus time`} style={{ fontSize: 9.5, color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <span className="mono" title={`${focusMin} minutes of logged focus time`} style={{ fontSize: '0.5938rem', color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
               <Icon name="zap" size={10} />{fmtFocusMin(focusMin)}
             </span>
           )}
@@ -102,12 +102,12 @@ function DaemonCard({
             </span>
           )}
           {due && !done && (
-            <span className="mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--lime)' }}>DUE TODAY</span>
+            <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.12em', color: 'var(--lime)' }}>DUE TODAY</span>
           )}
         </div>
       </div>
 
-      <span className="mono" style={{ fontSize: 11, color: 'var(--lime)', flex: 'none' }}>+{habit.baseXp}</span>
+      <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--lime)', flex: 'none' }}>+{habit.baseXp}</span>
       <button onClick={onEdit} className="btn btn-ghost" style={{ padding: '5px 6px', flex: 'none' }} aria-label={`Edit ${habit.title}`} title="Edit"><Icon name="edit" size={12} /></button>
       <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '5px 6px', flex: 'none' }} aria-label={`Delete ${habit.title}`} title="Kill daemon"><Icon name="close" size={12} /></button>
     </div>
@@ -144,26 +144,26 @@ function IceCard({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ag.title}</span>
-          <span className={`ncx-stamp flat ${ag.difficulty}`} title="Stakes" style={{ fontSize: 8.5, padding: '2px 6px', flex: 'none' }}>{RISK_LABEL[ag.difficulty]} RISK</span>
+          <span style={{ fontSize: '0.8438rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ag.title}</span>
+          <span className={`ncx-stamp flat ${ag.difficulty}`} title="Stakes" style={{ fontSize: '0.5312rem', padding: '2px 6px', flex: 'none' }}>{RISK_LABEL[ag.difficulty]} RISK</span>
         </div>
         <div style={{ marginTop: 3 }}>
           {breached ? (
-            <span className="mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span className="mono" style={{ fontSize: '0.6562rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <Icon name="bolt" size={11} /> BREACHED — defenses down
             </span>
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-              <span className="mono" style={{ fontSize: 10.5, color: 'var(--cyan)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--cyan)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <Icon name="shield" size={10} />SECURE
               </span>
               {ag.currentStreak > 0 && (
-                <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <Icon name="flame" size={10} style={{ color: 'var(--amber)' }} />{ag.currentStreak}d clean
                 </span>
               )}
               {ag.longestStreak > ag.currentStreak && ag.longestStreak > 0 && (
-                <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>· best {ag.longestStreak}</span>
+                <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)' }}>· best {ag.longestStreak}</span>
               )}
             </span>
           )}
@@ -171,7 +171,7 @@ function IceCard({
       </div>
 
       {ag.isActive && (
-        <button onClick={onBreach} disabled={breached} className="ncx-btn danger" title={breached ? 'Already breached today' : 'Log a slip for today'} style={{ padding: '6px 12px', fontSize: 10.5, fontWeight: 700, flex: 'none', color: breached ? 'var(--text-faint)' : undefined }}>
+        <button onClick={onBreach} disabled={breached} className="ncx-btn danger" title={breached ? 'Already breached today' : 'Log a slip for today'} style={{ padding: '6px 12px', fontSize: '0.6562rem', fontWeight: 700, flex: 'none', color: breached ? 'var(--text-faint)' : undefined }}>
           <Icon name="bolt" size={12} /> {breached ? 'BREACHED' : 'BREACH'}
         </button>
       )}
@@ -220,7 +220,7 @@ function IceAddForm({ onClose }: { onClose: () => void }) {
           </select>
         </label>
       </div>
-      <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+      <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>
         Days are clean by default — you only log a breach when you slip.
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -237,7 +237,7 @@ function Stat({ label, value, color }: { label: string; value: React.ReactNode; 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span className="ncx-serial">{label}</span>
-      <span className="ncx-val" style={{ fontSize: 18, color }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: '1.125rem', color }}>{value}</span>
     </div>
   );
 }
@@ -246,7 +246,7 @@ function SectionHead({ icon, color, title, sub, count }: { icon: string; color: 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div className="ncx-chip" style={{ width: 30, height: 30, color }}><Icon name={icon} size={15} style={{ color }} /></div>
-      <span className="mono" style={{ fontSize: 12, letterSpacing: '0.22em', textTransform: 'uppercase', color }}>{title}</span>
+      <span className="mono" style={{ fontSize: '0.75rem', letterSpacing: '0.22em', textTransform: 'uppercase', color }}>{title}</span>
       <span className="ncx-serial">{sub}</span>
       {count != null && <span className="ncx-serial" style={{ marginLeft: 'auto' }}>{count}</span>}
     </div>
@@ -258,7 +258,7 @@ const GRID: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repea
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }
@@ -370,8 +370,8 @@ export function HabitsView() {
         <div className="panel hud" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flex: '1 1 300px', minWidth: 0 }}>
           <div className="ncx-chip" style={{ color: 'var(--cyan)' }}><Icon name="check" size={18} /></div>
           <div style={{ minWidth: 0 }}>
-            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Habits</h2>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 3 }}>DAEMONS RUN FOR YOU · ICE GUARDS AGAINST YOU</div>
+            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Habits</h2>
+            <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 3 }}>DAEMONS RUN FOR YOU · ICE GUARDS AGAINST YOU</div>
           </div>
         </div>
         <div className="panel" style={{ padding: '12px 18px', display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap', flex: '2 1 440px', minWidth: 0 }}>
@@ -382,7 +382,7 @@ export function HabitsView() {
           <Stat label="BREACHED" value={breaches} color={breaches ? 'var(--red)' : 'var(--text-dim)'} />
           <button
             className={adding ? 'btn btn-ghost' : 'btn btn-primary'}
-            style={{ marginLeft: 'auto', padding: '8px 15px', fontSize: 11 }}
+            style={{ marginLeft: 'auto', padding: '8px 15px', fontSize: '0.6875rem' }}
             onClick={() => setAdding(a => !a)}
           >
             <Icon name={adding ? 'close' : 'plus'} size={13} /> {adding ? 'CLOSE' : 'NEW'}
@@ -403,7 +403,7 @@ export function HabitsView() {
                   onClick={() => setAddType(k)}
                   className="mono"
                   style={{
-                    padding: '7px 12px', fontSize: 10, border: 'none', cursor: 'pointer',
+                    padding: '7px 12px', fontSize: '0.625rem', border: 'none', cursor: 'pointer',
                     background: on ? `color-mix(in srgb, ${c} 16%, transparent)` : 'transparent',
                     color: on ? c : 'var(--text-dim)', fontWeight: on ? 700 : 500,
                     boxShadow: on ? `inset 0 0 0 1px ${c}` : 'none',
@@ -449,7 +449,7 @@ export function HabitsView() {
         )}
         {archivedIce.length > 0 && (
           <>
-            <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-faint)', marginTop: 4 }}>OFFLINE · {archivedIce.length}</span>
+            <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-faint)', marginTop: 4 }}>OFFLINE · {archivedIce.length}</span>
             <div style={GRID}>
               {archivedIce.map(a => (
                 <IceCard

@@ -72,7 +72,7 @@ export const CARD: React.CSSProperties = { padding: 16, display: 'flex', flexDir
 
 export const tileInput: React.CSSProperties = {
   width: '100%', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0,
-  color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 22,
+  color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: '1.375rem',
   padding: '6px 12px', outline: 'none', letterSpacing: '0.01em',
 };
 
@@ -238,8 +238,8 @@ export function UplinkModule() {
         </div>
 
         <div style={{ minWidth: 130 }}>
-          <div className="kicker" style={{ fontSize: 9.5 }}>PHONE UPLINK</div>
-          <div className="mono" style={{ fontSize: 12.5, color: 'var(--text)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div className="kicker" style={{ fontSize: '0.5938rem' }}>PHONE UPLINK</div>
+          <div className="mono" style={{ fontSize: '0.7812rem', color: 'var(--text)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
             <span className="cursor-blink" style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
             {statusTxt}
           </div>
@@ -248,7 +248,7 @@ export function UplinkModule() {
         {/* backfill reach — the "grab as much history as possible" story */}
         <div className="panel-inset" style={{ flex: 1, minWidth: 200, padding: '8px 12px' }}>
           {scanning ? (
-            <div className="ncx-term" style={{ fontSize: 10, lineHeight: 1.6, maxHeight: 46, overflow: 'hidden' }}>
+            <div className="ncx-term" style={{ fontSize: '0.625rem', lineHeight: 1.6, maxHeight: 46, overflow: 'hidden' }}>
               <div><span className="cy">▸</span> OPENING HEALTH BRIDGE</div>
               <div><span className="cy">▸</span> AUTH OK · PULLING HISTORY</div>
               <div><span className="cy">▸</span> {streamLine}</div>
@@ -264,7 +264,7 @@ export function UplinkModule() {
 
         <button
           className={'btn ' + (scanning ? 'btn-ghost' : 'btn-primary')}
-          style={{ padding: '8px 16px', fontSize: 11, flex: 'none' }}
+          style={{ padding: '8px 16px', fontSize: '0.6875rem', flex: 'none' }}
           onClick={() => sync.mutate()}
           disabled={scanning}
           title="Pull your phone's health history now — backfills the trend lines"
@@ -280,7 +280,7 @@ function Reach({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span className="ncx-serial">{label}</span>
-      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>{value}</span>
+      <span className="mono" style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--cyan)' }}>{value}</span>
     </div>
   );
 }
@@ -294,7 +294,7 @@ function SourceTag({ source }: { source: MetricSource }) {
   };
   const s = map[source];
   return (
-    <span className="mono" style={{ fontSize: 8.5, letterSpacing: '0.18em', color: s.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    <span className="mono" style={{ fontSize: '0.5312rem', letterSpacing: '0.18em', color: s.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       <Icon name={s.icon} size={10} style={{ color: s.color }} /> {s.label}
     </span>
   );
@@ -312,7 +312,7 @@ function ScalePicker({ lo, hi, value, onChange, color }: { lo: number; hi: numbe
         return (
           <button key={n} type="button" onClick={() => onChange(on ? '' : String(n))} className="mono"
             style={{
-              flex: 1, height: 38, cursor: 'pointer', fontSize: 14, fontWeight: 700, borderRadius: 0,
+              flex: 1, height: 38, cursor: 'pointer', fontSize: '0.875rem', fontWeight: 700, borderRadius: 0,
               border: on ? `1px solid ${color}` : '1px solid var(--line-2)',
               background: on ? `linear-gradient(135deg, ${color}, var(--violet))` : 'var(--panel-2)',
               color: on ? '#06070d' : 'var(--text-dim)',
@@ -345,8 +345,8 @@ export function MetricTile({ def, meta, value, onChange, logged }: {
   return (
     <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="kicker" style={{ fontSize: 9.5, color: logged ? 'var(--text-dim)' : 'var(--text-faint)' }}>{def.label}</span>
-        {def.unit && <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-ghost)' }}>{def.unit}</span>}
+        <span className="kicker" style={{ fontSize: '0.5938rem', color: logged ? 'var(--text-dim)' : 'var(--text-faint)' }}>{def.label}</span>
+        {def.unit && <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-ghost)' }}>{def.unit}</span>}
         <span style={{ marginLeft: 'auto' }}><SourceTag source={meta.source} /></span>
       </div>
       {isScale ? (
@@ -364,9 +364,9 @@ export function MetricTile({ def, meta, value, onChange, logged }: {
           </div>
           {stepper && (
             <>
-              <button type="button" className="btn btn-ghost" style={{ padding: '0 11px', fontSize: 16, flex: 'none' }}
+              <button type="button" className="btn btn-ghost" style={{ padding: '0 11px', fontSize: '1rem', flex: 'none' }}
                 onClick={() => stepBy(-1)} aria-label={`${def.label} minus 1`}>−</button>
-              <button type="button" className="btn btn-ghost" style={{ padding: '0 11px', fontSize: 16, flex: 'none' }}
+              <button type="button" className="btn btn-ghost" style={{ padding: '0 11px', fontSize: '1rem', flex: 'none' }}
                 onClick={() => stepBy(1)} aria-label={`${def.label} plus 1`}>+</button>
             </>
           )}
@@ -383,8 +383,8 @@ export function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; o
   return (
     <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9, gridColumn: 'span 2' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="kicker" style={{ fontSize: 9.5 }}>Blood Pressure</span>
-        <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-ghost)' }}>mmHg</span>
+        <span className="kicker" style={{ fontSize: '0.5938rem' }}>Blood Pressure</span>
+        <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-ghost)' }}>mmHg</span>
         <span style={{ marginLeft: 'auto' }}><SourceTag source="phone" /></span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -395,7 +395,7 @@ export function BpTile({ sys, dia, onSys, onDia }: { sys: string; dia: string; o
             if (e.target.value.length === 3) diaRef.current?.focus();
           }}
           style={{ ...tileInput, color: sys === '' ? 'var(--text-ghost)' : 'var(--magenta)', textAlign: 'center' }} />
-        <span className="ncx-val" style={{ fontSize: 22, color: 'var(--text-faint)' }}>/</span>
+        <span className="ncx-val" style={{ fontSize: '1.375rem', color: 'var(--text-faint)' }}>/</span>
         <input ref={diaRef} type="number" inputMode="numeric" placeholder="DIA" value={dia} onChange={e => onDia(e.target.value)}
           style={{ ...tileInput, color: dia === '' ? 'var(--text-ghost)' : 'var(--cyan)', textAlign: 'center' }} />
         {logged && <Icon name="check" size={15} style={{ color: 'var(--lime)', flex: 'none' }} />}
@@ -411,7 +411,7 @@ export function CardHead({ meta, label }: { meta: MetricMeta; label: string }) {
       <div className="ncx-chip" style={{ width: 30, height: 30, color: meta.color }}>
         <Icon name={meta.icon} size={14} style={{ color: meta.color }} />
       </div>
-      <span className="mono" style={{ fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text)' }}>{label}</span>
+      <span className="mono" style={{ fontSize: '0.7188rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text)' }}>{label}</span>
       <span style={{ marginLeft: 'auto' }}><SourceTag source={meta.source} /></span>
     </div>
   );
@@ -496,7 +496,7 @@ export function ConfigPanel({ defs }: { defs: MetricDef[] }) {
 
   return (
     <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>METRIC SET — toggle what shows in your readout + trends</span>
+      <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>METRIC SET — toggle what shows in your readout + trends</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {defs.map((def, i) => {
           const meta = metaFor(def.key, i);
@@ -506,11 +506,11 @@ export function ConfigPanel({ defs }: { defs: MetricDef[] }) {
                 <Icon name={meta.icon} size={14} style={{ color: meta.color }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: def.enabled ? 'var(--text)' : 'var(--text-faint)' }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: def.enabled ? 'var(--text)' : 'var(--text-faint)' }}>
                   {def.label}
-                  {def.unit && <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>{def.unit}</span>}
+                  {def.unit && <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginLeft: 8 }}>{def.unit}</span>}
                 </div>
-                <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>
+                <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)' }}>
                   {def.key} · {def.kind.toUpperCase()} · {meta.source.toUpperCase()}
                 </div>
               </div>
@@ -520,7 +520,7 @@ export function ConfigPanel({ defs }: { defs: MetricDef[] }) {
                 aria-pressed={def.enabled}
                 className="mono"
                 style={{
-                  fontSize: 11, padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
+                  fontSize: '0.6875rem', padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
                   border: def.enabled ? '1px solid var(--lime)' : '1px solid var(--line-2)',
                   background: def.enabled ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
                   color: def.enabled ? 'var(--lime)' : 'var(--text-dim)',

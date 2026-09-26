@@ -56,16 +56,16 @@ function MutationErrorToast() {
       style={{
         position: 'fixed', bottom: 16, right: 16, maxWidth: 340, padding: 14,
         background: 'var(--panel)', border: '1px solid var(--red)',
-        borderRadius: 'var(--r)', color: 'var(--text)', fontSize: 12.5, zIndex: 3000,
+        borderRadius: 'var(--r)', color: 'var(--text)', fontSize: '0.7812rem', zIndex: 3000,
         display: 'flex', alignItems: 'center', gap: 10,
       }}
     >
       <Icon name="bell" size={14} style={{ color: 'var(--red)', flex: 'none' }} />
       <span>
-        <span className="mono" style={{ color: 'var(--red)', letterSpacing: '0.1em', fontSize: 10.5 }}>SAVE FAILED · </span>
+        <span className="mono" style={{ color: 'var(--red)', letterSpacing: '0.1em', fontSize: '0.6562rem' }}>SAVE FAILED · </span>
         {msg}
       </span>
-      <button onClick={() => setMsg(null)} className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '2px 6px', fontSize: 11 }}>
+      <button onClick={() => setMsg(null)} className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '2px 6px', fontSize: '0.6875rem' }}>
         <Icon name="close" size={12} />
       </button>
     </div>

@@ -55,7 +55,7 @@ const MODULE_COLORS: Record<string, string> = {
 
 /** mono 10px / 0.26em section header style (design-system standard). */
 const SECTION: React.CSSProperties = {
-  fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase',
+  fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase',
 };
 
 /** Local midnight of the Monday starting d's ISO week. */
@@ -213,7 +213,7 @@ function Tally({ label, value, color }: { label: string; value: string; color?: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
       <span className="ncx-serial">{label}</span>
-      <span className="ncx-val" style={{ fontSize: 19, color: color ?? 'var(--text)' }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: '1.1875rem', color: color ?? 'var(--text)' }}>{value}</span>
     </div>
   );
 }
@@ -233,20 +233,20 @@ function CredStrip({
     <div className="panel hud ncx-scan" style={{ padding: 20, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="sweep" />
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-        <div className="ncx-hex" style={{ width: 58, height: 58, fontSize: 22, flex: 'none' }}>{player.level}</div>
+        <div className="ncx-hex" style={{ width: 58, height: 58, fontSize: '1.375rem', flex: 'none' }}>{player.level}</div>
         <div style={{ minWidth: 220, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.03em', textTransform: 'uppercase' }}>STREET CRED</h2>
-            <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.14em', color: 'var(--text-faint)' }}>{handle} // {titleName}</span>
+            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.375rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.03em', textTransform: 'uppercase' }}>STREET CRED</h2>
+            <span className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.14em', color: 'var(--text-faint)' }}>{handle} // {titleName}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-            <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.12em' }}>LVL {player.level}</span>
+            <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', letterSpacing: '0.12em' }}>LVL {player.level}</span>
             <div className="ncx-bar" style={{ flex: 1 }}>
               <i style={{ width: `${pctLevel}%`, background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))', boxShadow: '0 0 12px rgba(var(--accent-rgb),0.4)' }} />
               <span className="seg-mask" />
             </div>
-            <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.12em' }}>LVL {player.level + 1}</span>
-            <span className="mono" style={{ fontSize: 10, color: 'var(--cyan)', minWidth: 86, textAlign: 'right' }}>{player.xpIntoLevel} / {player.xpForNextLevel} XP</span>
+            <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', letterSpacing: '0.12em' }}>LVL {player.level + 1}</span>
+            <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--cyan)', minWidth: 86, textAlign: 'right' }}>{player.xpIntoLevel} / {player.xpForNextLevel} XP</span>
           </div>
         </div>
       </div>
@@ -261,7 +261,7 @@ function CredStrip({
             <i style={{ width: `${badgePct}%`, background: 'linear-gradient(90deg, var(--amber), var(--cyan))' }} />
             <span className="seg-mask" />
           </div>
-          <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', textAlign: 'right' }}>{badgePct}%</span>
+          <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', textAlign: 'right' }}>{badgePct}%</span>
         </div>
       </div>
     </div>
@@ -290,7 +290,7 @@ function VelocityPanel({ weekly }: { weekly: number[] }) {
           );
         })}
       </div>
-      <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-ghost)', marginTop: 8, letterSpacing: '0.14em' }}>
+      <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.5625rem', color: 'var(--text-ghost)', marginTop: 8, letterSpacing: '0.14em' }}>
         <span>W-{weekly.length}</span>
         <span style={{ color: 'var(--cyan)' }}>THIS WEEK {weekly[weekly.length - 1].toLocaleString()} XP ▴</span>
       </div>
@@ -305,19 +305,19 @@ function ModulesPanel({ domainXp }: { domainXp: Record<string, number> }) {
     <div className="ncx-panel" style={{ padding: 18 }}>
       <PanelHead title="XP BY MODULE" />
       {domain.length === 0 ? (
-        <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 16 }}>
+        <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 16 }}>
           NO MODULE XP BANKED YET
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
           {domain.map(([mod, xp]) => (
             <div key={mod} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 52px', gap: 12, alignItems: 'center' }}>
-              <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{mod}</span>
+              <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{mod}</span>
               <div className="ncx-bar slim">
                 <i style={{ width: `${(xp / max) * 100}%`, background: MODULE_COLORS[mod] ?? 'var(--cyan)', opacity: 0.9 }} />
                 <span className="seg-mask" />
               </div>
-              <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-dim)', textAlign: 'right' }}>{xp.toLocaleString()}</span>
+              <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-dim)', textAlign: 'right' }}>{xp.toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -330,7 +330,7 @@ function ActivityReadout({ label, value, color }: { label: string; value: string
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span className="ncx-serial">{label}</span>
-      <span className="ncx-val" style={{ fontSize: 18, color: color ?? 'var(--text)' }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: '1.125rem', color: color ?? 'var(--text)' }}>{value}</span>
     </div>
   );
 }
@@ -348,7 +348,7 @@ function ActivityPanel({ cells, streak }: { cells: number[]; streak: number }) {
 
   return (
     <div className="ncx-panel" style={{ padding: 18 }}>
-      <PanelHead title="ACTIVITY GRID — 17W" right={<span className="mono" style={{ fontSize: 10, color: 'var(--lime)' }}>STREAK {streak}D ▰▰▰</span>} />
+      <PanelHead title="ACTIVITY GRID — 17W" right={<span className="mono" style={{ fontSize: '0.625rem', color: 'var(--lime)' }}>STREAK {streak}D ▰▰▰</span>} />
       <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap', marginTop: 16, alignItems: 'flex-start' }}>
         {/* heat grid */}
         <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 1fr)', gridAutoFlow: 'column', gap: 3, justifyContent: 'start', flex: 'none' }}>
@@ -444,7 +444,7 @@ function LedgerPanel({
               key={`${c}-${active}`}
               onClick={() => setCurrency(c)}
               className={'ncx-btn' + (active ? ' primary' : '')}
-              style={{ fontSize: 9.5, padding: '4px 11px', letterSpacing: '0.14em' }}
+              style={{ fontSize: '0.5938rem', padding: '4px 11px', letterSpacing: '0.14em' }}
             >
               {c.toUpperCase()}
             </button>
@@ -487,7 +487,7 @@ function BadgeChip({ children, color }: { children: React.ReactNode; color: stri
     <span
       className="mono"
       style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color,
+        fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.04em', color,
         padding: '2px 7px',
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
@@ -525,21 +525,21 @@ function AchCard({ a }: { a: Achievement }) {
           <Icon name={unlocked ? a.icon : 'lock'} size={18} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: unlocked ? 'var(--text)' : 'var(--text-dim)' }}>{a.name}</div>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: unlocked ? 'var(--text)' : 'var(--text-dim)' }}>{a.name}</div>
           <div style={{ marginTop: 5 }}>
-            <span className="ncx-stamp flat" style={{ color, fontSize: 8 }}>{TIER_LABEL[tier]}</span>
+            <span className="ncx-stamp flat" style={{ color, fontSize: '0.5rem' }}>{TIER_LABEL[tier]}</span>
           </div>
         </div>
         {unlocked && <Icon name="check" size={16} style={{ color, flexShrink: 0 }} />}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4 }}>{a.description}</div>
+      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', lineHeight: 1.4 }}>{a.description}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {a.xpReward != null && a.xpReward > 0 && <BadgeChip color="var(--violet)">+{a.xpReward.toLocaleString()} XP</BadgeChip>}
         {a.eddieReward != null && a.eddieReward > 0 && <BadgeChip color="var(--amber)">+{a.eddieReward.toLocaleString()} €$</BadgeChip>}
       </div>
       {unlocked ? (
         a.unlockedAt && (
-          <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--lime)', marginTop: 'auto' }}>
+          <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--lime)', marginTop: 'auto' }}>
             <Icon name="check" size={10} /> UNLOCKED {new Date(a.unlockedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         )
@@ -549,7 +549,7 @@ function AchCard({ a }: { a: Achievement }) {
             <i style={{ width: `${Math.round(progress * 100)}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 70%, transparent), ${color})`, opacity: 0.85 }} />
             <span className="seg-mask" />
           </div>
-          {a.progressLabel && <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>{a.progressLabel}</div>}
+          {a.progressLabel && <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>{a.progressLabel}</div>}
         </div>
       )}
     </div>
@@ -587,7 +587,7 @@ function BadgeWall({
               onClick={() => setFilter(k)}
               className="mono"
               style={{
-                fontSize: 10, padding: '5px 11px', letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 0,
+                fontSize: '0.625rem', padding: '5px 11px', letterSpacing: '0.06em', cursor: 'pointer', borderRadius: 0,
                 border: active ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)',
                 background: active ? 'rgba(var(--accent-rgb),0.12)' : 'var(--panel-2)',
                 color: active ? 'var(--cyan)' : 'var(--text-dim)',
@@ -599,11 +599,11 @@ function BadgeWall({
         })}
       />
       {loading ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>READING STREET CRED…</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>READING STREET CRED…</div>
       ) : error ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--red)' }}>FAILED TO LOAD STREET CRED</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--red)' }}>FAILED TO LOAD STREET CRED</div>
       ) : achievements.length === 0 ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>No achievements wired yet.</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>No achievements wired yet.</div>
       ) : (
         <div className="bwall">
           {shown.map(a => <AchCard key={a.key} a={a} />)}
@@ -618,7 +618,7 @@ function BadgeWall({
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="ncx-panel focal" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }

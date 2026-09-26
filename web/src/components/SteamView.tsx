@@ -154,7 +154,7 @@ export function SteamView() {
     return (
       <div className="fade-up">
         <div className="panel" style={{ padding: 24, maxWidth: 520 }}>
-          <div className="mono" style={{ color: 'var(--cyan)', fontSize: 10, letterSpacing: '0.1em', marginBottom: 12 }}>
+          <div className="mono" style={{ color: 'var(--cyan)', fontSize: '0.625rem', letterSpacing: '0.1em', marginBottom: 12 }}>
             STEAM // NOT CONFIGURED
           </div>
           <p style={{ color: 'var(--text)', marginBottom: 16, lineHeight: 1.6 }}>
@@ -162,12 +162,12 @@ export function SteamView() {
           </p>
           <div className="mono" style={{
             background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 4,
-            padding: '12px 16px', fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.8,
+            padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-faint)', lineHeight: 1.8,
           }}>
             STEAM_API_KEY=your_web_api_key<br />
             STEAM_USER_ID=your_steam64_id
           </div>
-          <p style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 12, lineHeight: 1.6 }}>
+          <p style={{ color: 'var(--text-faint)', fontSize: '0.75rem', marginTop: 12, lineHeight: 1.6 }}>
             Get a free API key at <strong style={{ color: 'var(--text-dim)' }}>steamcommunity.com/dev/apikey</strong>.
             Your Steam64 ID is at <strong style={{ color: 'var(--text-dim)' }}>steamid.io</strong>.
             Game details must be Public in your Steam privacy settings.
@@ -186,17 +186,17 @@ export function SteamView() {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <span className="mono" style={{ color: 'var(--cyan)', fontSize: 10, letterSpacing: '0.1em' }}>
+            <span className="mono" style={{ color: 'var(--cyan)', fontSize: '0.625rem', letterSpacing: '0.1em' }}>
               STEAM // LIBRARY
             </span>
             {status.totalGames != null && (
-              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+              <span style={{ color: 'var(--text-faint)', fontSize: '0.75rem' }}>
                 {status.totalGames} games · {status.unplayedGames} unplayed
               </span>
             )}
           </div>
           {status.lastSyncedAt && (
-            <div style={{ color: 'var(--text-faint)', fontSize: 11, marginTop: 2 }}>
+            <div style={{ color: 'var(--text-faint)', fontSize: '0.6875rem', marginTop: 2 }}>
               last sync {relativeDate(status.lastSyncedAt)}
             </div>
           )}
@@ -206,7 +206,7 @@ export function SteamView() {
           className="btn-ghost mono"
           onClick={() => syncMutation.mutate()}
           disabled={syncMutation.isPending}
-          style={{ fontSize: 11, letterSpacing: '0.08em' }}
+          style={{ fontSize: '0.6875rem', letterSpacing: '0.08em' }}
         >
           <Icon name="target" size={12} />
           {syncMutation.isPending ? 'SYNCING...' : 'SYNC LIBRARY'}
@@ -215,7 +215,7 @@ export function SteamView() {
 
       {syncMsg && (
         <div className="mono" style={{
-          fontSize: 11, color: 'var(--cyan)', background: 'var(--panel-2)',
+          fontSize: '0.6875rem', color: 'var(--cyan)', background: 'var(--panel-2)',
           border: '1px solid var(--line-2)', borderRadius: 3, padding: '7px 12px',
         }}>
           {syncMsg}
@@ -230,7 +230,7 @@ export function SteamView() {
             className="mono"
             onClick={() => setPanel(p)}
             style={{
-              fontSize: 10, padding: '5px 14px', cursor: 'pointer', borderRadius: 0,
+              fontSize: '0.625rem', padding: '5px 14px', cursor: 'pointer', borderRadius: 0,
               border: panel === p ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)',
               background: panel === p ? 'rgba(var(--accent-rgb),0.12)' : 'var(--panel-2)',
               color: panel === p ? 'var(--cyan)' : 'var(--text-dim)',
@@ -271,7 +271,7 @@ export function SteamView() {
                 padding: '8px 16px', borderBottom: '1px solid var(--line-2)',
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                <span className="mono" style={{ color: 'var(--text-faint)', fontSize: 10, letterSpacing: '0.1em' }}>
+                <span className="mono" style={{ color: 'var(--text-faint)', fontSize: '0.625rem', letterSpacing: '0.1em' }}>
                   RECENTLY PLAYED
                 </span>
               </div>
@@ -280,11 +280,11 @@ export function SteamView() {
               ))}
             </div>
           ) : status.totalGames != null && status.totalGames > 0 ? (
-            <div style={{ color: 'var(--text-faint)', fontSize: 13, padding: '8px 0' }}>
+            <div style={{ color: 'var(--text-faint)', fontSize: '0.8125rem', padding: '8px 0' }}>
               No games played in the Steam 2-week window. Sync again after some playtime.
             </div>
           ) : (
-            <div style={{ color: 'var(--text-faint)', fontSize: 13, padding: '8px 0' }}>
+            <div style={{ color: 'var(--text-faint)', fontSize: '0.8125rem', padding: '8px 0' }}>
               No data yet. Hit <strong>SYNC LIBRARY</strong> to pull your Steam library.
             </div>
           )}
@@ -302,7 +302,7 @@ export function SteamView() {
                 className="mono"
                 onClick={() => setFilter(f)}
                 style={{
-                  fontSize: 10, padding: '4px 12px', cursor: 'pointer', borderRadius: 0,
+                  fontSize: '0.625rem', padding: '4px 12px', cursor: 'pointer', borderRadius: 0,
                   border: filter === f ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)',
                   background: filter === f ? 'rgba(var(--accent-rgb),0.12)' : 'var(--panel-2)',
                   color: filter === f ? 'var(--cyan)' : 'var(--text-dim)',
@@ -312,18 +312,18 @@ export function SteamView() {
               </button>
             ))}
             {gamesQuery.data && (
-              <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>
+              <span style={{ color: 'var(--text-faint)', fontSize: '0.6875rem' }}>
                 {gamesQuery.data.count} game{gamesQuery.data.count !== 1 ? 's' : ''}
               </span>
             )}
           </div>
 
           {gamesQuery.isLoading && (
-            <div className="mono" style={{ color: 'var(--text-faint)', fontSize: 11 }}>LOADING...</div>
+            <div className="mono" style={{ color: 'var(--text-faint)', fontSize: '0.6875rem' }}>LOADING...</div>
           )}
 
           {!gamesQuery.isLoading && games.length === 0 && (
-            <div style={{ color: 'var(--text-faint)', fontSize: 13 }}>
+            <div style={{ color: 'var(--text-faint)', fontSize: '0.8125rem' }}>
               {status.totalGames === 0
                 ? 'No library synced yet. Hit SYNC LIBRARY above.'
                 : 'No games match this filter.'}
@@ -358,11 +358,11 @@ function StatCard({ label, value, sub, accent }: {
 }) {
   return (
     <div className="panel" style={{ padding: '14px 16px' }}>
-      <div className="mono" style={{ color: accent, fontSize: 9, letterSpacing: '0.12em', marginBottom: 6 }}>{label}</div>
-      <div className="mono" style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
+      <div className="mono" style={{ color: accent, fontSize: '0.5625rem', letterSpacing: '0.12em', marginBottom: 6 }}>{label}</div>
+      <div className="mono" style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
         {value}
       </div>
-      {sub && <div style={{ color: 'var(--text-faint)', fontSize: 11, marginTop: 4 }}>{sub}</div>}
+      {sub && <div style={{ color: 'var(--text-faint)', fontSize: '0.6875rem', marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
@@ -380,20 +380,20 @@ function RecentGameRow({ game }: { game: SteamGame }) {
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          color: 'var(--text)', fontSize: 13, fontWeight: 500,
+          color: 'var(--text)', fontSize: '0.8125rem', fontWeight: 500,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {game.name}
         </div>
-        <div style={{ color: 'var(--text-faint)', fontSize: 11 }}>
+        <div style={{ color: 'var(--text-faint)', fontSize: '0.6875rem' }}>
           {fmtHours(game.playtimeTotal)} total · last played {relativeDate(game.lastPlayedAt)}
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: 'var(--cyan)' }}>
+        <div className="mono" style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--cyan)' }}>
           {fmtHours(game.playtime2Weeks)}
         </div>
-        <div style={{ color: 'var(--text-faint)', fontSize: 10 }}>this period</div>
+        <div style={{ color: 'var(--text-faint)', fontSize: '0.625rem' }}>this period</div>
       </div>
     </div>
   );
@@ -425,11 +425,11 @@ function GameRow({ game, isAdding, isAdded, onAddToMedia }: {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           color: unplayed ? 'var(--text-dim)' : 'var(--text)',
-          fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {game.name}
         </div>
-        <div style={{ color: 'var(--text-faint)', fontSize: 10 }}>
+        <div style={{ color: 'var(--text-faint)', fontSize: '0.625rem' }}>
           {unplayed
             ? 'unplayed'
             : `${fmtHours(game.playtimeTotal)} · last ${relativeDate(game.lastPlayedAt)}`}
@@ -438,7 +438,7 @@ function GameRow({ game, isAdding, isAdded, onAddToMedia }: {
 
       {unplayed && (
         <span className="mono" style={{
-          fontSize: 8, letterSpacing: '0.1em', color: 'var(--violet)',
+          fontSize: '0.5rem', letterSpacing: '0.1em', color: 'var(--violet)',
           border: '1px solid var(--violet)', borderRadius: 2, padding: '2px 5px',
           flexShrink: 0,
         }}>
@@ -449,7 +449,7 @@ function GameRow({ game, isAdding, isAdded, onAddToMedia }: {
       <button
         className="btn-ghost mono"
         style={{
-          fontSize: 10, flexShrink: 0, padding: '3px 8px',
+          fontSize: '0.625rem', flexShrink: 0, padding: '3px 8px',
           letterSpacing: '0.06em',
           opacity: isAdded ? 0.6 : 1,
         }}

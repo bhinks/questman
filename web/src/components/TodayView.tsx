@@ -135,7 +135,7 @@ function HandlerCard() {
       <span className="kicker" style={{ color: meta.accent, flexShrink: 0, marginTop: 2 }}>
         HANDLER · {meta.name}
       </span>
-      <span style={{ flex: 1, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text)' }}>
+      <span style={{ flex: 1, fontSize: '0.8438rem', lineHeight: 1.55, color: 'var(--text)' }}>
         {msg.text}
       </span>
       <button
@@ -186,7 +186,7 @@ function ChronoPanel() {
 
   const row = (label: string, n: number, total: number, left: number, color: string, leftLabel: string) => (
     <div style={{ marginTop: 10 }}>
-      <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, letterSpacing: '0.16em', color: 'var(--text-faint)', marginBottom: 5 }}>
+      <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.5938rem', letterSpacing: '0.16em', color: 'var(--text-faint)', marginBottom: 5 }}>
         <span>{label} · DAY {n}/{total}</span>
         <span style={{ color }}>{left} {leftLabel} LEFT</span>
       </div>
@@ -200,7 +200,7 @@ function ChronoPanel() {
   return (
     <div className="panel" style={{ padding: '15px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span className="ncx-val" style={{ fontSize: 24 }}>{dateLabel}</span>
+        <span className="ncx-val" style={{ fontSize: '1.5rem' }}>{dateLabel}</span>
         <span style={{ flex: 1 }} />
         <span className="ncx-serial">CHRONO // W{String(isoWeek(now)).padStart(2, '0')}</span>
       </div>
@@ -418,13 +418,13 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
       <Ticks focal>
         <div className="panel hud ncx-scan qm-hud-strip" style={{ display: 'flex', alignItems: 'center', gap: 26, padding: '18px 24px' }}>
           <div className="sweep" />
-          <div className="ncx-hex" style={{ width: 58, height: 58, fontSize: 23, flex: 'none', boxShadow: '0 0 24px -4px rgba(var(--accent-rgb),0.6)' }}>
+          <div className="ncx-hex" style={{ width: 58, height: 58, fontSize: '1.4375rem', flex: 'none', boxShadow: '0 0 24px -4px rgba(var(--accent-rgb),0.6)' }}>
             {player.level}
           </div>
           <div style={{ flex: 1.4, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-              <span className="kicker" style={{ fontSize: 10 }}>LEVEL {player.level} → {player.level + 1}</span>
-              <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+              <span className="kicker" style={{ fontSize: '0.625rem' }}>LEVEL {player.level} → {player.level + 1}</span>
+              <span className="mono" style={{ fontSize: '0.7188rem', color: 'var(--text-dim)' }}>
                 <b style={{ color: 'var(--cyan)' }}>{player.xpIntoLevel}</b>/{player.xpForNextLevel} XP
               </span>
             </div>
@@ -436,14 +436,14 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
               }} />
               <span className="seg-mask" />
             </div>
-            <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.16em', marginTop: 7 }}>
+            <div className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', letterSpacing: '0.16em', marginTop: 7 }}>
               {player.totalXp.toLocaleString()} LIFETIME · TODAY <span style={{ color: 'var(--lime)' }}>+{today.xpEarned}</span> · {today.xpAvailable} ON THE TABLE
             </div>
           </div>
           {hudStats.map(([k, v, c]) => (
             <div key={k} className="qm-hud-stat" style={{ textAlign: 'right', paddingLeft: 22, borderLeft: '1px solid var(--line)' }}>
-              <div className="kicker" style={{ fontSize: 9.5 }}>{k}</div>
-              <div className="ncx-val" style={{ fontSize: 24, color: c }}>{v}</div>
+              <div className="kicker" style={{ fontSize: '0.5938rem' }}>{k}</div>
+              <div className="ncx-val" style={{ fontSize: '1.5rem', color: c }}>{v}</div>
             </div>
           ))}
         </div>
@@ -462,10 +462,10 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
             <Icon name="zap" size={24} style={{ color: 'var(--cyan)', filter: 'drop-shadow(0 0 5px var(--cyan))' }} />
           </div>
           <div>
-            <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '1.1875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
               Focus Chamber
             </div>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.18em', color: 'var(--text-faint)', marginTop: 3 }}>
+            <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.18em', color: 'var(--text-faint)', marginTop: 3 }}>
               ONE CLOCK · NO FEEDS · POINT IT AT ANYTHING
             </div>
           </div>
@@ -476,13 +476,13 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
             ['BEST RUN', bestRunMin > 0 ? `${bestRunMin}M` : '—', undefined],
           ] as const).map(([k, v, c]) => (
             <div key={k} className="panel-inset" style={{ padding: '8px 16px', textAlign: 'center' }}>
-              <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.2em', color: 'var(--text-faint)' }}>{k}</div>
-              <div className="ncx-val" style={{ fontSize: 16, marginTop: 2, ...(c ? { color: c } : {}) }}>{v}</div>
+              <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.2em', color: 'var(--text-faint)' }}>{k}</div>
+              <div className="ncx-val" style={{ fontSize: '1rem', marginTop: 2, ...(c ? { color: c } : {}) }}>{v}</div>
             </div>
           ))}
           <button
             className="btn btn-primary"
-            style={{ padding: '14px 38px', fontSize: 13 }}
+            style={{ padding: '14px 38px', fontSize: '0.8125rem' }}
             onClick={() => onJackIn(null)}
           >
             <Icon name="zap" size={15} /> JACK IN
@@ -492,8 +492,8 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
 
       {today.totalCount === 0 ? (
         <div className="panel hud" style={{ padding: '34px 24px', textAlign: 'center' }}>
-          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700 }}>NO CONTRACTS ON FILE</div>
-          <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 10 }}>
+          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700 }}>NO CONTRACTS ON FILE</div>
+          <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 10 }}>
             ADD HABITS, PROJECTS, MEDIA, OR VITALS TO START GENERATING DAILY MISSIONS
           </div>
         </div>
@@ -506,7 +506,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                 <div className="panel hud ncx-scan" style={{ padding: '20px 24px' }}>
                   <div className="sweep" style={{ animationDelay: '-3s' }} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--cyan)' }}>▸▸ PRIORITY CONTRACT</span>
+                    <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--cyan)' }}>▸▸ PRIORITY CONTRACT</span>
                     <span className="ncx-serial">CTR-{priority.id.slice(0, 6).toUpperCase()}</span>
                     <span style={{ flex: 1 }} />
                     {lastClearIds.has(priority.id) && (
@@ -529,14 +529,14 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         className="ncx-glitch ncx-chroma"
-                        style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'uppercase', cursor: 'pointer' }}
+                        style={{ fontFamily: 'var(--font-display)', fontSize: '1.625rem', fontWeight: 700, letterSpacing: '0.01em', textTransform: 'uppercase', cursor: 'pointer' }}
                         onClick={() => onNavigate(questTab(priority))}
                         title={`Open ${priority.module.name}`}
                       >
                         {priority.title}
                       </div>
-                      <div style={{ color: 'var(--text-dim)', fontSize: 13.5, marginTop: 5 }}>{priority.description}</div>
-                      <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 11 }}>
+                      <div style={{ color: 'var(--text-dim)', fontSize: '0.8438rem', marginTop: 5 }}>{priority.description}</div>
+                      <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 11 }}>
                         {priority.module.name.toUpperCase()}
                         {priority.estMinutes != null && <> · EST {priority.estMinutes} MIN</>}
                         {' '}· REWARD <span style={{ color: 'var(--lime)' }}>+{priority.xpReward} XP</span>
@@ -560,7 +560,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                         <button
                           className="btn btn-ghost"
-                          style={{ padding: '5px 10px', fontSize: 10 }}
+                          style={{ padding: '5px 10px', fontSize: '0.625rem' }}
                           disabled={(player.skipTokens ?? 0) <= 0 || skipQuest.isPending}
                           title={player.skipTokens > 0 ? `Skip (${player.skipTokens} tokens)` : 'No skip tokens — buy more in the Shop'}
                           onClick={() => setPendingSkip({ id: priority.id, title: priority.title })}
@@ -569,7 +569,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                         </button>
                         <button
                           className="btn btn-ghost"
-                          style={{ padding: '5px 10px', fontSize: 10 }}
+                          style={{ padding: '5px 10px', fontSize: '0.625rem' }}
                           disabled={(player.rerollTokens ?? 0) <= 0 || rerollQuest.isPending}
                           title={player.rerollTokens > 0 ? `Reroll (${player.rerollTokens} tokens)` : 'No reroll tokens — buy more in the Shop'}
                           onClick={() => rerollQuest.mutate(priority.id)}
@@ -583,10 +583,10 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
               </Ticks>
             ) : (
               <div className="panel hud" style={{ padding: '34px 24px', textAlign: 'center' }}>
-                <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--lime)' }}>
+                <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--lime)' }}>
                   ALL CONTRACTS CLEARED
                 </div>
-                <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 10 }}>
+                <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 10 }}>
                   STREAK DAY {player.currentStreak} IN THE BAG · SEE YOU TOMORROW, RUNNER
                 </div>
               </div>
@@ -595,7 +595,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
             {/* ---- contract ledger ---- */}
             <div className="panel">
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--line-2)' }}>
-                <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)' }}>CONTRACT LEDGER — IN PLAN</span>
+                <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)' }}>CONTRACT LEDGER — IN PLAN</span>
                 <span style={{ flex: 1 }} />
                 {plan && (
                   <span className="ncx-serial">
@@ -604,7 +604,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                 )}
               </div>
               {ledgerRows.length === 0 && (
-                <div className="mono" style={{ padding: '15px 18px', fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
+                <div className="mono" style={{ padding: '15px 18px', fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
                   NO FURTHER CONTRACTS ON FILE
                 </div>
               )}
@@ -634,8 +634,8 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
             {weather && (
               <div className="panel" style={{ padding: '15px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span className="ncx-val" style={{ fontSize: 30 }}>{weather.tempMaxF}°F</span>
-                  <span className="mono" style={{ fontSize: 10, letterSpacing: '0.2em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                  <span className="ncx-val" style={{ fontSize: '1.875rem' }}>{weather.tempMaxF}°F</span>
+                  <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.2em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                     {weather.label}
                   </span>
                   <span style={{ flex: 1 }} />
@@ -650,26 +650,26 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                     ['WIND', `${weather.windMaxMph} MPH`],
                   ].map(([k, v]) => (
                     <div key={k} className="panel-inset" style={{ flex: 1, padding: '7px 4px', textAlign: 'center' }}>
-                      <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.2em', color: 'var(--text-ghost)' }}>{k}</div>
-                      <div className="ncx-val" style={{ fontSize: 12.5, marginTop: 3 }}>{v}</div>
+                      <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.2em', color: 'var(--text-ghost)' }}>{k}</div>
+                      <div className="ncx-val" style={{ fontSize: '0.7812rem', marginTop: 3 }}>{v}</div>
                     </div>
                   ))}
                 </div>
                 {/* Rain tip: the first likely-wet hour ahead — get outdoor
                     things done before this. */}
                 {weather.nextRain && (
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--amber)', letterSpacing: '0.08em', marginTop: 10, lineHeight: 1.6 }}>
+                  <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--amber)', letterSpacing: '0.08em', marginTop: 10, lineHeight: 1.6 }}>
                     ▴ RAIN AT {weather.nextRain.label.toUpperCase()} · {weather.nextRain.probPct}%
                   </div>
                 )}
                 {bestWindowQuest && (
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', marginTop: weather.nextRain ? 4 : 10, lineHeight: 1.6 }}>
+                  <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--teal)', letterSpacing: '0.08em', marginTop: weather.nextRain ? 4 : 10, lineHeight: 1.6 }}>
                     ▴ BEST WINDOW · {bestWindowQuest.title.toUpperCase()} {bestWindowQuest.meta!.bestWindow}
                   </div>
                 )}
                 {/* Tomorrow's outlook — informs which outdoor work can wait. */}
                 {weather.tomorrow && (
-                  <div className="mono" style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 10, letterSpacing: '0.08em', marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)', lineHeight: 1.6 }}>
+                  <div className="mono" style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: '0.625rem', letterSpacing: '0.08em', marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)', lineHeight: 1.6 }}>
                     <span style={{ color: 'var(--text-ghost)', letterSpacing: '0.2em' }}>TOMORROW</span>
                     <span style={{ color: weather.tomorrow.rainSumIn > 0.04 ? 'var(--amber)' : weather.tomorrow.tempMaxF >= 90 ? 'var(--red)' : 'var(--text-dim)' }}>
                       {weather.tomorrow.label.toUpperCase()}
@@ -688,25 +688,25 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
             )}
 
             <div className="panel" style={{ padding: '15px 18px' }}>
-              <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', marginBottom: 11 }}>
+              <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', marginBottom: 11 }}>
                 SIDE JOBS — NOT IN PLAN
               </div>
               {sideJobs.length === 0 ? (
-                <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>
+                <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.1em', color: 'var(--text-faint)' }}>
                   NONE — THE PLAN COVERS EVERYTHING
                 </div>
               ) : sideJobs.map(q => {
                 // Boosted count: taps still batching client-side show as checked.
                 const shown = Math.min(q.targetCount, q.currentCount + (tickBoost[q.id] ?? 0));
                 return (
-                <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--text-dim)', padding: '5px 0' }}>
+                <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.7812rem', color: 'var(--text-dim)', padding: '5px 0' }}>
                   <Icon name={moduleIcon(q.module.key)} size={14} style={{ color: 'var(--text-faint)', flex: 'none' }} />
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>+{q.xpReward}</span>
+                  <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>+{q.xpReward}</span>
                   {/* Off-plan ≠ unreachable: counters tick +1, one-shots complete. */}
                   <button
                     className="btn btn-ghost"
-                    style={{ padding: '3px 7px', fontSize: 10, flex: 'none' }}
+                    style={{ padding: '3px 7px', fontSize: '0.625rem', flex: 'none' }}
                     title={q.targetCount > 1 ? `Check in (${shown}/${q.targetCount})` : 'Complete'}
                     onClick={() => (q.targetCount > 1 ? queueProgress(q.id) : completeQuest.mutate(q.id))}
                   >
@@ -715,7 +715,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                   {/* Same token-gated relief the in-plan contracts get. */}
                   <button
                     className="btn btn-ghost"
-                    style={{ padding: '3px 6px', fontSize: 9.5, flex: 'none' }}
+                    style={{ padding: '3px 6px', fontSize: '0.5938rem', flex: 'none' }}
                     disabled={(player.skipTokens ?? 0) <= 0 || skipQuest.isPending}
                     title={player.skipTokens > 0 ? `Skip (${player.skipTokens} tokens)` : 'No skip tokens — buy more in the Shop'}
                     onClick={() => setPendingSkip({ id: q.id, title: q.title })}
@@ -724,7 +724,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                   </button>
                   <button
                     className="btn btn-ghost"
-                    style={{ padding: '3px 6px', fontSize: 9.5, flex: 'none' }}
+                    style={{ padding: '3px 6px', fontSize: '0.5938rem', flex: 'none' }}
                     disabled={(player.rerollTokens ?? 0) <= 0 || rerollQuest.isPending}
                     title={player.rerollTokens > 0 ? `Reroll (${player.rerollTokens} tokens)` : 'No reroll tokens — buy more in the Shop'}
                     onClick={() => rerollQuest.mutate(q.id)}
@@ -737,7 +737,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
             </div>
 
             <div className="panel" style={{ padding: '15px 18px' }}>
-              <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', marginBottom: 11 }}>
+              <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', marginBottom: 11 }}>
                 SESSION LOG
               </div>
               <div className="ncx-term" style={{ maxHeight: 180, overflowY: 'auto' }}>
@@ -764,7 +764,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                 <i style={{ width: `${bankedPct}%`, background: 'linear-gradient(90deg, #1fae5c, var(--lime))' }} />
                 <span className="seg-mask" />
               </div>
-              <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 6 }}>
+              <div className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 6 }}>
                 {today.xpEarned}/{xpDayTotal} XP BANKED
               </div>
             </div>
@@ -796,7 +796,7 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
 function Splash({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13, letterSpacing: '0.18em' }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem', letterSpacing: '0.18em' }}>{children}</div>
     </div>
   );
 }
@@ -854,32 +854,32 @@ function LedgerRow({
         title={`Open ${quest.module.name}`}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
-          <span className="ncx-row-title-text" style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="ncx-row-title-text" style={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {quest.title}
           </span>
           {!done && !skipped && carriedDays > 0 && (
-            <span className="mono" style={{ flex: 'none', fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--amber)' }}>
+            <span className="mono" style={{ flex: 'none', fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--amber)' }}>
               CARRIED ×{carriedDays}D
             </span>
           )}
           {!done && !skipped && weatherTag && (
-            <span className="mono" style={{ flex: 'none', fontSize: 9.5, letterSpacing: '0.14em', color: weatherTag === 'last-clear' ? 'var(--amber)' : 'var(--lime)' }}>
+            <span className="mono" style={{ flex: 'none', fontSize: '0.5938rem', letterSpacing: '0.14em', color: weatherTag === 'last-clear' ? 'var(--amber)' : 'var(--lime)' }}>
               {weatherTag === 'last-clear' ? 'LAST CLEAR DAY' : '☀ NICE DAY'}
             </span>
           )}
         </div>
         {/* The underlying activity — the themed title alone can be cryptic. */}
         {!done && !skipped && quest.description && quest.description !== quest.title && (
-          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '0.7188rem', color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {quest.description}
           </div>
         )}
-        <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 3 }}>
+        <div className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 3 }}>
           {meta}
         </div>
       </div>
       {done || skipped ? (
-        <span className="mono" style={{ fontSize: 11, color: done ? 'var(--lime)' : 'var(--text-faint)' }}>
+        <span className="mono" style={{ fontSize: '0.6875rem', color: done ? 'var(--lime)' : 'var(--text-faint)' }}>
           {done ? `+${quest.xpReward} XP` : '—'}
         </span>
       ) : isCounter ? (
@@ -895,10 +895,10 @@ function LedgerRow({
               }} />
             ))}
           </div>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--teal)' }}>{shown}/{quest.targetCount}</span>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--teal)' }}>{shown}/{quest.targetCount}</span>
           <button
             className="btn"
-            style={{ padding: '6px 13px', fontSize: 11 }}
+            style={{ padding: '6px 13px', fontSize: '0.6875rem' }}
             onClick={() => onProgress(quest.id)}
             disabled={shown >= quest.targetCount}
           >
@@ -908,13 +908,13 @@ function LedgerRow({
       ) : (
         <>
           <span className={`ncx-stamp flat ${quest.difficulty}`}>{quest.difficulty}</span>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--lime)', width: 44, textAlign: 'right' }}>+{quest.xpReward}</span>
+          <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--lime)', width: 44, textAlign: 'right' }}>+{quest.xpReward}</span>
           <button className="btn" style={{ padding: '6px 11px' }} title="Complete" onClick={() => onComplete(quest.id)}>
             <Icon name="check" size={12} />
           </button>
           <button
             className="btn"
-            style={{ padding: '6px 11px', fontSize: 10 }}
+            style={{ padding: '6px 11px', fontSize: '0.625rem' }}
             title={skipTokens > 0 ? 'Skip this quest (1 skip token)' : 'No skip tokens — buy more in the Shop'}
             disabled={skipTokens <= 0}
             onClick={() => onSkip(quest.id)}
@@ -923,7 +923,7 @@ function LedgerRow({
           </button>
           <button
             className="btn"
-            style={{ padding: '6px 11px', fontSize: 10 }}
+            style={{ padding: '6px 11px', fontSize: '0.625rem' }}
             title="Not today — push to tomorrow (free, no token)"
             onClick={() => onDefer(quest.id)}
           >
@@ -931,7 +931,7 @@ function LedgerRow({
           </button>
           <button
             className="btn btn-ghost"
-            style={{ padding: '6px 9px', fontSize: 10 }}
+            style={{ padding: '6px 9px', fontSize: '0.625rem' }}
             title={rerollTokens > 0 ? `Reroll: swap for a different quest (1 token, ${rerollTokens} left)` : 'No reroll tokens — buy more in the Shop'}
             disabled={rerollTokens <= 0}
             onClick={() => onReroll(quest.id)}
@@ -967,15 +967,15 @@ function EnergyPanel({
       style={{ display: 'block', width: '100%', padding: '15px 18px', textAlign: 'left', cursor: 'pointer' }}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
-        <span className="kicker" style={{ fontSize: 10 }}>POWER CELL</span>
+        <span className="kicker" style={{ fontSize: '0.625rem' }}>POWER CELL</span>
         <span style={{ flex: 1 }} />
-        <span className="ncx-val" style={{ fontSize: 16, color: tierColor }}>{energy.pct}%</span>
+        <span className="ncx-val" style={{ fontSize: '1rem', color: tierColor }}>{energy.pct}%</span>
       </div>
       <div className="ncx-bar slim">
         <i style={{ width: `${Math.min(100, energy.pct)}%`, background: tierColor }} />
         <span className="seg-mask" />
       </div>
-      <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 8 }}>
+      <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', letterSpacing: '0.18em', marginTop: 8 }}>
         <span style={{ color: tierColor }}>{energy.tier.toUpperCase()}</span> · {source}
       </div>
     </button>

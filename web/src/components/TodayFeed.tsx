@@ -20,7 +20,7 @@ import { Icon } from './Icon';
 
 const KICKER: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: '0.625rem',
   letterSpacing: '0.26em',
   color: 'var(--text-dim)',
   textTransform: 'uppercase',
@@ -69,7 +69,7 @@ export function CityFeed() {
     return (
       <div className="panel" style={{ padding: '15px 18px', textAlign: 'center' }}>
         <div style={KICKER}>CITY FEED</div>
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 8 }}>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 8 }}>
           ALL QUIET — NO BOSSES, PATTERNS, OR COLD CONTACTS
         </div>
       </div>
@@ -98,23 +98,23 @@ function AgendaPanel({ cal }: { cal: NonNullable<CalendarTodayResponse['calendar
         <span className="ncx-serial">CAL.UPLINK</span>
       </div>
       {shown.length === 0 ? (
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.1em', color: 'var(--text-faint)' }}>
           CLEAR GRID — NO COMMITMENTS TODAY
         </div>
       ) : shown.map((e, i) => {
         const past = !e.allDay && new Date(e.endsAt).getTime() < now;
         return (
           <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '5px 0', opacity: past ? 0.45 : 1 }}>
-            <span className="ncx-val mono" style={{ fontSize: 11, color: 'var(--cyan)', flexShrink: 0, minWidth: 86 }}>
+            <span className="ncx-val mono" style={{ fontSize: '0.6875rem', color: 'var(--cyan)', flexShrink: 0, minWidth: 86 }}>
               {e.allDay ? 'ALL DAY' : `${hhmm(e.startsAt)}–${hhmm(e.endsAt)}`}
             </span>
-            <span style={{ fontSize: 12.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.7812rem', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {e.title}
             </span>
           </div>
         );
       })}
-      <div className="mono" style={{ display: 'flex', gap: 12, fontSize: 10, letterSpacing: '0.14em', marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)' }}>
+      <div className="mono" style={{ display: 'flex', gap: 12, fontSize: '0.625rem', letterSpacing: '0.14em', marginTop: 10, paddingTop: 9, borderTop: '1px solid var(--line)' }}>
         <span style={{ color: 'var(--lime)' }}>FREE {fmtHm(cal.freeMin)}</span>
         <span style={{ color: 'var(--text-faint)' }}>BUSY {fmtHm(cal.busyMin)}</span>
         {cal.nextEvent && (
@@ -139,11 +139,11 @@ function BossOpsPanel({ bosses }: { bosses: Boss[] }) {
       {bosses.map(b => (
         <div key={b.id} style={{ padding: '6px 0' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 5 }}>
-            <span style={{ fontSize: 12.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.7812rem', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {b.name}
             </span>
             <span style={{ flex: 1 }} />
-            <span className="ncx-val mono" style={{ fontSize: 11, color: b.color ?? 'var(--cyan)' }}>
+            <span className="ncx-val mono" style={{ fontSize: '0.6875rem', color: b.color ?? 'var(--cyan)' }}>
               {b.pct}% DOWN
             </span>
           </div>
@@ -188,9 +188,9 @@ function PatternWatchPanel({ patterns }: { patterns: Insight[] }) {
       </div>
       {patterns.map(p => (
         <div key={p.id} style={{ padding: '7px 0', borderTop: '1px solid var(--line)' }}>
-          <div style={{ fontSize: 12.5, color: 'var(--text)' }}>{p.title}</div>
+          <div style={{ fontSize: '0.7812rem', color: 'var(--text)' }}>{p.title}</div>
           {p.evidence && (
-            <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--text-faint)', marginTop: 3, lineHeight: 1.5 }}>
+            <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.06em', color: 'var(--text-faint)', marginTop: 3, lineHeight: 1.5 }}>
               {p.evidence}
             </div>
           )}
@@ -200,7 +200,7 @@ function PatternWatchPanel({ patterns }: { patterns: Insight[] }) {
                 type="button"
                 className="btn btn-ghost"
                 disabled={act.isPending}
-                style={{ padding: '4px 10px', fontSize: 9.5, color: 'var(--lime)' }}
+                style={{ padding: '4px 10px', fontSize: '0.5938rem', color: 'var(--lime)' }}
                 onClick={() => act.mutate({ id: p.id, verb: 'accept' })}
               >
                 <Icon name="check" size={11} /> ACCEPT
@@ -210,7 +210,7 @@ function PatternWatchPanel({ patterns }: { patterns: Insight[] }) {
               type="button"
               className="btn btn-ghost"
               disabled={act.isPending}
-              style={{ padding: '4px 10px', fontSize: 9.5, color: 'var(--text-faint)' }}
+              style={{ padding: '4px 10px', fontSize: '0.5938rem', color: 'var(--text-faint)' }}
               onClick={() => act.mutate({ id: p.id, verb: 'dismiss' })}
             >
               <Icon name="close" size={11} /> DISMISS
@@ -244,11 +244,11 @@ function ColdContactsPanel({ npcs }: { npcs: Npc[] }) {
       </div>
       {npcs.map(n => (
         <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '0.7812rem', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {n.name}
           </span>
           <span style={{ flex: 1 }} />
-          <span className="ncx-val mono" style={{ fontSize: 11, color: (n.daysSinceContact ?? 99) >= 2 * (n.cadenceDays ?? 21) ? 'var(--red)' : 'var(--amber)', flexShrink: 0 }}>
+          <span className="ncx-val mono" style={{ fontSize: '0.6875rem', color: (n.daysSinceContact ?? 99) >= 2 * (n.cadenceDays ?? 21) ? 'var(--red)' : 'var(--amber)', flexShrink: 0 }}>
             {n.daysSinceContact == null ? 'NEVER' : `${n.daysSinceContact}D`}
           </span>
           <button
@@ -256,7 +256,7 @@ function ColdContactsPanel({ npcs }: { npcs: Npc[] }) {
             className="btn btn-ghost"
             title="Log contact now"
             disabled={ping.isPending}
-            style={{ padding: '4px 9px', fontSize: 9.5, flexShrink: 0 }}
+            style={{ padding: '4px 9px', fontSize: '0.5938rem', flexShrink: 0 }}
             onClick={() => ping.mutate(n.id)}
           >
             <Icon name="zap" size={11} /> PING

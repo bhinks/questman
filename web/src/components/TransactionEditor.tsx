@@ -17,13 +17,13 @@ interface TransactionEditorProps {
 }
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, color: 'var(--text-dim)',
+  display: 'block', fontSize: '0.75rem', color: 'var(--text-dim)',
   fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', marginBottom: 6,
 };
 const fieldStyle: React.CSSProperties = {
   width: '100%', padding: 10, background: '#070811',
   border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text)',
-  fontSize: 14, fontFamily: 'var(--font-ui)',
+  fontSize: '0.875rem', fontFamily: 'var(--font-ui)',
 };
 
 /**
@@ -89,7 +89,7 @@ export function TransactionEditor({ transaction, onSave, onCancel, saving = fals
           <div className="ncx-chip" style={{ width: 34, height: 34, color: 'var(--cyan)' }}>
             <Icon name="edit" size={15} />
           </div>
-          <h3 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
+          <h3 className="ncx-chroma" style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
             Edit Transaction
           </h3>
           <span className="ncx-serial">TXN.EDIT</span>
@@ -194,7 +194,7 @@ export function TransactionEditor({ transaction, onSave, onCancel, saving = fals
                 onChange={(e) => { setAmountDraft(e.target.value); setAmountError(false); }}
                 style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', ...(amountError ? { borderColor: 'var(--red)' } : {}) }} />
               {amountError && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+                <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)', marginTop: 4 }}>
                   Enter a valid amount.
                 </div>
               )}
@@ -209,12 +209,12 @@ export function TransactionEditor({ transaction, onSave, onCancel, saving = fals
 
           {/* Toggles: exclude (transfer) + wasteful */}
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-dim)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
               <input type="checkbox" checked={!!t.excluded}
                 onChange={(e) => setT(p => ({ ...p, excluded: e.target.checked }))} />
               Exclude from totals (transfer)
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-dim)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
               <input type="checkbox" checked={!!t.isWasteful}
                 onChange={(e) => setT(p => ({ ...p, isWasteful: e.target.checked }))} />
               Flag as wasteful
@@ -225,7 +225,7 @@ export function TransactionEditor({ transaction, onSave, onCancel, saving = fals
             <div
               className="mono"
               style={{
-                fontSize: 12, color: 'var(--red)', lineHeight: 1.5,
+                fontSize: '0.75rem', color: 'var(--red)', lineHeight: 1.5,
                 padding: '10px 12px',
                 background: 'color-mix(in srgb, var(--red) 8%, transparent)',
                 border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',

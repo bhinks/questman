@@ -84,13 +84,13 @@ export function QuickCapture({ open, onClose, onAdded }: {
           </div>
           <div style={{ minWidth: 0 }}>
             <h3 className="ncx-chroma" style={{
-              fontSize: 16, fontWeight: 700, margin: 0,
+              fontSize: '1rem', fontWeight: 700, margin: 0,
               fontFamily: 'var(--font-display)', color: 'var(--text)',
               textTransform: 'uppercase', letterSpacing: '0.03em',
             }}>
               Quick Capture
             </h3>
-            <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 2 }}>
+            <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 2 }}>
               ONE-OFF CHORE · LANDS ON TODAY
             </div>
           </div>
@@ -109,13 +109,13 @@ export function QuickCapture({ open, onClose, onAdded }: {
           style={{
             width: '100%', boxSizing: 'border-box',
             background: 'var(--panel-2)', border: '1px solid var(--line-2)',
-            color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 14,
+            color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem',
             padding: '11px 13px', outline: 'none', letterSpacing: '0.01em',
           }}
         />
 
         {lastAdded && (
-          <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 10.5, letterSpacing: '0.08em', color: 'var(--lime)' }}>
+          <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: '0.6562rem', letterSpacing: '0.08em', color: 'var(--lime)' }}>
             <Icon name="check" size={12} style={{ flex: 'none' }} />
             <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>LOGGED — {lastAdded}</span>
           </div>

@@ -135,12 +135,12 @@ function Header({ kind, count, dueCount }: { kind: 'habit' | 'chore'; count: num
         <Icon name={kind === 'chore' ? 'list' : 'check'} size={18} />
       </div>
       <div>
-        <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>{label}</h2>
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3, textTransform: 'uppercase' }}>
+        <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em' }}>{label}</h2>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 3, textTransform: 'uppercase' }}>
           {kind === 'chore' ? 'MAINTENANCE ROTATION' : 'DAILY PROTOCOLS'}
         </div>
       </div>
-      <span className="mono" style={{ marginLeft: 'auto', fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
+      <span className="mono" style={{ marginLeft: 'auto', fontSize: '0.6562rem', letterSpacing: '0.12em', color: 'var(--text-dim)' }}>
         {dueCount} DUE · {count} TOTAL
       </span>
     </div>
@@ -149,7 +149,7 @@ function Header({ kind, count, dueCount }: { kind: 'habit' | 'chore'; count: num
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', paddingLeft: 4 }}>
+    <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', paddingLeft: 4 }}>
       {children}
     </div>
   );
@@ -194,7 +194,7 @@ function Row({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 14, fontWeight: 600,
+          fontSize: '0.875rem', fontWeight: 600,
           color: done ? 'var(--lime)' : 'var(--text)',
           textDecoration: done ? 'line-through' : 'none',
           textDecorationColor: 'rgba(67,255,166,0.5)',
@@ -202,7 +202,7 @@ function Row({
           {habit.title}
         </div>
         {habit.description && (
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: 2 }}>
             {habit.description}
           </div>
         )}
@@ -213,7 +213,7 @@ function Row({
           title="Weather-aware: only surfaces as a quest when conditions fit"
           style={{
             display: 'flex', alignItems: 'center',
-            fontSize: 11, color: 'var(--cyan)',
+            fontSize: '0.6875rem', color: 'var(--cyan)',
             padding: '4px 8px',
             background: 'rgba(var(--accent-rgb),0.08)',
             border: '1px solid rgba(var(--accent-rgb),0.3)',
@@ -229,7 +229,7 @@ function Row({
           title="Estimated time to complete"
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: 'var(--violet)',
+            fontSize: '0.6875rem', color: 'var(--violet)',
             padding: '4px 8px',
             background: 'color-mix(in srgb, var(--violet) 8%, transparent)',
             border: '1px solid color-mix(in srgb, var(--violet) 30%, transparent)',
@@ -245,7 +245,7 @@ function Row({
           title={`${focusMin} minutes of logged focus time`}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: 'var(--teal)',
+            fontSize: '0.6875rem', color: 'var(--teal)',
             padding: '4px 8px',
             background: 'color-mix(in srgb, var(--teal) 8%, transparent)',
             border: '1px solid color-mix(in srgb, var(--teal) 30%, transparent)',
@@ -260,7 +260,7 @@ function Row({
           className="mono"
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 12, color: 'var(--amber)',
+            fontSize: '0.75rem', color: 'var(--amber)',
             padding: '4px 8px',
             background: 'rgba(255,194,75,0.08)',
             border: '1px solid rgba(255,194,75,0.3)',
@@ -274,7 +274,7 @@ function Row({
       <div
         className="mono"
         style={{
-          fontSize: 11, color: 'var(--lime)',
+          fontSize: '0.6875rem', color: 'var(--lime)',
           minWidth: 40, textAlign: 'right',
         }}
       >
@@ -284,7 +284,7 @@ function Row({
       <button
         onClick={onEdit}
         className="btn btn-ghost"
-        style={{ padding: '6px 8px', fontSize: 11 }}
+        style={{ padding: '6px 8px', fontSize: '0.6875rem' }}
         aria-label={`Edit ${habit.title}`}
         title="Edit"
       >
@@ -294,7 +294,7 @@ function Row({
       <button
         onClick={onDelete}
         className="btn btn-ghost"
-        style={{ padding: '6px 8px', fontSize: 11 }}
+        style={{ padding: '6px 8px', fontSize: '0.6875rem' }}
         aria-label={`Delete ${habit.title}`}
         title="Delete"
       >
@@ -489,7 +489,7 @@ export function HabitForm({
             style={{ accentColor: 'var(--cyan)', width: 16, height: 16 }}
           />
           <Icon name="eye" size={14} style={{ color: 'var(--cyan)' }} />
-          <span style={{ fontSize: 13, color: 'var(--text)' }}>Outdoor (weather-aware)</span>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text)' }}>Outdoor (weather-aware)</span>
         </label>
       </div>
 
@@ -548,7 +548,7 @@ function DayOfWeekPicker({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
                 cursor: 'pointer',
-                fontSize: 12, fontWeight: 700,
+                fontSize: '0.75rem', fontWeight: 700,
                 border: on
                   ? '1px solid var(--cyan)'
                   : '1px solid var(--line-2)',
@@ -597,7 +597,7 @@ function WeatherFields({
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {fields.map(f => (
           <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className="kicker" style={{ fontSize: 9 }}>{f.label}</span>
+            <span className="kicker" style={{ fontSize: '0.5625rem' }}>{f.label}</span>
             <input
               type="number"
               min={f.min}
@@ -640,7 +640,7 @@ function Empty({ children, color }: { children: React.ReactNode; color?: string 
       padding: 40, textAlign: 'center',
       color: color ?? 'var(--text-faint)',
     }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }
@@ -654,6 +654,6 @@ const inputStyle: React.CSSProperties = {
   clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
 };

@@ -43,7 +43,7 @@ export function SessionTimer({ styleKey, start, estMin, preview, hideDigits }: {
   const accent = over ? 'var(--red)' : 'var(--cyan)';
   const cls = 'panel-inset tmr' + (preview ? ' prev' : '');
   const tag = (label: string) => (
-    <span className="kicker" style={{ fontSize: 9, flex: 'none' }}>{over ? 'OVERTIME' : label}</span>
+    <span className="kicker" style={{ fontSize: '0.5625rem', flex: 'none' }}>{over ? 'OVERTIME' : label}</span>
   );
 
   if (styleKey === 'flatline') {
@@ -56,7 +56,7 @@ export function SessionTimer({ styleKey, start, estMin, preview, hideDigits }: {
             style={{ filter: 'drop-shadow(0 0 5px rgba(var(--accent-rgb),0.8))' }}
             points={EKG_POINTS} />
         </svg>
-        {!hideDigits && <span className="tmr-digits" style={{ fontSize: 22, color: accent }}>{txt}</span>}
+        {!hideDigits && <span className="tmr-digits" style={{ fontSize: '1.375rem', color: accent }}>{txt}</span>}
       </div>
     );
   }
@@ -70,7 +70,7 @@ export function SessionTimer({ styleKey, start, estMin, preview, hideDigits }: {
           <i style={{ position: 'absolute', right: 1, top: 1, bottom: 1, width: ((1 - prog) * 100) + '%', background: 'linear-gradient(90deg, var(--red), var(--amber))', transition: 'width 1s linear' }} />
           {!over && <span className="tmr-fusetip" style={{ left: (prog * 100) + '%' }} />}
         </div>
-        {!hideDigits && <span className="tmr-digits" style={{ fontSize: 22, color: over ? 'var(--red)' : 'var(--amber)' }}>{txt}</span>}
+        {!hideDigits && <span className="tmr-digits" style={{ fontSize: '1.375rem', color: over ? 'var(--red)' : 'var(--amber)' }}>{txt}</span>}
       </div>
     );
   }
@@ -82,11 +82,11 @@ export function SessionTimer({ styleKey, start, estMin, preview, hideDigits }: {
         {tag('ARMED')}
         {!hideDigits && (
           <span className={'tmr-digits' + (hot ? ' tmr-blink' : '')} style={{
-            fontSize: 30, letterSpacing: '0.1em', color: 'var(--red)',
+            fontSize: '1.875rem', letterSpacing: '0.1em', color: 'var(--red)',
             textShadow: '0 0 16px rgba(255,77,109,0.65)',
           }}>⟦ {txt} ⟧</span>
         )}
-        <span className="mono" style={{ fontSize: 9, letterSpacing: '0.22em', color: 'var(--text-faint)' }}>
+        <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.22em', color: 'var(--text-faint)' }}>
           {over ? 'BOOM. KEEP WORKING' : 'EST ' + (estMin || 25) + 'M'}
         </span>
       </div>
@@ -107,8 +107,8 @@ export function SessionTimer({ styleKey, start, estMin, preview, hideDigits }: {
           <circle cx={26 + 21 * Math.cos(a)} cy={26 + 21 * Math.sin(a)} r="3.2" fill={accent}
             style={{ filter: 'drop-shadow(0 0 5px rgba(var(--accent-rgb),0.9))', transition: 'cx 1s linear, cy 1s linear' }} />
         </svg>
-        {!hideDigits && <span className="tmr-digits" style={{ fontSize: 24, color: accent }}>{txt}</span>}
-        <span className="mono" style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-faint)', marginLeft: 'auto' }}>
+        {!hideDigits && <span className="tmr-digits" style={{ fontSize: '1.5rem', color: accent }}>{txt}</span>}
+        <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.2em', color: 'var(--text-faint)', marginLeft: 'auto' }}>
           {Math.round(prog * 100)}% OF EST
         </span>
       </div>
@@ -119,12 +119,12 @@ export function SessionTimer({ styleKey, start, estMin, preview, hideDigits }: {
   return (
     <div className={cls}>
       {tag('SESSION')}
-      {!hideDigits && <span className="tmr-digits" style={{ fontSize: 24, color: accent }}>{txt}</span>}
+      {!hideDigits && <span className="tmr-digits" style={{ fontSize: '1.5rem', color: accent }}>{txt}</span>}
       <div className="ncx-bar slim" style={{ flex: 1 }}>
         <i style={{ width: (prog * 100) + '%', background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))', transition: 'width 1s linear' }} />
         <span className="seg-mask" />
       </div>
-      <span className="mono" style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-faint)' }}>EST {estMin || 25}M</span>
+      <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.2em', color: 'var(--text-faint)' }}>EST {estMin || 25}M</span>
     </div>
   );
 }

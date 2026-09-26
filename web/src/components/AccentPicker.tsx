@@ -45,7 +45,7 @@ export function AccentPicker({ value, onChange, autoTitle = 'Default' }: {
         onClick={() => onChange('')}
         className="mono"
         style={{
-          height: 24, padding: '0 8px', fontSize: 8.5, letterSpacing: '0.12em',
+          height: 24, padding: '0 8px', fontSize: '0.5312rem', letterSpacing: '0.12em',
           background: 'var(--panel-2)', color: value === '' ? 'var(--text)' : 'var(--text-faint)',
           border: value === '' ? '1px solid var(--text-dim)' : '1px solid var(--line-2)',
           cursor: 'pointer',

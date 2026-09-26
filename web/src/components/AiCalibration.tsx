@@ -27,7 +27,7 @@ import { Icon } from './Icon';
 
 const SECTION_HEADER: CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: '0.625rem',
   letterSpacing: '0.26em',
   color: 'var(--text-dim)',
   textTransform: 'uppercase',
@@ -55,7 +55,7 @@ const INPUT: CSSProperties = {
   border: '1px solid var(--line)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 12,
+  fontSize: '0.75rem',
   padding: '8px 10px',
   colorScheme: 'dark',
 };
@@ -174,7 +174,7 @@ export function AiCalibrationPanel() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2
             className="ncx-chroma ncx-glitch"
-            style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
+            style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
           >
             AI Calibration
           </h2>
@@ -184,7 +184,7 @@ export function AiCalibrationPanel() {
         </div>
         <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
           <span className="ncx-serial">SYS-CAL-AI</span>
-          <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.18em', color: save.isPending ? 'var(--amber)' : 'var(--lime)' }}>
+          <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.18em', color: save.isPending ? 'var(--amber)' : 'var(--lime)' }}>
             {save.isPending ? '▴ WRITING…' : '● SYNCED'}
           </span>
         </div>
@@ -282,7 +282,7 @@ export function AiCalibrationPanel() {
                 key={`prov-cloud-${cloud ? 'p' : 'n'}`}
                 type="button"
                 className={cloud ? 'btn btn-primary' : 'btn'}
-                style={{ padding: '8px 14px', fontSize: 11 }}
+                style={{ padding: '8px 14px', fontSize: '0.6875rem' }}
                 aria-pressed={cloud}
                 onClick={() => apply({ aiProvider: 'anthropic' })}
               >
@@ -292,14 +292,14 @@ export function AiCalibrationPanel() {
                 key={`prov-local-${cloud ? 'n' : 'p'}`}
                 type="button"
                 className={cloud ? 'btn' : 'btn btn-primary'}
-                style={{ padding: '8px 14px', fontSize: 11 }}
+                style={{ padding: '8px 14px', fontSize: '0.6875rem' }}
                 aria-pressed={!cloud}
                 onClick={() => apply({ aiProvider: 'ollama' })}
               >
                 OLLAMA
               </button>
             </div>
-            <span className="ncx-val mono" style={{ fontSize: 11, textAlign: 'right', color: cloudOffline ? 'var(--red)' : 'var(--cyan)' }}>
+            <span className="ncx-val mono" style={{ fontSize: '0.6875rem', textAlign: 'right', color: cloudOffline ? 'var(--red)' : 'var(--cyan)' }}>
               {cloud ? (cloudOffline ? 'NO KEY' : 'KEYED') : 'LOCAL'}
             </span>
           </div>
@@ -324,7 +324,7 @@ export function AiCalibrationPanel() {
               />
               {cloudOffline && (
                 <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)' }}>
-                  <span className="mono" style={{ fontSize: 10, letterSpacing: '0.18em', color: 'var(--red)' }}>
+                  <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.18em', color: 'var(--red)' }}>
                     ⚠ NO ANTHROPIC_API_KEY ON THE SERVER — CLOUD AI OFFLINE, DETERMINISTIC MODE
                   </span>
                 </div>
@@ -405,13 +405,13 @@ export function AiCalibrationPanel() {
               onBlur={() => commit('aiDailyTokenCap')}
               onKeyUp={e => e.key === 'Enter' && commit('aiDailyTokenCap')}
             />
-            <span className="ncx-val mono" style={{ fontSize: 11, textAlign: 'right', color: 'var(--text-dim)' }}>TKN</span>
+            <span className="ncx-val mono" style={{ fontSize: '0.6875rem', textAlign: 'right', color: 'var(--text-dim)' }}>TKN</span>
           </div>
 
           <div style={{ padding: '14px 18px', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={SECTION_HEADER}>BURNED TODAY</span>
-              <span className="ncx-val mono" style={{ fontSize: 12, color: usedPct >= 100 ? 'var(--red)' : usedPct >= 80 ? 'var(--amber)' : 'var(--cyan)' }}>
+              <span className="ncx-val mono" style={{ fontSize: '0.75rem', color: usedPct >= 100 ? 'var(--red)' : usedPct >= 80 ? 'var(--amber)' : 'var(--cyan)' }}>
                 {used.toLocaleString()}{cap > 0 ? ` / ${cap.toLocaleString()}` : ' TKN'}
               </span>
             </div>
@@ -429,7 +429,7 @@ export function AiCalibrationPanel() {
                 <span className="seg-mask" />
               </div>
             )}
-            <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.18em', color: 'var(--text-ghost)' }}>
+            <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.18em', color: 'var(--text-ghost)' }}>
               CAP REACHED → AI YIELDS TO DETERMINISTIC MODE UNTIL MIDNIGHT
             </span>
           </div>
@@ -473,7 +473,7 @@ function ToggleRow(props: {
           key={`${label}-on-${on ? 'p' : 'n'}`}
           type="button"
           className={on ? 'btn btn-primary' : 'btn'}
-          style={{ padding: '8px 16px', fontSize: 11 }}
+          style={{ padding: '8px 16px', fontSize: '0.6875rem' }}
           aria-pressed={on}
           onClick={() => !on && onSet(true)}
         >
@@ -483,14 +483,14 @@ function ToggleRow(props: {
           key={`${label}-off-${on ? 'n' : 'p'}`}
           type="button"
           className={on ? 'btn' : 'btn btn-primary'}
-          style={{ padding: '8px 16px', fontSize: 11 }}
+          style={{ padding: '8px 16px', fontSize: '0.6875rem' }}
           aria-pressed={!on}
           onClick={() => on && onSet(false)}
         >
           OFF
         </button>
       </div>
-      <span className="ncx-val mono" style={{ fontSize: 12, textAlign: 'right', color: on ? 'var(--cyan)' : 'var(--text-faint)' }}>
+      <span className="ncx-val mono" style={{ fontSize: '0.75rem', textAlign: 'right', color: on ? 'var(--cyan)' : 'var(--text-faint)' }}>
         {on ? readoutOn : readoutOff}
       </span>
     </div>

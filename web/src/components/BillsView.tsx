@@ -110,7 +110,7 @@ export function BillsView() {
           {!adding && (
             <button
               className="btn"
-              style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: 11 }}
+              style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '0.6875rem' }}
               onClick={() => setAdding(true)}
             >
               <Icon name="plus" size={14} /> ADD BILL
@@ -159,7 +159,7 @@ export function BillsView() {
               className="btn btn-ghost"
               onClick={() => setShowCancelled(v => !v)}
               style={{
-                alignSelf: 'flex-start', padding: '4px 10px', fontSize: 11,
+                alignSelf: 'flex-start', padding: '4px 10px', fontSize: '0.6875rem',
                 color: 'var(--text-faint)',
               }}
             >
@@ -214,22 +214,22 @@ function Header({ monthlyTotal, activeCount }: { monthlyTotal: number; activeCou
         <Icon name="repeat" size={20} />
       </div>
       <div>
-        <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
+        <h2 className="ncx-chroma" style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
           LEECH PROCESSES
         </h2>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3, maxWidth: 420, lineHeight: 1.5 }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-dim)', marginTop: 3, maxWidth: 420, lineHeight: 1.5 }}>
           Track recurring bills &amp; subscriptions, see what they cost, and cancel
           what you don&rsquo;t need.
         </div>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 4, letterSpacing: '0.08em' }}>
+        <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', marginTop: 4, letterSpacing: '0.08em' }}>
           {activeCount} ACTIVE
         </div>
       </div>
       <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-        <div className="ncx-val" style={{ fontSize: 28, color: 'var(--magenta)', lineHeight: 1 }}>
-          {money(monthlyTotal)}<span style={{ fontSize: 14, color: 'var(--text-faint)', fontWeight: 600 }}>/mo</span>
+        <div className="ncx-val" style={{ fontSize: '1.75rem', color: 'var(--magenta)', lineHeight: 1 }}>
+          {money(monthlyTotal)}<span style={{ fontSize: '0.875rem', color: 'var(--text-faint)', fontWeight: 600 }}>/mo</span>
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)', marginTop: 6 }}>
           {money(annual, 0)}/yr bleeding out
         </div>
       </div>
@@ -263,11 +263,11 @@ function DetectedSection({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Icon name="search" size={16} style={{ color: 'var(--amber)' }} />
         <span className="kicker" style={{ color: 'var(--amber)' }}>DETECTED CHARGES — REVIEW</span>
-        <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+        <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>
           · {totalCount} recurring charge{totalCount === 1 ? '' : 's'} found in your transactions
         </span>
       </div>
-      <p className="mono" style={{ margin: 0, fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.55 }}>
+      <p className="mono" style={{ margin: 0, fontSize: '0.7188rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>
         These look like recurring charges in your history.{' '}
         <b style={{ color: 'var(--text)' }}>Track</b> the ones you want to watch — they&rsquo;ll
         move up to your bills (and the subscription audit). <b style={{ color: 'var(--text)' }}>Dismiss</b>{' '}
@@ -282,7 +282,7 @@ function DetectedSection({
         <button
           className="btn btn-ghost"
           onClick={onToggleShowAll}
-          style={{ alignSelf: 'center', padding: '5px 12px', fontSize: 11, color: 'var(--amber)' }}
+          style={{ alignSelf: 'center', padding: '5px 12px', fontSize: '0.6875rem', color: 'var(--amber)' }}
         >
           <Icon name={showingAll ? 'arrowUp' : 'arrowDn'} size={12} />
           {showingAll ? 'SHOW FEWER' : `SHOW ALL ${totalCount}`}
@@ -325,10 +325,10 @@ function CandidateCard({
     >
       <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{candidate.name}</span>
+          <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text)' }}>{candidate.name}</span>
           {candidate.isSubscription && <Chip color="var(--violet)">SUBSCRIPTION</Chip>}
         </div>
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ color: 'var(--magenta)', fontWeight: 700 }}>
             {money(candidate.amount)}{CADENCE_LABEL[candidate.cadence]}
           </span>
@@ -345,7 +345,7 @@ function CandidateCard({
           disabled={track.isPending}
           onClick={() => track.mutate()}
           title="Add this to your tracked bills"
-          style={{ padding: '7px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}
+          style={{ padding: '7px 14px', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.05em' }}
         >
           <Icon name="check" size={13} /> {track.isPending ? 'TRACKING…' : 'TRACK'}
         </button>
@@ -355,13 +355,13 @@ function CandidateCard({
           onClick={onDismiss}
           title="Hide this suggestion — your transactions are untouched"
           aria-label={`Dismiss ${candidate.name}`}
-          style={{ padding: '7px 12px', fontSize: 11, color: 'var(--text-faint)' }}
+          style={{ padding: '7px 12px', fontSize: '0.6875rem', color: 'var(--text-faint)' }}
         >
           <Icon name="close" size={13} /> DISMISS
         </button>
       </div>
       {track.isError && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--red)', flexBasis: '100%' }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)', flexBasis: '100%' }}>
           COULDN&rsquo;T TRACK — TRY AGAIN
         </div>
       )}
@@ -444,24 +444,24 @@ function BillCard({
       {/* body */}
       <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 7 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{bill.name}</span>
+          <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text)' }}>{bill.name}</span>
           {bill.isSubscription && <Chip color="var(--violet)">SUB</Chip>}
           {bill.category && (
             <span
               className="ncx-stamp flat"
-              style={{ fontSize: 9.5, color: bill.category.color || 'var(--text-dim)' }}
+              style={{ fontSize: '0.5938rem', color: bill.category.color || 'var(--text-dim)' }}
             >
               {bill.category.name}
             </span>
           )}
           {inactive && (
-            <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.06em' }}>
+            <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', letterSpacing: '0.06em' }}>
               CANCELLED
             </span>
           )}
         </div>
 
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ color: 'var(--magenta)', fontWeight: 700 }}>
             {money(bill.amount)}{CADENCE_LABEL[bill.cadence]}
           </span>
@@ -494,7 +494,7 @@ function BillCard({
             disabled={pay.isPending}
             onClick={() => pay.mutate()}
             title="Mark this cycle paid — advances the next due date"
-            style={{ padding: '8px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--lime)' }}
+            style={{ padding: '8px 14px', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--lime)' }}
           >
             <Icon name="check" size={13} /> {pay.isPending ? 'PAID…' : 'PAID'}
           </button>
@@ -504,7 +504,7 @@ function BillCard({
           onClick={onEdit}
           title="Edit bill"
           aria-label={`Edit ${bill.name}`}
-          style={{ padding: '6px 9px', fontSize: 11, color: 'var(--text-faint)' }}
+          style={{ padding: '6px 9px', fontSize: '0.6875rem', color: 'var(--text-faint)' }}
         >
           <Icon name="edit" size={13} />
         </button>
@@ -514,7 +514,7 @@ function BillCard({
           onClick={() => setConfirmingDelete(true)}
           title="Delete bill permanently"
           aria-label={`Delete ${bill.name}`}
-          style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-faint)' }}
+          style={{ padding: '6px 8px', fontSize: '0.6875rem', color: 'var(--text-faint)' }}
         >
           <Icon name="close" size={14} />
         </button>
@@ -583,7 +583,7 @@ function AuditSection({
             <AuditStat label="RUNNING" value={String(audit!.count)} color="var(--violet)" icon="repeat" />
             <AuditStat label="MONTHLY" value={money(audit!.monthlySubCost)} color="var(--magenta)" icon="trend" />
             <AuditStat label="ANNUAL" value={money(audit!.annualSubCost, 0)} color="var(--red)" icon="flame" />
-            <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', maxWidth: 220, lineHeight: 1.4 }}>
+            <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginLeft: 'auto', maxWidth: 220, lineHeight: 1.4 }}>
               Each kill stops the bleed. Cancel anything you forgot you were paying for.
             </span>
           </div>
@@ -605,7 +605,7 @@ function AuditStat({ label, value, color, icon }: { label: string; value: string
       <span className="kicker" style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-faint)' }}>
         <Icon name={icon} size={11} style={{ color }} /> {label}
       </span>
-      <span className="ncx-val" style={{ fontSize: 20, color }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: '1.25rem', color }}>{value}</span>
     </div>
   );
 }
@@ -628,8 +628,8 @@ function AuditRow({ sub, onChanged }: { sub: RecurringExpense; onChanged: () => 
     >
       <Icon name="repeat" size={16} style={{ color: 'var(--violet)', flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 160 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{sub.name}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
+        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)' }}>{sub.name}</div>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-dim)', marginTop: 3 }}>
           <span style={{ color: 'var(--magenta)', fontWeight: 700 }}>
             {money(sub.amount)}{CADENCE_LABEL[sub.cadence]}
           </span>
@@ -641,12 +641,12 @@ function AuditRow({ sub, onChanged }: { sub: RecurringExpense; onChanged: () => 
         disabled={cancel.isPending}
         onClick={() => cancel.mutate()}
         title="Cancel this subscription — stop the drain"
-        style={{ padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', flexShrink: 0 }}
+        style={{ padding: '8px 16px', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.06em', flexShrink: 0 }}
       >
         <Icon name="bolt" size={13} /> {cancel.isPending ? 'KILLING…' : 'CANCEL'}
       </button>
       {cancel.isError && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--red)', flexBasis: '100%' }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)', flexBasis: '100%' }}>
           COULDN&rsquo;T CANCEL — TRY AGAIN
         </div>
       )}
@@ -769,7 +769,7 @@ function BillForm({
         </label>
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-dim)' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
         <input
           type="checkbox"
           checked={isSubscription}
@@ -781,7 +781,7 @@ function BillForm({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         {save.isError && (
-          <span className="mono" style={{ fontSize: 11, color: 'var(--red)', marginRight: 'auto' }}>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)', marginRight: 'auto' }}>
             COULDN&rsquo;T SAVE — TRY AGAIN
           </span>
         )}
@@ -802,18 +802,18 @@ function SectionLabel({ icon, color, title, sub }: { icon: string; color: string
       <Icon name={icon} size={14} style={{ color }} />
       <span
         className="mono"
-        style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
+        style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
       >
         {title}
       </span>
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>// {sub}</span>
+      <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.1em', color: 'var(--text-faint)' }}>// {sub}</span>
     </div>
   );
 }
 
 function Chip({ children, color }: { children: React.ReactNode; color: string }) {
   return (
-    <span className="ncx-stamp flat" style={{ flexShrink: 0, fontSize: 9.5, color }}>
+    <span className="ncx-stamp flat" style={{ flexShrink: 0, fontSize: '0.5938rem', color }}>
       {children}
     </span>
   );
@@ -822,7 +822,7 @@ function Chip({ children, color }: { children: React.ReactNode; color: string })
 function Splash({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 480, margin: '0 auto' }}>
+      <div className="mono" style={{ fontSize: '0.8125rem', lineHeight: 1.5, maxWidth: 480, margin: '0 auto' }}>
         {children}
       </div>
     </div>
@@ -836,7 +836,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',

@@ -366,7 +366,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
                 <button
                   key={'none-' + String(limitChoice === null)}
                   className={'btn' + (limitChoice === null ? ' btn-primary' : '')}
-                  style={{ padding: '7px 14px', fontSize: 11 }}
+                  style={{ padding: '7px 14px', fontSize: '0.6875rem' }}
                   onClick={() => setLimitChoice(null)}
                 >
                   NONE · COUNT UP
@@ -375,7 +375,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
                   <button
                     key={m + '-' + String(limitChoice === m)}
                     className={'btn' + (limitChoice === m ? ' btn-primary' : '')}
-                    style={{ padding: '7px 14px', fontSize: 11 }}
+                    style={{ padding: '7px 14px', fontSize: '0.6875rem' }}
                     onClick={() => setLimitChoice(m)}
                   >
                     {m} MIN
@@ -384,7 +384,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
                 <button
                   key={'custom-' + String(limitChoice === 'custom')}
                   className={'btn' + (limitChoice === 'custom' ? ' btn-primary' : '')}
-                  style={{ padding: '7px 14px', fontSize: 11 }}
+                  style={{ padding: '7px 14px', fontSize: '0.6875rem' }}
                   onClick={() => setLimitChoice('custom')}
                 >
                   CUSTOM
@@ -452,10 +452,10 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
         {/* ---- under-clock: status + controls ---- */}
         {phase === 'setup' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.22em', color: 'var(--text-faint)' }}>
+            <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.22em', color: 'var(--text-faint)' }}>
               {limitMin != null ? `COUNTDOWN · ${limitMin} MIN` : 'OPEN RUN · COUNTS UP UNTIL YOU JACK OUT'}
             </div>
-            <button className="btn btn-primary" style={{ padding: '14px 38px', fontSize: 13 }} onClick={jackIn}>
+            <button className="btn btn-primary" style={{ padding: '14px 38px', fontSize: '0.8125rem' }} onClick={jackIn}>
               <Icon name="zap" size={15} /> JACK IN
             </button>
           </div>
@@ -463,17 +463,17 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
 
         {phase === 'running' && run && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
-            <div className="mono" style={{ fontSize: 11, letterSpacing: '0.18em', color: 'var(--text-dim)', textTransform: 'uppercase', maxWidth: '80vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.18em', color: 'var(--text-dim)', textTransform: 'uppercase', maxWidth: '80vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               ▸ {run.label}
             </div>
-            <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.22em', color: 'var(--text-faint)' }}>
+            <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.22em', color: 'var(--text-faint)' }}>
               {run.limitMin != null ? `LIMIT ${run.limitMin} MIN` : 'OPEN RUN'} · SINCE{' '}
               {new Date(run.startedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 className="btn btn-primary"
-                style={{ padding: '13px 34px', fontSize: 13 }}
+                style={{ padding: '13px 34px', fontSize: '0.8125rem' }}
                 disabled={logSession.isPending}
                 onClick={jackOut}
               >
@@ -481,7 +481,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
               </button>
               <button
                 className="btn btn-ghost"
-                style={{ fontSize: 11 }}
+                style={{ fontSize: '0.6875rem' }}
                 disabled={logSession.isPending}
                 onClick={abort}
                 title="Discard this run — nothing is logged"
@@ -490,7 +490,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
               </button>
             </div>
             {error && (
-              <div className="mono" style={{ fontSize: 10.5, color: 'var(--red)', letterSpacing: '0.08em' }}>✕ {error}</div>
+              <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--red)', letterSpacing: '0.08em' }}>✕ {error}</div>
             )}
           </div>
         )}
@@ -498,7 +498,7 @@ export function FocusView({ seed, onExit }: { seed: FocusSeed | null; onExit: ()
         {phase === 'done' && done && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
             <div className="ncx-stamp flat" style={{ color: 'var(--lime)' }}>SESSION LOGGED</div>
-            <div className="mono" style={{ fontSize: 11, letterSpacing: '0.14em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+            <div className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.14em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
               +{done.minutes} MIN ▸ {done.label}
             </div>
             <button className="btn btn-primary" style={{ padding: '12px 30px' }} onClick={onExit}>

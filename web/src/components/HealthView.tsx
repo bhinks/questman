@@ -88,13 +88,13 @@ const inputStyle: React.CSSProperties = {
   clipPath: 'polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
 };
 // Plain (un-chamfered) control for the compact logger's top row.
 const ctrl: React.CSSProperties = {
   width: '100%', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0,
-  color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '9px 12px', outline: 'none',
+  color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', padding: '9px 12px', outline: 'none',
 };
 
 function timeAgo(iso: string): string {
@@ -153,12 +153,12 @@ export function HealthView() {
             <Icon name="heart" size={18} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Health</h2>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 3 }}>
+            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Health</h2>
+            <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 3 }}>
               {v.loggedCount}/{v.totalCount} VITALS LOGGED · {week.sessions} WORKOUT{week.sessions === 1 ? '' : 'S'} THIS WEEK
             </div>
           </div>
-          <button className={configuring ? 'btn btn-primary' : 'btn btn-ghost'} style={{ marginLeft: 'auto', padding: '7px 13px', fontSize: 11, flex: 'none' }}
+          <button className={configuring ? 'btn btn-primary' : 'btn btn-ghost'} style={{ marginLeft: 'auto', padding: '7px 13px', fontSize: '0.6875rem', flex: 'none' }}
             onClick={() => setConfiguring(c => !c)} key={`cfg-${configuring}`}>
             <Icon name="edit" size={13} /> {configuring ? 'DONE' : 'CONFIGURE'}
           </button>
@@ -189,7 +189,7 @@ export function HealthView() {
           <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <Icon name="trend" size={16} style={{ color: 'var(--violet)' }} />
-              <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TRENDS</span>
+              <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TRENDS</span>
               <span className="ncx-serial">ALL STREAMS · ONE WINDOW</span>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                 {WINDOWS.map(([label, d]) => {
@@ -197,7 +197,7 @@ export function HealthView() {
                   return (
                     <button key={label} onClick={() => setDays(d)} className="mono"
                       style={{
-                        fontSize: 11, padding: '5px 13px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
+                        fontSize: '0.6875rem', padding: '5px 13px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 0,
                         border: on ? '1px solid var(--violet)' : '1px solid var(--line-2)',
                         background: on ? 'color-mix(in srgb, var(--violet) 16%, transparent)' : 'var(--panel-2)',
                         color: on ? 'var(--violet)' : 'var(--text-dim)',
@@ -243,19 +243,19 @@ function VitalsReadout({ v }: { v: ReturnType<typeof useVitalsReadout> }) {
       onSubmit={e => { e.preventDefault(); if (!v.submit.isPending && canSubmit) v.submit.mutate(); }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
+        <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>TODAY&rsquo;S READOUT</span>
         {logQ.data && <span className="ncx-serial">LOG {format(new Date(logQ.data.date), 'yyyy.MM.dd')}</span>}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--text-faint)' }}>
           UPLINK PREFILLED · EDIT ANYTIME
         </span>
       </div>
 
       {loading ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)', letterSpacing: '0.12em', padding: '8px 0' }}>LOADING…</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)', letterSpacing: '0.12em', padding: '8px 0' }}>LOADING…</div>
       ) : error ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--red)', letterSpacing: '0.12em', padding: '8px 0' }}>FAILED TO LOAD</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--red)', letterSpacing: '0.12em', padding: '8px 0' }}>FAILED TO LOAD</div>
       ) : noMetrics ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)', letterSpacing: '0.06em', padding: '8px 0' }}>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)', letterSpacing: '0.06em', padding: '8px 0' }}>
           No metrics enabled — open <strong style={{ color: 'var(--text)' }}>CONFIGURE</strong> to turn some on.
         </div>
       ) : (
@@ -283,12 +283,12 @@ function VitalsReadout({ v }: { v: ReturnType<typeof useVitalsReadout> }) {
               {v.submit.isPending ? 'TRANSMITTING…' : v.submitted ? 'UPDATE LOG' : 'SUBMIT LOG'}
             </button>
             {v.submit.isSuccess && v.submit.data?.questAutoCompleted && (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--lime)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--lime)', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Icon name="check" size={13} style={{ color: 'var(--lime)' }} /> +{v.submit.data.questAutoCompleted.xpReward} XP banked · daily vitals contract cleared
               </span>
             )}
             {v.submitted && !v.submit.isPending && !(v.submit.isSuccess && v.submit.data?.questAutoCompleted) && (
-              <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Icon name="check" size={12} style={{ color: 'var(--lime)' }} /> LOGGED
               </span>
             )}
@@ -364,24 +364,24 @@ const WorkoutLogger = forwardRef<WorkoutLoggerHandle, { exerciseNames: string[] 
       style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 13 }}
       onSubmit={e => { e.preventDefault(); log.mutate(); }}
     >
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>LOG A WORKOUT</span>
+      <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>LOG A WORKOUT</span>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className="kicker" style={{ fontSize: 9 }}>TYPE</span>
+          <span className="kicker" style={{ fontSize: '0.5625rem' }}>TYPE</span>
           <select value={type} onChange={e => setType(e.target.value as WorkoutType)} style={ctrl}>
             {SESSION_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className="kicker" style={{ fontSize: 9 }}>MINUTES</span>
+          <span className="kicker" style={{ fontSize: '0.5625rem' }}>MINUTES</span>
           <input type="number" inputMode="numeric" min={0} max={720} value={durationMin}
             onChange={e => setDurationMin(Number(e.target.value))} style={ctrl} />
         </label>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className="kicker" style={{ fontSize: 9 }}>INTENSITY</span>
+        <span className="kicker" style={{ fontSize: '0.5625rem' }}>INTENSITY</span>
         <div style={{ display: 'flex', gap: 0, boxShadow: 'inset 0 0 0 1px var(--line-2)' }}>
           {INTENSITIES.map(o => {
             const on = intensity === o.value;
@@ -389,7 +389,7 @@ const WorkoutLogger = forwardRef<WorkoutLoggerHandle, { exerciseNames: string[] 
             return (
               <button key={o.value} type="button" onClick={() => setIntensity(o.value)} className="mono"
                 style={{
-                  flex: 1, padding: '8px 0', fontSize: 11, letterSpacing: '0.1em', cursor: 'pointer', border: 'none', borderRadius: 0,
+                  flex: 1, padding: '8px 0', fontSize: '0.6875rem', letterSpacing: '0.1em', cursor: 'pointer', border: 'none', borderRadius: 0,
                   background: on ? `color-mix(in srgb, ${c} 18%, transparent)` : 'transparent',
                   color: on ? c : 'var(--text-dim)', fontWeight: on ? 700 : 500,
                   boxShadow: on ? `inset 0 0 0 1px ${c}` : 'none',
@@ -402,14 +402,14 @@ const WorkoutLogger = forwardRef<WorkoutLoggerHandle, { exerciseNames: string[] 
       </div>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className="kicker" style={{ fontSize: 9 }}>TITLE (OPTIONAL)</span>
+        <span className="kicker" style={{ fontSize: '0.5625rem' }}>TITLE (OPTIONAL)</span>
         <input ref={titleInputRef} value={title} onChange={e => setTitle(e.target.value)}
           placeholder='e.g. "Push day", "5k run"' style={ctrl} />
       </label>
 
       {/* optional richer logging — exercises + notes, collapsed by default */}
       <button type="button" className="btn btn-ghost"
-        style={{ alignSelf: 'flex-start', padding: '4px 8px', fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-faint)' }}
+        style={{ alignSelf: 'flex-start', padding: '4px 8px', fontSize: '0.625rem', letterSpacing: '0.12em', color: 'var(--text-faint)' }}
         onClick={() => setShowDetails(s => !s)}
         aria-expanded={showDetails}
       >
@@ -420,7 +420,7 @@ const WorkoutLogger = forwardRef<WorkoutLoggerHandle, { exerciseNames: string[] 
       {showDetails && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="kicker" style={{ fontSize: 9 }}>NOTES</span>
+            <span className="kicker" style={{ fontSize: '0.5625rem' }}>NOTES</span>
             <textarea placeholder="How did it feel?" value={notes} onChange={e => setNotes(e.target.value)} rows={2}
               style={{ ...inputStyle, resize: 'vertical' }} />
           </label>
@@ -429,11 +429,11 @@ const WorkoutLogger = forwardRef<WorkoutLoggerHandle, { exerciseNames: string[] 
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button type="submit" className="btn btn-primary" disabled={log.isPending} style={{ padding: '8px 16px', fontSize: 11 }}>
+        <button type="submit" className="btn btn-primary" disabled={log.isPending} style={{ padding: '8px 16px', fontSize: '0.6875rem' }}>
           <Icon name="plus" size={13} /> {log.isPending ? 'LOGGING…' : 'LOG WORKOUT'}
         </button>
         {log.isSuccess && log.data && !log.data.deduped && (
-          <span className="mono" style={{ fontSize: 12, color: 'var(--lime)', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--lime)', display: 'flex', alignItems: 'center', gap: 5 }}>
             <Icon name="check" size={13} style={{ color: 'var(--lime)' }} /> +{log.data.xpAwarded} XP banked
           </span>
         )}
@@ -448,10 +448,10 @@ function WeekVolume({ week }: { week: WeekVol }) {
   return (
     <div className="panel-inset" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 9 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
-        <span className="kicker" style={{ fontSize: 9 }}>THIS WEEK</span>
+        <span className="kicker" style={{ fontSize: '0.5625rem' }}>THIS WEEK</span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 16, alignItems: 'baseline' }}>
-          <span><span className="ncx-val" style={{ fontSize: 17, color: 'var(--lime)' }}>{week.sessions}</span><span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>/{week.goal} SESSIONS</span></span>
-          <span><span className="ncx-val" style={{ fontSize: 17, color: 'var(--cyan)' }}>{week.minutes}</span><span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}> MIN</span></span>
+          <span><span className="ncx-val" style={{ fontSize: '1.0625rem', color: 'var(--lime)' }}>{week.sessions}</span><span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>/{week.goal} SESSIONS</span></span>
+          <span><span className="ncx-val" style={{ fontSize: '1.0625rem', color: 'var(--cyan)' }}>{week.minutes}</span><span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}> MIN</span></span>
         </span>
       </div>
       <div className="ncx-bar slim">
@@ -484,14 +484,14 @@ function RecentWorkouts({ workouts, loading }: { workouts: Workout[]; loading: b
     <section className="panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Icon name="spark" size={14} style={{ color: 'var(--lime)' }} />
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>RECENT WORKOUTS</span>
+        <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>RECENT WORKOUTS</span>
         <span className="ncx-serial">{workouts.length} LOGGED</span>
       </div>
 
       {loading ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)', letterSpacing: '0.12em' }}>LOADING…</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)', letterSpacing: '0.12em' }}>LOADING…</div>
       ) : workouts.length === 0 ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)', letterSpacing: '0.08em' }}>NO WORKOUTS LOGGED YET</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)', letterSpacing: '0.08em' }}>NO WORKOUTS LOGGED YET</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 12, alignItems: 'start' }}>
           {workouts.map(w => (
@@ -568,16 +568,16 @@ function WorkoutCard({
           <Icon name={tm.icon} size={15} style={{ color: tm.color }} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {w.title || w.type[0].toUpperCase() + w.type.slice(1)}
           </div>
-          <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--text-faint)', marginTop: 2 }}>
+          <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.06em', color: 'var(--text-faint)', marginTop: 2 }}>
             <span style={{ color: tm.color }}>{w.type.toUpperCase()}</span>
             {w.intensity && <> · <span style={{ color: ic }}>{w.intensity.toUpperCase()}</span></>}
             {w.durationMin ? ` · ${w.durationMin}M` : ''} · {timeAgo(w.performedAt)}
           </div>
         </div>
-        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--lime)', flex: 'none' }}>+{w.xpAwarded}</span>
+        <span className="mono" style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--lime)', flex: 'none' }}>+{w.xpAwarded}</span>
         <Icon name="chevD" size={13} style={{ color: 'var(--text-faint)', flex: 'none', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </div>
 
@@ -586,18 +586,18 @@ function WorkoutCard({
         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--line)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span className="kicker" style={{ fontSize: 9 }}>TYPE</span>
+              <span className="kicker" style={{ fontSize: '0.5625rem' }}>TYPE</span>
               <select value={type} onChange={e => setType(e.target.value as WorkoutType)} style={ctrl}>
                 {SESSION_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span className="kicker" style={{ fontSize: 9 }}>MINUTES</span>
+              <span className="kicker" style={{ fontSize: '0.5625rem' }}>MINUTES</span>
               <input type="number" inputMode="numeric" min={0} max={720} value={durationMin}
                 onChange={e => setDurationMin(e.target.value)} style={ctrl} />
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span className="kicker" style={{ fontSize: 9 }}>INTENSITY</span>
+              <span className="kicker" style={{ fontSize: '0.5625rem' }}>INTENSITY</span>
               <div style={{ display: 'flex', gap: 0, boxShadow: 'inset 0 0 0 1px var(--line-2)' }}>
                 {INTENSITIES.map(o => {
                   const on = intensity === o.value;
@@ -605,7 +605,7 @@ function WorkoutCard({
                   return (
                     <button key={o.value} type="button" onClick={() => setIntensity(o.value)} className="mono"
                       style={{
-                        flex: 1, padding: '8px 0', fontSize: 11, letterSpacing: '0.1em', cursor: 'pointer', border: 'none', borderRadius: 0,
+                        flex: 1, padding: '8px 0', fontSize: '0.6875rem', letterSpacing: '0.1em', cursor: 'pointer', border: 'none', borderRadius: 0,
                         background: on ? `color-mix(in srgb, ${c} 18%, transparent)` : 'transparent',
                         color: on ? c : 'var(--text-dim)', fontWeight: on ? 700 : 500,
                         boxShadow: on ? `inset 0 0 0 1px ${c}` : 'none',
@@ -619,7 +619,7 @@ function WorkoutCard({
           </div>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="kicker" style={{ fontSize: 9 }}>TITLE (OPTIONAL)</span>
+            <span className="kicker" style={{ fontSize: '0.5625rem' }}>TITLE (OPTIONAL)</span>
             <input value={title} onChange={e => setTitle(e.target.value)}
               placeholder='e.g. "Push day", "5k run"' style={ctrl} />
           </label>
@@ -635,9 +635,9 @@ function WorkoutCard({
               <span className="kicker">EXERCISES</span>
               {w.exercises.map((ex: any, i: number) => (
                 <div key={i} className="panel-inset" style={{ padding: '8px 10px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: ex.sets?.length ? 4 : 0 }}>{ex.exercise}</div>
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: ex.sets?.length ? 4 : 0 }}>{ex.exercise}</div>
                   {ex.sets?.length > 0 && (
-                    <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                    <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-dim)' }}>
                       {ex.sets.map((s: any) =>
                         [s.reps != null ? `${s.reps} reps` : null, s.weight != null ? `${s.weight} kg` : null]
                           .filter(Boolean).join(' × ') || 'set'
@@ -656,11 +656,11 @@ function WorkoutCard({
           </label>
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11, color: 'var(--red)' }}>
+            <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: '0.6875rem', color: 'var(--red)' }}>
               <Icon name="close" size={13} style={{ marginRight: 4 }} /> DELETE
             </button>
             {dirty && (
-              <button onClick={() => save.mutate()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11 }} disabled={save.isPending}>
+              <button onClick={() => save.mutate()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.6875rem' }} disabled={save.isPending}>
                 {save.isPending ? 'SAVING…' : 'SAVE'}
               </button>
             )}
@@ -674,8 +674,8 @@ function WorkoutCard({
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="panel-inset" style={{ padding: '6px 10px', minWidth: 70 }}>
-      <div className="kicker" style={{ fontSize: 9, marginBottom: 2 }}>{label}</div>
-      <div className="mono" style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, textTransform: 'capitalize' }}>{value}</div>
+      <div className="kicker" style={{ fontSize: '0.5625rem', marginBottom: 2 }}>{label}</div>
+      <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text)', fontWeight: 600, textTransform: 'capitalize' }}>{value}</div>
     </div>
   );
 }
@@ -732,15 +732,15 @@ function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void 
   return (
     <section className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>WEEKLY PROTOCOL</span>
+        <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>WEEKLY PROTOCOL</span>
         <span style={{ flex: 1 }} />
         <span className="ncx-serial">{plans.length} SLOT{plans.length === 1 ? '' : 'S'}</span>
       </div>
 
       {plansQ.isLoading ? (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SYNCING PROTOCOL…</div>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SYNCING PROTOCOL…</div>
       ) : plans.length === 0 && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
           NO PROTOCOL ON FILE — lay out your training week
         </div>
       )}
@@ -760,7 +760,7 @@ function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void 
                 }}
               >
                 <div className="mono" style={{
-                  fontSize: 9, letterSpacing: '0.22em', fontWeight: 700, textAlign: 'center',
+                  fontSize: '0.5625rem', letterSpacing: '0.22em', fontWeight: 700, textAlign: 'center',
                   color: isToday ? 'rgba(var(--accent-rgb), 0.95)' : 'var(--text-faint)',
                 }}>
                   {label}
@@ -796,7 +796,7 @@ function WeeklyProtocol({ onLogSlot }: { onLogSlot: (plan: WorkoutPlan) => void 
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    style={{ padding: '3px 6px', fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-faint)', justifyContent: 'center' }}
+                    style={{ padding: '3px 6px', fontSize: '0.5625rem', letterSpacing: '0.14em', color: 'var(--text-faint)', justifyContent: 'center' }}
                     onClick={() => { setAddingDay(dow); setEditingId(null); }}
                   >
                     <Icon name="plus" size={9} /> ADD
@@ -817,27 +817,27 @@ function PlanSlot({
 }: { plan: WorkoutPlan; focusMin: number; busy: boolean; onLog: () => void; onEdit: () => void; onDelete: () => void }) {
   return (
     <div className="panel-inset" style={{ padding: 7, display: 'flex', flexDirection: 'column', gap: 5, opacity: plan.isActive ? 1 : 0.45 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'break-word' }}>{plan.title}</div>
+      <div style={{ fontSize: '0.75rem', fontWeight: 600, lineHeight: 1.3, overflowWrap: 'break-word' }}>{plan.title}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-        <span className="ncx-stamp flat" style={{ fontSize: 9.5, padding: '1px 5px', letterSpacing: '0.12em', color: (TYPE_META[plan.type] ?? TYPE_META.other).color }}>
+        <span className="ncx-stamp flat" style={{ fontSize: '0.5938rem', padding: '1px 5px', letterSpacing: '0.12em', color: (TYPE_META[plan.type] ?? TYPE_META.other).color }}>
           {plan.type}
         </span>
         {plan.targetMin != null && (
-          <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <Icon name="clock" size={9} /> {plan.targetMin}m
           </span>
         )}
         {focusMin > 0 && (
-          <span className="mono" title={`${focusMin} minutes of logged focus time`} style={{ fontSize: 9.5, color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <span className="mono" title={`${focusMin} minutes of logged focus time`} style={{ fontSize: '0.5938rem', color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <Icon name="zap" size={9} /> {fmtFocusMin(focusMin)}
           </span>
         )}
       </div>
       {plan.notes && (
-        <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', lineHeight: 1.4, overflowWrap: 'break-word' }}>{plan.notes}</div>
+        <div className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', lineHeight: 1.4, overflowWrap: 'break-word' }}>{plan.notes}</div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-        <button type="button" className="btn btn-ghost" style={{ padding: '2px 7px', fontSize: 9, letterSpacing: '0.14em' }} onClick={onLog}>
+        <button type="button" className="btn btn-ghost" style={{ padding: '2px 7px', fontSize: '0.5625rem', letterSpacing: '0.14em' }} onClick={onLog}>
           LOG
         </button>
         <span style={{ flex: 1 }} />
@@ -861,7 +861,7 @@ function PlanForm({
   const [targetMin, setTargetMin] = useState<string>(initial?.targetMin != null ? String(initial.targetMin) : '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
 
-  const slotInput: React.CSSProperties = { ...inputStyle, padding: '5px 8px', fontSize: 11, width: '100%', boxSizing: 'border-box' };
+  const slotInput: React.CSSProperties = { ...inputStyle, padding: '5px 8px', fontSize: '0.6875rem', width: '100%', boxSizing: 'border-box' };
 
   const submit = () => {
     if (!title.trim()) return;
@@ -926,7 +926,7 @@ function ExercisesEditor({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span className="kicker">EXERCISES</span>
-        <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={addExercise}>
+        <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: '0.6875rem' }} onClick={addExercise}>
           <Icon name="plus" size={12} /> ADD
         </button>
       </div>
@@ -943,7 +943,7 @@ function ExercisesEditor({
               onChange={e => updateExercise(i, x => ({ ...x, exercise: e.target.value }))}
               style={{ ...inputStyle, flex: 1 }}
             />
-            <button type="button" className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 11 }} onClick={() => removeExercise(i)}>
+            <button type="button" className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: '0.6875rem' }} onClick={() => removeExercise(i)}>
               <Icon name="close" size={12} />
             </button>
           </div>
@@ -970,7 +970,7 @@ function SetsEditor({ ex, onChange }: { ex: ExerciseRow; onChange: (x: ExerciseR
             }}
             style={{ ...inputStyle, width: 64 }}
           />
-          <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>×</span>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>×</span>
           <input
             type="number" placeholder="kg"
             value={s.weight ?? ''}
@@ -988,7 +988,7 @@ function SetsEditor({ ex, onChange }: { ex: ExerciseRow; onChange: (x: ExerciseR
         </div>
       ))}
       {/* clone the previous set as the starting values — 4×10@60 shouldn't mean 8 retypes */}
-      <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }}
+      <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: '0.6875rem' }}
         onClick={() => update([...ex.sets, { ...ex.sets[ex.sets.length - 1] }])}>
         <Icon name="plus" size={11} /> SET
       </button>

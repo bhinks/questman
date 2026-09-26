@@ -63,8 +63,8 @@ export function LoginScreen() {
 
             {/* Brand lockup */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 6 }}>
-              <div className="ncx-hex" style={{ width: 44, height: 44, fontSize: 18, boxShadow: '0 0 22px -2px rgba(var(--accent-rgb),0.55)' }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
-              <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, letterSpacing: '0.03em' }}>
+              <div className="ncx-hex" style={{ width: 44, height: 44, fontSize: '1.125rem', boxShadow: '0 0 22px -2px rgba(var(--accent-rgb),0.55)' }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
+              <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '1.875rem', fontWeight: 700, letterSpacing: '0.03em' }}>
                 QUEST<span style={{ color: 'var(--cyan)' }}>MAN</span>
               </div>
               <span className="ncx-serial vert" style={{ marginLeft: 'auto' }}>NC-077 // 2.4.0</span>
@@ -89,7 +89,7 @@ export function LoginScreen() {
             {/* Credentials */}
             <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="kicker" style={{ fontSize: 9.5 }}>HANDLE</span>
+                <span className="kicker" style={{ fontSize: '0.5938rem' }}>HANDLE</span>
                 <input
                   className="ncx-input"
                   type="email"
@@ -101,7 +101,7 @@ export function LoginScreen() {
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="kicker" style={{ fontSize: 9.5 }}>PASSKEY</span>
+                <span className="kicker" style={{ fontSize: '0.5938rem' }}>PASSKEY</span>
                 <input
                   className="ncx-input"
                   type="password"
@@ -117,7 +117,7 @@ export function LoginScreen() {
                 type="submit"
                 className="btn btn-primary"
                 disabled={submitting || demoing}
-                style={{ padding: 14, fontSize: 13, marginTop: 6, width: '100%' }}
+                style={{ padding: 14, fontSize: '0.8125rem', marginTop: 6, width: '100%' }}
               >
                 {submitting ? 'AUTHENTICATING…' : (<><Icon name="zap" size={15} /> JACK IN</>)}
               </button>
@@ -126,7 +126,7 @@ export function LoginScreen() {
                 className="btn btn-ghost"
                 disabled={submitting || demoing}
                 onClick={onDemo}
-                style={{ padding: 11, fontSize: 11, width: '100%', letterSpacing: '0.12em' }}
+                style={{ padding: 11, fontSize: '0.6875rem', width: '100%', letterSpacing: '0.12em' }}
               >
                 {demoing ? 'SPINNING UP NIGHT CITY…' : (<><Icon name="play" size={13} /> EXPLORE THE DEMO</>)}
               </button>
@@ -137,17 +137,17 @@ export function LoginScreen() {
                   onChange={e => setRemember(e.target.checked)}
                   style={{ accentColor: 'var(--cyan)', width: 13, height: 13 }}
                 />
-                <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.18em', color: 'var(--text-faint)' }}>
+                <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.18em', color: 'var(--text-faint)' }}>
                   PERSIST SESSION ON THIS DECK
                 </span>
               </label>
             </form>
 
-            <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-faint)' }}>
+            <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, fontSize: '0.5625rem', letterSpacing: '0.2em', color: 'var(--text-faint)' }}>
               <span>⬡ LOCAL VAULT</span>
               <span>DATA NEVER LEAVES THIS DEVICE</span>
             </div>
-            <div className="mono" style={{ marginTop: 10, fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-ghost)', textAlign: 'center' }}>
+            <div className="mono" style={{ marginTop: 10, fontSize: '0.5625rem', letterSpacing: '0.12em', color: 'var(--text-ghost)', textAlign: 'center' }}>
               NO ACCOUNT? EXPLORE A SEEDED SANDBOX — NO DATA LEAVES THIS DEVICE
             </div>
           </div>

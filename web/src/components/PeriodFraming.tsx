@@ -37,7 +37,7 @@ export function PeriodBar({ period }: { period: SpendingPeriod }) {
     >
       <div
         className="mono"
-        style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.14em' }}
+        style={{ fontSize: '0.625rem', color: 'var(--text-faint)', letterSpacing: '0.14em' }}
       >
         {format(period.start, 'MMM yyyy')} – {format(period.end, 'MMM yyyy')}
         <span style={{ color: 'var(--text-ghost)' }}> · </span>
@@ -57,7 +57,7 @@ export function PeriodBar({ period }: { period: SpendingPeriod }) {
               onClick={() => setMode(m.id)}
               className="mono"
               style={{
-                fontSize: 9,
+                fontSize: '0.5625rem',
                 letterSpacing: '0.12em',
                 padding: '4px 10px',
                 background: active ? 'rgba(var(--accent-rgb),0.10)' : 'transparent',

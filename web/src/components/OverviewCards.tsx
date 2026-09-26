@@ -106,7 +106,7 @@ export function OverviewCards({ analysis }: OverviewCardsProps) {
           <div
             className="kicker"
             style={{
-              fontSize: 9.5,
+              fontSize: '0.5938rem',
               marginBottom: 8,
               display: 'flex',
               justifyContent: 'space-between',
@@ -115,14 +115,14 @@ export function OverviewCards({ analysis }: OverviewCardsProps) {
             }}
           >
             <span>{m.k}</span>
-            <span style={{ color: 'var(--text-faint)', fontSize: 8.5, letterSpacing: '0.12em' }}>
+            <span style={{ color: 'var(--text-faint)', fontSize: '0.5312rem', letterSpacing: '0.12em' }}>
               {unit}
             </span>
           </div>
           <div
             className="ncx-val"
             style={{
-              fontSize: 27,
+              fontSize: '1.6875rem',
               color: m.c,
               textShadow: m.focal ? '0 0 16px rgba(var(--accent-rgb),0.4)' : 'none',
             }}
@@ -135,7 +135,7 @@ export function OverviewCards({ analysis }: OverviewCardsProps) {
             ) : (
               <span
                 className="mono"
-                style={{ fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.14em' }}
+                style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', letterSpacing: '0.14em' }}
               >
                 {m.sub}
               </span>

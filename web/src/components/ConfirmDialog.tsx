@@ -78,7 +78,7 @@ export function ConfirmDialog({
             <Icon name={danger ? 'close' : 'spark'} size={18} />
           </div>
           <h3 className="ncx-chroma" style={{
-            fontSize: 16, fontWeight: 700, margin: 0,
+            fontSize: '1rem', fontWeight: 700, margin: 0,
             fontFamily: 'var(--font-display)', color: 'var(--text)',
             textTransform: 'uppercase', letterSpacing: '0.03em',
           }}>
@@ -87,7 +87,7 @@ export function ConfirmDialog({
         </div>
 
         {message && (
-          <div style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 20 }}>
+          <div style={{ fontSize: '0.8438rem', color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 20 }}>
             {message}
           </div>
         )}

@@ -58,7 +58,7 @@ function staleInfo(c: Habit): { stale: boolean; overdue: number } {
 function MoveSelect({ value, projects, onChange }: { value: string | null; projects: Project[]; onChange: (pid: string | null) => void }) {
   return (
     <select value={value || ''} onChange={e => onChange(e.target.value || null)} title="Move to a project"
-      style={{ background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
+      style={{ background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.625rem', padding: '4px 6px', outline: 'none' }}>
       <option value="">Uncategorized</option>
       {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
     </select>
@@ -67,7 +67,7 @@ function MoveSelect({ value, projects, onChange }: { value: string | null; proje
 
 function StaleHint({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 10, color: 'var(--text-dim)', padding: '5px 9px', background: 'color-mix(in srgb, var(--red) 8%, transparent)', borderLeft: '2px solid var(--red)' }}>
+    <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.625rem', color: 'var(--text-dim)', padding: '5px 9px', background: 'color-mix(in srgb, var(--red) 8%, transparent)', borderLeft: '2px solid var(--red)' }}>
       <Icon name="bell" size={11} style={{ color: 'var(--red)', flex: 'none' }} />
       <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
     </div>
@@ -112,7 +112,7 @@ function StatusPill({ status }: { status: Project['status'] }) {
 
 function SectionLabel({ icon, color, count, children }: { icon: string; color?: string; count?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: color || 'var(--text-dim)', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+    <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: color || 'var(--text-dim)', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <Icon name={icon} size={11} style={{ color: color || 'var(--text-dim)' }} />{children}
       {count != null && <span className="ncx-serial" style={{ marginLeft: 2 }}>{count}</span>}
     </span>
@@ -139,19 +139,19 @@ function ChoreRow({
           ? <CheckBox done={done} busy={choreBusy} onClick={onToggle} label={done ? `Reopen ${chore.title}` : `Complete ${chore.title}`} />
           : <RoundCheck done={done} busy={choreBusy} onClick={onToggle} label={done ? `Uncheck ${chore.title}` : `Check ${chore.title}`} />}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: done ? 'var(--lime)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chore.title}</div>
+          <div style={{ fontSize: '0.8438rem', fontWeight: 600, color: done ? 'var(--lime)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chore.title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
             {!once && (
-              <span className="mono" style={{ fontSize: 9, letterSpacing: '0.1em', color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px', border: '1px solid color-mix(in srgb, var(--teal) 35%, transparent)', background: 'color-mix(in srgb, var(--teal) 8%, transparent)' }}>
+              <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.1em', color: 'var(--teal)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px', border: '1px solid color-mix(in srgb, var(--teal) 35%, transparent)', background: 'color-mix(in srgb, var(--teal) 8%, transparent)' }}>
                 <Icon name="repeat" size={9} /> {CADENCE_LABEL[chore.cadence]}
               </span>
             )}
-            {once && <span className="ncx-stamp flat" style={{ fontSize: 8.5, color: 'var(--text-faint)' }}>ONE-OFF</span>}
-            {!once && chore.currentStreak > 0 && <span className="mono" style={{ fontSize: 9.5, color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="flame" size={10} />{chore.currentStreak}</span>}
+            {once && <span className="ncx-stamp flat" style={{ fontSize: '0.5312rem', color: 'var(--text-faint)' }}>ONE-OFF</span>}
+            {!once && chore.currentStreak > 0 && <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="flame" size={10} />{chore.currentStreak}</span>}
             {chore.weatherRule?.outdoor && <Icon name="eye" size={11} style={{ color: 'var(--cyan)' }} />}
-            {chore.estMinutes != null && <span className="mono" style={{ fontSize: 9.5, color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="clock" size={10} />{chore.estMinutes}m</span>}
-            <span className="mono" style={{ fontSize: 9.5, color: 'var(--lime)' }}>+{chore.baseXp}</span>
-            {stale && <span className="mono" style={{ fontSize: 9.5, color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="bell" size={10} />OVERDUE {overdue}D</span>}
+            {chore.estMinutes != null && <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="clock" size={10} />{chore.estMinutes}m</span>}
+            <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--lime)' }}>+{chore.baseXp}</span>
+            {stale && <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="bell" size={10} />OVERDUE {overdue}D</span>}
           </div>
         </div>
         <MoveSelect value={chore.projectId} projects={projects} onChange={onMove} />
@@ -171,12 +171,12 @@ function TaskRow({ task, busy, onToggle, onDelete }: { task: ProjectTask; busy: 
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <CheckBox done={task.done} busy={busy} onClick={onToggle} label={task.done ? `Reopen ${task.title}` : `Complete ${task.title}`} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, color: task.done ? 'var(--lime)' : 'var(--text)', textDecoration: task.done ? 'line-through' : 'none', textDecorationColor: 'rgba(67,255,166,0.5)' }}>{task.title}</span>
-        {task.description && <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 1 }}>{task.description}</div>}
+        <span style={{ fontSize: '0.8125rem', color: task.done ? 'var(--lime)' : 'var(--text)', textDecoration: task.done ? 'line-through' : 'none', textDecorationColor: 'rgba(67,255,166,0.5)' }}>{task.title}</span>
+        {task.description && <div style={{ fontSize: '0.7188rem', color: 'var(--text-dim)', marginTop: 1 }}>{task.description}</div>}
       </div>
-      {task.priority > 0 && <span className="ncx-stamp flat" title="Priority" style={{ color: 'var(--magenta)', fontSize: 9 }}>P{task.priority}</span>}
-      {task.xpReward != null && <span className="ncx-stamp flat" title="Authored XP reward" style={{ color: 'var(--amber)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="bolt" size={10} /> +{task.xpReward}</span>}
-      {task.estMinutes != null && <span className="ncx-stamp flat" title="Estimated time" style={{ color: 'var(--violet)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="clock" size={10} /> {task.estMinutes}m</span>}
+      {task.priority > 0 && <span className="ncx-stamp flat" title="Priority" style={{ color: 'var(--magenta)', fontSize: '0.5625rem' }}>P{task.priority}</span>}
+      {task.xpReward != null && <span className="ncx-stamp flat" title="Authored XP reward" style={{ color: 'var(--amber)', fontSize: '0.5625rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="bolt" size={10} /> +{task.xpReward}</span>}
+      {task.estMinutes != null && <span className="ncx-stamp flat" title="Estimated time" style={{ color: 'var(--violet)', fontSize: '0.5625rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="clock" size={10} /> {task.estMinutes}m</span>}
       <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '4px 6px' }} title="Delete objective" aria-label={`Delete ${task.title}`}><Icon name="close" size={12} /></button>
     </div>
   );
@@ -233,13 +233,13 @@ function SequencedTaskRow({ task, state, isLast, busy, onToggle, onDelete }: { t
       <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 10, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: current ? 700 : 500, color: done ? 'var(--lime)' : current ? 'var(--text)' : 'var(--text-faint)', textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'rgba(67,255,166,0.5)' }}>{task.title}</span>
-            {current && <span className="ncx-stamp flat" style={{ fontSize: 9.5, padding: '2px 7px', color: 'var(--cyan)', background: 'rgba(var(--accent-rgb), 0.12)' }}>CURRENT</span>}
+            <span style={{ fontSize: '0.8125rem', fontWeight: current ? 700 : 500, color: done ? 'var(--lime)' : current ? 'var(--text)' : 'var(--text-faint)', textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'rgba(67,255,166,0.5)' }}>{task.title}</span>
+            {current && <span className="ncx-stamp flat" style={{ fontSize: '0.5938rem', padding: '2px 7px', color: 'var(--cyan)', background: 'rgba(var(--accent-rgb), 0.12)' }}>CURRENT</span>}
           </div>
-          {task.description && <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2, opacity: locked ? 0.6 : 1 }}>{task.description}</div>}
+          {task.description && <div style={{ fontSize: '0.7188rem', color: 'var(--text-dim)', marginTop: 2, opacity: locked ? 0.6 : 1 }}>{task.description}</div>}
         </div>
-        {task.xpReward != null && <span className="ncx-stamp flat" title="Authored XP reward" style={{ color: current ? 'var(--amber)' : 'var(--text-faint)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="bolt" size={10} /> +{task.xpReward}</span>}
-        {task.estMinutes != null && <span className="ncx-stamp flat" title="Estimated time" style={{ color: 'var(--violet)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="clock" size={10} /> {task.estMinutes}m</span>}
+        {task.xpReward != null && <span className="ncx-stamp flat" title="Authored XP reward" style={{ color: current ? 'var(--amber)' : 'var(--text-faint)', fontSize: '0.5625rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="bolt" size={10} /> +{task.xpReward}</span>}
+        {task.estMinutes != null && <span className="ncx-stamp flat" title="Estimated time" style={{ color: 'var(--violet)', fontSize: '0.5625rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="clock" size={10} /> {task.estMinutes}m</span>}
         <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '4px 6px' }} title="Delete step" aria-label={`Delete ${task.title}`}><Icon name="close" size={12} /></button>
       </div>
     </div>
@@ -252,10 +252,10 @@ function MilestoneRow({ milestone, busy, onToggle, onDelete }: { milestone: Mile
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <CheckBox done={milestone.done} busy={busy} onClick={onToggle} label={milestone.done ? `Reopen ${milestone.title}` : `Clear ${milestone.title}`} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: milestone.done ? 'var(--cyan)' : 'var(--text)', textDecoration: milestone.done ? 'line-through' : 'none', textDecorationColor: 'rgba(72,209,255,0.5)' }}>{milestone.title}</span>
-        {due && <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 8 }}><Icon name="clock" size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />{due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
+        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: milestone.done ? 'var(--cyan)' : 'var(--text)', textDecoration: milestone.done ? 'line-through' : 'none', textDecorationColor: 'rgba(72,209,255,0.5)' }}>{milestone.title}</span>
+        {due && <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', marginLeft: 8 }}><Icon name="clock" size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />{due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
       </div>
-      <span className="ncx-stamp flat" title="Bonus XP on clear" style={{ color: 'var(--amber)', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="trophy" size={10} />+{milestone.bonusXp}</span>
+      <span className="ncx-stamp flat" title="Bonus XP on clear" style={{ color: 'var(--amber)', fontSize: '0.5625rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="trophy" size={10} />+{milestone.bonusXp}</span>
       <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '4px 6px' }} title="Delete milestone" aria-label={`Delete ${milestone.title}`}><Icon name="close" size={12} /></button>
     </div>
   );
@@ -303,11 +303,11 @@ function ProjectCard({
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', color: 'var(--text)' }}>{project.name}</h3>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', color: 'var(--text)' }}>{project.name}</h3>
             <StatusPill status={project.status} />
-            {project.ordered && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)', fontSize: 8.5 }}>SEQUENCED</span>}
+            {project.ordered && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)', fontSize: '0.5312rem' }}>SEQUENCED</span>}
           </div>
-          {project.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{project.description}</div>}
+          {project.description && <div style={{ fontSize: '0.8125rem', color: 'var(--text-dim)', marginTop: 4 }}>{project.description}</div>}
         </div>
         <button onClick={onEdit} className="btn btn-ghost" style={{ padding: '6px 8px' }} title="Edit operation" aria-label={`Edit ${project.name}`}><Icon name="edit" size={14} /></button>
         <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '6px 8px' }} title="Delete operation" aria-label={`Delete ${project.name}`}><Icon name="close" size={14} /></button>
@@ -329,17 +329,17 @@ function ProjectCard({
               <TaskRow key={t.id} task={t} busy={toggleTask.isPending && toggleTask.variables?.id === t.id}
                 onToggle={() => toggleTask.mutate(t)} onDelete={() => removeTask.mutate(t.id)} />
             ))}
-        {tasks.length === 0 && <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', paddingLeft: 4 }}>No objectives yet.</div>}
+        {tasks.length === 0 && <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', paddingLeft: 4 }}>No objectives yet.</div>}
         {addingTask
           ? <TaskForm projectId={project.id} onClose={() => setAddingTask(false)} />
-          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 11, padding: '5px 10px' }} onClick={() => setAddingTask(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD OBJECTIVE</button>}
+          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: '0.6875rem', padding: '5px 10px' }} onClick={() => setAddingTask(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD OBJECTIVE</button>}
       </section>
 
       {/* rotation — attached recurring chores */}
       <section className="panel-inset" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <SectionLabel icon="repeat" color="var(--teal)" count={rotation.length}>ROTATION · RECURRING</SectionLabel>
         {rotation.length === 0
-          ? <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>No recurring upkeep attached. Add one below, or move a chore here from Uncategorized.</div>
+          ? <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)' }}>No recurring upkeep attached. Add one below, or move a chore here from Uncategorized.</div>
           : rotation.map(c => (
               <ChoreRow key={c.id} chore={c} projects={projects} showSugg={showSugg}
                 editing={editingChoreId === c.id} choreBusy={choreBusyId === c.id}
@@ -349,7 +349,7 @@ function ProjectCard({
             ))}
         {choresModuleId && (addingChore
           ? <HabitForm kind="chore" moduleId={choresModuleId} defaultProjectId={project.id} onClose={() => setAddingChore(false)} />
-          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 11, padding: '5px 10px' }} onClick={() => setAddingChore(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD CHORE</button>)}
+          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: '0.6875rem', padding: '5px 10px' }} onClick={() => setAddingChore(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD CHORE</button>)}
       </section>
 
       {/* milestones */}
@@ -359,10 +359,10 @@ function ProjectCard({
           <MilestoneRow key={m.id} milestone={m} busy={toggleMilestone.isPending && toggleMilestone.variables?.id === m.id}
             onToggle={() => toggleMilestone.mutate(m)} onDelete={() => removeMilestone.mutate(m.id)} />
         ))}
-        {milestones.length === 0 && <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', paddingLeft: 4 }}>No milestones set.</div>}
+        {milestones.length === 0 && <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', paddingLeft: 4 }}>No milestones set.</div>}
         {addingMilestone
           ? <MilestoneForm projectId={project.id} onClose={() => setAddingMilestone(false)} />
-          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: 11, padding: '5px 10px' }} onClick={() => setAddingMilestone(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD MILESTONE</button>}
+          : <button className="btn btn-ghost" style={{ alignSelf: 'flex-start', fontSize: '0.6875rem', padding: '5px 10px' }} onClick={() => setAddingMilestone(true)}><Icon name="plus" size={12} style={{ marginRight: 4 }} /> ADD MILESTONE</button>}
       </section>
     </div>
   );
@@ -401,7 +401,7 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
         </label>
         <label title="Objectives unlock in order — only the current step is actionable (questline mode)" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', border: '1px solid var(--line-2)', cursor: 'pointer' }}>
           <input type="checkbox" checked={ordered} onChange={e => setOrdered(e.target.checked)} style={{ accentColor: 'var(--cyan)' }} />
-          <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.14em', color: ordered ? 'var(--cyan)' : 'var(--text-dim)' }}>SEQUENCED</span>
+          <span className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.14em', color: ordered ? 'var(--cyan)' : 'var(--text-dim)' }}>SEQUENCED</span>
         </label>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -431,8 +431,8 @@ function TaskForm({ projectId, onClose }: { projectId: string; onClose: () => vo
       <input type="number" min={1} max={1440} placeholder="est min" value={estMinutes} onChange={e => setEstMinutes(e.target.value === '' ? '' : Math.max(1, Math.min(1440, Number(e.target.value))))} style={{ ...inputStyle, width: 90 }} />
       <input type="number" min={0} max={100} title="Priority (higher surfaces first)" value={priority} onChange={e => setPriority(Math.max(0, Math.min(100, Number(e.target.value))))} style={{ ...inputStyle, width: 70 }} />
       <input type="number" min={0} max={2000} placeholder="xp auto" title="XP reward (blank = derived from the time estimate)" value={xpReward} onChange={e => setXpReward(e.target.value === '' ? '' : Math.max(0, Math.min(2000, Number(e.target.value))))} style={{ ...inputStyle, width: 80 }} />
-      <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 11 }}>CANCEL</button>
-      <button className="btn btn-primary" disabled={!title.trim() || create.isPending} onClick={submit} style={{ fontSize: 11 }}>{create.isPending ? 'ADDING…' : 'ADD'}</button>
+      <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '0.6875rem' }}>CANCEL</button>
+      <button className="btn btn-primary" disabled={!title.trim() || create.isPending} onClick={submit} style={{ fontSize: '0.6875rem' }}>{create.isPending ? 'ADDING…' : 'ADD'}</button>
     </div>
   );
 }
@@ -462,8 +462,8 @@ function MilestoneForm({ projectId, onClose }: { projectId: string; onClose: () 
       <input autoFocus placeholder="Milestone title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
       <input type="date" title="Due date (optional)" value={dueDate} onChange={e => setDueDate(e.target.value)} style={{ ...inputStyle, width: 150 }} />
       <input type="number" min={0} max={2000} title="Bonus XP on clear" value={bonusXp} onChange={e => setBonusXp(Math.max(0, Math.min(2000, Number(e.target.value))))} style={{ ...inputStyle, width: 90 }} />
-      <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 11 }}>CANCEL</button>
-      <button className="btn btn-primary" disabled={!title.trim() || create.isPending} onClick={submit} style={{ fontSize: 11 }}>{create.isPending ? 'ADDING…' : 'ADD'}</button>
+      <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '0.6875rem' }}>CANCEL</button>
+      <button className="btn btn-primary" disabled={!title.trim() || create.isPending} onClick={submit} style={{ fontSize: '0.6875rem' }}>{create.isPending ? 'ADDING…' : 'ADD'}</button>
     </div>
   );
 }
@@ -566,12 +566,12 @@ export function OperationsView() {
       <div className="panel hud" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div className="ncx-chip" style={{ color: 'var(--cyan)' }}><Icon name="grid" size={18} /></div>
         <div style={{ minWidth: 0 }}>
-          <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Operations</h2>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
+          <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Operations</h2>
+          <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
             {projects.length} PROJECTS · {dueCount} CHORES DUE{overdueCount ? ` · ${overdueCount} OVERDUE` : ''}
           </div>
         </div>
-        <button className={adding ? 'btn btn-ghost' : 'btn btn-primary'} style={{ marginLeft: 'auto', padding: '8px 15px', fontSize: 11 }} onClick={() => setAdding(a => !a)}>
+        <button className={adding ? 'btn btn-ghost' : 'btn btn-primary'} style={{ marginLeft: 'auto', padding: '8px 15px', fontSize: '0.6875rem' }} onClick={() => setAdding(a => !a)}>
           <Icon name={adding ? 'close' : 'plus'} size={13} /> {adding ? 'CLOSE' : 'NEW'}
         </button>
       </div>
@@ -582,16 +582,16 @@ export function OperationsView() {
           <div style={{ display: 'flex', boxShadow: 'inset 0 0 0 1px var(--line-2)', alignSelf: 'flex-start' }}>
             {([['project', 'PROJECT'], ['chore', 'RECURRING CHORE'], ['task', 'ONE-OFF TASK']] as [NewKind, string][]).map(([k, label]) => {
               const on = newKind === k;
-              return <button key={k} onClick={() => setNewKind(k)} className="mono" style={{ padding: '7px 12px', fontSize: 10, border: 'none', cursor: 'pointer', background: on ? 'color-mix(in srgb, var(--cyan) 16%, transparent)' : 'transparent', color: on ? 'var(--cyan)' : 'var(--text-dim)', fontWeight: on ? 700 : 500, boxShadow: on ? 'inset 0 0 0 1px var(--cyan)' : 'none' }}>{label}</button>;
+              return <button key={k} onClick={() => setNewKind(k)} className="mono" style={{ padding: '7px 12px', fontSize: '0.625rem', border: 'none', cursor: 'pointer', background: on ? 'color-mix(in srgb, var(--cyan) 16%, transparent)' : 'transparent', color: on ? 'var(--cyan)' : 'var(--text-dim)', fontWeight: on ? 700 : 500, boxShadow: on ? 'inset 0 0 0 1px var(--cyan)' : 'none' }}>{label}</button>;
             })}
           </div>
           {newKind === 'project' && <ProjectForm onClose={() => setAdding(false)} />}
           {newKind === 'chore' && (choresModuleId
             ? <HabitForm kind="chore" moduleId={choresModuleId} onClose={() => setAdding(false)} />
-            : <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>Chores module missing — re-run seed.</div>)}
+            : <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>Chores module missing — re-run seed.</div>)}
           {newKind === 'task' && (choresModuleId
             ? <TaskDefForm moduleId={choresModuleId} onClose={() => setAdding(false)} />
-            : <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>Chores module missing — re-run seed.</div>)}
+            : <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>Chores module missing — re-run seed.</div>)}
         </div>
       )}
 
@@ -611,9 +611,9 @@ export function OperationsView() {
       {/* uncategorized */}
       <div className="panel" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, border: '1px dashed var(--line-2)' }}>
         <SectionLabel icon="layers" count={looseChores.length}>UNCATEGORIZED — loose tasks &amp; chores</SectionLabel>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: -4 }}>Not tied to a project. Move anything into one, or leave it here.</div>
+        <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', marginTop: -4 }}>Not tied to a project. Move anything into one, or leave it here.</div>
         {looseChores.length === 0
-          ? <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>Empty — everything&rsquo;s organized.</div>
+          ? <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>Empty — everything&rsquo;s organized.</div>
           : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 12, alignItems: 'start' }}>
               {looseChores.map(c => (
@@ -644,7 +644,7 @@ export function OperationsView() {
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }
@@ -656,6 +656,6 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
 };

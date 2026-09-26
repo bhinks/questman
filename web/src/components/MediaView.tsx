@@ -318,12 +318,12 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
       <div className="panel hud" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div className="ncx-chip" style={{ color: 'var(--magenta)' }}><Icon name="layers" size={18} /></div>
         <div style={{ minWidth: 0 }}>
-          <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Braindance</h2>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
+          <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Braindance</h2>
+          <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
             {counts.active} IN PROGRESS · {counts.backlog} QUEUED · {fmtMin(weekMinutes)} THIS WEEK
           </div>
         </div>
-        <button className={creating ? 'btn btn-ghost' : 'btn btn-primary'} style={{ marginLeft: 'auto', padding: '8px 15px', fontSize: 11 }} onClick={() => setCreating(c => !c)} key={`add-${creating}`}>
+        <button className={creating ? 'btn btn-ghost' : 'btn btn-primary'} style={{ marginLeft: 'auto', padding: '8px 15px', fontSize: '0.6875rem' }} onClick={() => setCreating(c => !c)} key={`add-${creating}`}>
           <Icon name={creating ? 'close' : 'plus'} size={13} /> {creating ? 'CLOSE' : 'ADD TO QUEUE'}
         </button>
       </div>
@@ -343,7 +343,7 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
           return (
             <button key={k} onClick={() => setFilter(k)} className="mono"
               style={{
-                fontSize: 10, padding: '5px 12px', cursor: 'pointer', borderRadius: 0,
+                fontSize: '0.625rem', padding: '5px 12px', cursor: 'pointer', borderRadius: 0,
                 border: on ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)',
                 background: on ? 'rgba(var(--accent-rgb),0.12)' : 'var(--panel-2)',
                 color: on ? 'var(--cyan)' : 'var(--text-dim)',
@@ -375,10 +375,10 @@ export function MediaView({ onJackIn }: { onJackIn?: (seed: FocusSeed | null) =>
 
       {/* flash toast (overrun notice) */}
       {flash && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, maxWidth: 340, padding: 14, background: 'var(--panel)', border: '1px solid var(--red)', borderRadius: 'var(--r)', color: 'var(--text)', fontSize: 12.5, zIndex: 1000, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ position: 'fixed', bottom: 16, right: 16, maxWidth: 340, padding: 14, background: 'var(--panel)', border: '1px solid var(--red)', borderRadius: 'var(--r)', color: 'var(--text)', fontSize: '0.7812rem', zIndex: 1000, display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon name="shield" size={14} style={{ color: 'var(--red)', flex: 'none' }} />
           <span>{flash}</span>
-          <button onClick={() => setFlash(null)} className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '2px 6px', fontSize: 11 }}><Icon name="close" size={12} /></button>
+          <button onClick={() => setFlash(null)} className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '2px 6px', fontSize: '0.6875rem' }}><Icon name="close" size={12} /></button>
         </div>
       )}
 
@@ -430,13 +430,13 @@ function WhatNow({
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div className="ncx-chip" style={{ color: 'var(--cyan)', flex: 'none' }}><Icon name="clock" size={18} /></div>
         <div>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>WHAT NOW</div>
+          <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>WHAT NOW</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>I HAVE</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--text)' }}>I HAVE</span>
             <input type="number" value={budget} min={5} max={300}
               onChange={e => setBudget(Math.max(5, Math.min(300, Number(e.target.value) || 0)))}
-              style={{ width: 74, background: '#070811', border: '1px solid var(--line-2)', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 22, padding: '2px 8px', textAlign: 'center', outline: 'none' }} />
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>MIN</span>
+              style={{ width: 74, background: '#070811', border: '1px solid var(--line-2)', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '1.375rem', padding: '2px 8px', textAlign: 'center', outline: 'none' }} />
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', fontWeight: 700, color: 'var(--text)' }}>MIN</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
@@ -445,7 +445,7 @@ function WhatNow({
             return (
               <button key={c} onClick={() => setBudget(c)} className="mono"
                 style={{
-                  fontSize: 11, padding: '6px 12px', cursor: 'pointer', borderRadius: 0,
+                  fontSize: '0.6875rem', padding: '6px 12px', cursor: 'pointer', borderRadius: 0,
                   border: on ? '1px solid var(--cyan)' : '1px solid var(--line-2)',
                   background: on ? 'color-mix(in srgb, var(--cyan) 16%, transparent)' : 'var(--panel-2)',
                   color: on ? 'var(--cyan)' : 'var(--text-dim)',
@@ -467,18 +467,18 @@ function WhatNow({
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <Cover it={it} w={34} h={48} />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title}</div>
-                  <div className="mono" style={{ fontSize: 9, letterSpacing: '0.1em', color: m.color, marginTop: 2 }}>{m.label.toUpperCase()}{it.status === 'active' ? ' · IN PROGRESS' : ''}</div>
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title}</div>
+                  <div className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.1em', color: m.color, marginTop: 2 }}>{m.label.toUpperCase()}{it.status === 'active' ? ' · IN PROGRESS' : ''}</div>
                 </div>
-                {s.finishes && <span className="ncx-stamp flat" style={{ color: 'var(--lime)', fontSize: 8 }}>FINISHES</span>}
+                {s.finishes && <span className="ncx-stamp flat" style={{ color: 'var(--lime)', fontSize: '0.5rem' }}>FINISHES</span>}
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--text)' }}>{s.label}</div>
+              <div style={{ fontSize: '0.7812rem', color: 'var(--text)' }}>{s.label}</div>
               <div className="ncx-bar slim"><i style={{ width: `${fillPct}%`, background: `linear-gradient(90deg, ${m.color}, var(--cyan))` }} /><span className="seg-mask" /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="mono" style={{ fontSize: 9, color: 'var(--text-faint)' }}>{fillPct}% OF WINDOW{(s.leftover ?? 0) > 4 ? ` · ${fmtMin(s.leftover!)} SPARE` : ''}</span>
+                <span className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)' }}>{fillPct}% OF WINDOW{(s.leftover ?? 0) > 4 ? ` · ${fmtMin(s.leftover!)} SPARE` : ''}</span>
                 <button
                   className="btn btn-primary"
-                  style={{ marginLeft: 'auto', padding: '5px 11px', fontSize: 10 }}
+                  style={{ marginLeft: 'auto', padding: '5px 11px', fontSize: '0.625rem' }}
                   onClick={() => onJackIn(it)}
                   disabled={it.status === 'backlog' && rrBanked <= 0}
                   title={it.status === 'backlog' ? (rrBanked > 0 ? 'Spend 1 R&R credit to activate' : 'No R&R credits — clear a full day to bank one') : undefined}
@@ -491,10 +491,10 @@ function WhatNow({
         })}
       </div>
       {ranked.fits.length === 0 && (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>Nothing fits {fmtMin(budget)} — try a bigger window, or start a book/game session.</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>Nothing fits {fmtMin(budget)} — try a bigger window, or start a book/game session.</div>
       )}
       {ranked.over.length > 0 && (
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.06em', color: 'var(--text-ghost)', display: 'flex', gap: 14, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 11 }}>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.06em', color: 'var(--text-ghost)', display: 'flex', gap: 14, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 11 }}>
           <span style={{ color: 'var(--text-faint)' }}>WON&rsquo;T FIT NOW:</span>
           {ranked.over.slice(0, 4).map(({ it, s }) => <span key={it.id}>{it.title} <span style={{ color: 'var(--text-faint)' }}>({s.label})</span></span>)}
         </div>
@@ -517,7 +517,7 @@ function PaceStrip({ pace, rr, antigoals }: { pace: MediaPace; rr: MediaPaceResp
 
   return (
     <div className="panel" style={{ padding: '11px 18px', display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'center' }}>
-      <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>YOUR PACE</span>
+      <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>YOUR PACE</span>
       <Pace icon="file" color="var(--amber)" label="READING" value={`${pace.book.pagesPerDay} pg/day`} />
       <Pace icon="eye" color="var(--violet)" label="SHOWS" value={`~${pace.show.epsPerDay} eps/day`} />
       <Pace icon="target" color="var(--lime)" label="GAMING" value={`${Math.round(pace.game.minPerWeek / 6) / 10} h/week`} />
@@ -526,16 +526,16 @@ function PaceStrip({ pace, rr, antigoals }: { pace: MediaPace; rr: MediaPaceResp
       <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }} title={rr ? `${rr.dayBudget - rr.usedToday > 0 ? rr.dayBudget - rr.usedToday : 0} of today's budget + ${rr.banked} banked` : undefined}>
           <Icon name="zap" size={12} style={{ color: rrColor }} />
-          <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>R&amp;R</span>
-          <span className="mono" style={{ fontSize: 11.5, fontWeight: 700, color: rrColor }}>{remaining} LEFT</span>
+          <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.1em', color: 'var(--text-faint)' }}>R&amp;R</span>
+          <span className="mono" style={{ fontSize: '0.7188rem', fontWeight: 700, color: rrColor }}>{remaining} LEFT</span>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.1em', color: 'var(--text-ghost)' }}>OVERRUN →</span>
+          <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.1em', color: 'var(--text-ghost)' }}>OVERRUN →</span>
           <select
             value={rr?.overrunTargetId ?? ''}
             onChange={e => setTarget.mutate(e.target.value || null)}
             title="When you're out of R&R, logging media breaches this ICE entry"
-            style={{ background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: rr?.overrunTargetId ? 'var(--red)' : 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 10.5, padding: '4px 6px', outline: 'none', maxWidth: 160 }}
+            style={{ background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: rr?.overrunTargetId ? 'var(--red)' : 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.6562rem', padding: '4px 6px', outline: 'none', maxWidth: 160 }}
           >
             <option value="">no ICE (inert)</option>
             {active.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
@@ -549,8 +549,8 @@ function Pace({ icon, color, label, value }: { icon: string; color: string; labe
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
       <Icon name={icon} size={12} style={{ color }} />
-      <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>{label}</span>
-      <span className="mono" style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-dim)' }}>{value}</span>
+      <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.1em', color: 'var(--text-faint)' }}>{label}</span>
+      <span className="mono" style={{ fontSize: '0.7188rem', fontWeight: 700, color: 'var(--text-dim)' }}>{value}</span>
     </span>
   );
 }
@@ -615,37 +615,37 @@ function MediaCard({
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: done ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: done || dropped ? 'line-through' : 'none' }}>{it.title}</div>
+            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: done ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: done || dropped ? 'line-through' : 'none' }}>{it.title}</div>
           </div>
-          {dropped && <span className="mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--text-faint)', border: '1px solid var(--line-2)', padding: '2px 6px', flex: 'none' }}>DROPPED</span>}
+          {dropped && <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.12em', color: 'var(--text-faint)', border: '1px solid var(--line-2)', padding: '2px 6px', flex: 'none' }}>DROPPED</span>}
           <TypeBadge type={it.type} />
         </div>
 
         {/* length + source */}
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.04em', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.04em', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Icon name="clock" size={11} style={{ color: m.color }} />{lengthText(it, pace)}
           <span style={{ color: 'var(--text-ghost)' }}>· via {sourceOf(it)}</span>
         </div>
 
         {/* progress */}
         {endlessGame ? (
-          <div className="mono" style={{ fontSize: 10.5, color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {progressText(it)} <span style={{ color: 'var(--text-faint)' }}>· session-based · no finish line</span>
           </div>
         ) : (
           <>
             <div className="ncx-bar slim"><i style={{ width: `${pct}%`, background: done ? 'var(--lime)' : `linear-gradient(90deg, ${m.color}, var(--cyan))` }} /><span className="seg-mask" /></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span className="mono" style={{ fontSize: 10.5, color: 'var(--cyan)' }}>{progressText(it)}</span>
-              {!done && rem > 0 && <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>· {fmtMin(rem)} left{relativeText(rem, pace) ? ` · ${relativeText(rem, pace)}` : ''}</span>}
+              <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--cyan)' }}>{progressText(it)}</span>
+              {!done && rem > 0 && <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>· {fmtMin(rem)} left{relativeText(rem, pace) ? ` · ${relativeText(rem, pace)}` : ''}</span>}
             </div>
           </>
         )}
 
         {/* footer: ETA + controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
-          {!done && etaText(it, pace) && <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="trend" size={10} style={{ color: 'var(--violet)' }} />{etaText(it, pace)}</span>}
-          {endlessGame && !done && <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--text-faint)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="repeat" size={10} style={{ color: 'var(--text-faint)' }} />log a session anytime</span>}
+          {!done && etaText(it, pace) && <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.06em', color: 'var(--violet)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="trend" size={10} style={{ color: 'var(--violet)' }} />{etaText(it, pace)}</span>}
+          {endlessGame && !done && <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.06em', color: 'var(--text-faint)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="repeat" size={10} style={{ color: 'var(--text-faint)' }} />log a session anytime</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {it.status === 'backlog' && (
               <button
@@ -668,13 +668,13 @@ function MediaCard({
     </div>
   );
 }
-const ctrlBtn: React.CSSProperties = { padding: '5px 9px', fontSize: 10 };
+const ctrlBtn: React.CSSProperties = { padding: '5px 9px', fontSize: '0.625rem' };
 
 function Stepper({ minus, plus, label }: { minus: () => void; plus: () => void; label: string }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       <button className="btn btn-ghost" style={{ ...ctrlBtn, padding: '4px 8px' }} onClick={minus}>−</button>
-      <span className="mono" style={{ fontSize: 9, color: 'var(--text-faint)' }}>{label}</span>
+      <span className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)' }}>{label}</span>
       <button className="btn btn-ghost" style={{ ...ctrlBtn, padding: '4px 8px' }} onClick={plus}>+</button>
     </span>
   );
@@ -695,7 +695,7 @@ function SetProgress({ unit, max, onSet }: { unit: string; max?: number; onSet: 
         onChange={e => setVal(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commit(); }}
         title={`Set exact ${unit.toLowerCase()} (Enter to save)`}
-        style={{ width: 54, padding: '4px 6px', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none', textAlign: 'right' }} />
+        style={{ width: 54, padding: '4px 6px', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: '0.625rem', outline: 'none', textAlign: 'right' }} />
       <button className="btn btn-ghost" style={{ ...ctrlBtn, padding: '4px 8px' }} disabled={val.trim() === ''} onClick={commit}>SET</button>
     </span>
   );
@@ -771,7 +771,7 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={() => setInProgress(p => !p)} className="mono"
           style={{
-            fontSize: 10, letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
+            fontSize: '0.625rem', letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
             border: inProgress ? '1px solid var(--cyan)' : '1px solid var(--line-2)',
             background: inProgress ? 'color-mix(in srgb, var(--cyan) 14%, transparent)' : 'var(--panel-2)',
             color: inProgress ? 'var(--cyan)' : 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -781,7 +781,7 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
         {type === 'game' && (
           <button onClick={() => setEndless(e => !e)} className="mono"
             style={{
-              fontSize: 10, letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
+              fontSize: '0.625rem', letterSpacing: '0.06em', padding: '5px 10px', cursor: 'pointer', borderRadius: 0,
               border: endless ? '1px solid var(--lime)' : '1px solid var(--line-2)',
               background: endless ? 'color-mix(in srgb, var(--lime) 14%, transparent)' : 'var(--panel-2)',
               color: endless ? 'var(--lime)' : 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -790,7 +790,7 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
           </button>
         )}
       </div>
-      <div className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>
+      <div className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)' }}>
         {type === 'game' && endless
           ? 'Endless titles skip estimation — progress is logged per session.'
           : 'Pages / runtime / episodes auto-estimate on ADD.'}
@@ -798,12 +798,12 @@ function AddForm({ onClose, onDone }: { onClose: () => void; onDone: () => void 
     </div>
   );
 }
-const addInput: React.CSSProperties = { padding: '8px 12px', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 13, outline: 'none' };
+const addInput: React.CSSProperties = { padding: '8px 12px', background: '#070811', border: '1px solid var(--line-2)', borderRadius: 0, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', outline: 'none' };
 
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }

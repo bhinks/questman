@@ -59,7 +59,7 @@ function ProgressRing({ progress }: { progress: number }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, width: 96 }}>
-      <span className="ncx-val" style={{ fontSize: 16, color: done ? 'var(--lime)' : 'var(--cyan)' }}>
+      <span className="ncx-val" style={{ fontSize: '1rem', color: done ? 'var(--lime)' : 'var(--cyan)' }}>
         {Math.round(pct)}%
       </span>
       <div className="ncx-bar slim" style={{ width: '100%' }}>
@@ -119,7 +119,7 @@ function MissionCard({ mission }: { mission: Mission }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
             <h3 style={{
-              fontSize: 16, fontWeight: 700, margin: 0,
+              fontSize: '1rem', fontWeight: 700, margin: 0,
               fontFamily: 'var(--font-display)', textTransform: 'uppercase',
               color: onTrack ? 'var(--lime)' : 'var(--text)',
             }}>
@@ -128,7 +128,7 @@ function MissionCard({ mission }: { mission: Mission }) {
             <DifficultyBadge difficulty={mission.difficulty} />
           </div>
 
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 12 }}>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 12 }}>
             {mission.description}
           </div>
 
@@ -136,10 +136,10 @@ function MissionCard({ mission }: { mission: Mission }) {
             <div className="kicker" style={{ color: 'var(--text-faint)' }}>{mission.category.toUpperCase()}</div>
             <div
               className="mono"
-              style={{ fontSize: 14, fontWeight: 600, color: 'var(--lime)', display: 'flex', alignItems: 'baseline', gap: 4 }}
+              style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--lime)', display: 'flex', alignItems: 'baseline', gap: 4 }}
             >
               {fmtMoney(mission.potential)}
-              <span style={{ fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SURPLUS / MO</span>
+              <span style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SURPLUS / MO</span>
             </div>
           </div>
         </div>
@@ -160,8 +160,8 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
   return (
     <div className="panel-inset" style={{ padding: 16, textAlign: 'center' }}>
       <div className="kicker" style={{ marginBottom: 8 }}>{label}</div>
-      <div className="ncx-val" style={{ fontSize: 26, color }}>{value}</div>
-      {sub && <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 6, letterSpacing: '0.1em' }}>{sub}</div>}
+      <div className="ncx-val" style={{ fontSize: '1.625rem', color }}>{value}</div>
+      {sub && <div className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', marginTop: 6, letterSpacing: '0.1em' }}>{sub}</div>}
     </div>
   );
 }
@@ -221,10 +221,10 @@ export function SavingsMissions() {
           </div>
 
           <div>
-            <h2 className="ncx-chroma" style={{ fontSize: 22, fontWeight: 700, margin: 0, marginBottom: 4, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
+            <h2 className="ncx-chroma" style={{ fontSize: '1.375rem', fontWeight: 700, margin: 0, marginBottom: 4, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
               Savings Missions
             </h2>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+            <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>
               hold the line on your budgets · cut the leeches
             </div>
           </div>
@@ -249,12 +249,12 @@ export function SavingsMissions() {
       {/* Mission cards */}
       {loading ? (
         <div className="panel hud" style={{ padding: 60, textAlign: 'center', color: 'var(--text-faint)' }}>
-          <div className="mono" style={{ fontSize: 13 }}>READING THE VAULT…</div>
+          <div className="mono" style={{ fontSize: '0.8125rem' }}>READING THE VAULT…</div>
         </div>
       ) : missions.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 2 }}>
-            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+            <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
               Mission Board
             </span>
             <span className="ncx-serial">// {missions.length} ACTIVE</span>
@@ -264,8 +264,8 @@ export function SavingsMissions() {
       ) : (
         <div className="panel hud" style={{ padding: 60, textAlign: 'center', color: 'var(--text-faint)' }}>
           <Icon name="target" size={32} style={{ color: 'var(--cyan)', marginBottom: 16 }} />
-          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No budgets set yet</div>
-          <div className="mono" style={{ fontSize: 13 }}>
+          <div style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 8 }}>No budgets set yet</div>
+          <div className="mono" style={{ fontSize: '0.8125rem' }}>
             Set a cap on a category in BUDGETS to turn it into a savings mission.
           </div>
         </div>

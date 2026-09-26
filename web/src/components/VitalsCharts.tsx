@@ -54,7 +54,7 @@ function dayLabel(d: Date): string {
 /** Delta pill — respects whether up or down is the "good" direction. */
 function DeltaPill({ delta, good, unit }: { delta: number | null; good: 'up' | 'down' | null; unit?: string | null }) {
   if (delta == null || Math.abs(delta) < 1e-6) {
-    return <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.04em' }}>FLAT</span>;
+    return <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-faint)', letterSpacing: '0.04em' }}>FLAT</span>;
   }
   const up = delta > 0;
   const positive = good == null ? up : (good === 'up' ? up : !up);
@@ -63,7 +63,7 @@ function DeltaPill({ delta, good, unit }: { delta: number | null; good: 'up' | '
   const txt = mag >= 1000 ? Math.round(mag).toLocaleString() : (Number.isInteger(mag) ? String(mag) : mag.toFixed(1));
   return (
     <span className="mono" style={{
-      fontSize: 10.5, fontWeight: 700, letterSpacing: '0.03em', color,
+      fontSize: '0.6562rem', fontWeight: 700, letterSpacing: '0.03em', color,
       display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
     }}>
       <Icon name={up ? 'arrowUp' : 'arrowDn'} size={11} style={{ color }} />
@@ -76,14 +76,14 @@ export function FootStat({ label, value }: { label: string; value: React.ReactNo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span className="ncx-serial">{label}</span>
-      <span className="mono" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-dim)' }}>{value}</span>
+      <span className="mono" style={{ fontSize: '0.7812rem', fontWeight: 600, color: 'var(--text-dim)' }}>{value}</span>
     </div>
   );
 }
 
 export function ChartEmpty({ height }: { height: number }) {
   return (
-    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-ghost)', fontFamily: 'var(--font-mono)', fontSize: '0.625rem', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
       no readings in window
     </div>
   );
@@ -137,10 +137,10 @@ export function TrendChart({
       {/* header: latest (or scrubbed) value + delta */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span className="ncx-val" style={{ fontSize: 25, color, lineHeight: 1 }}>
+          <span className="ncx-val" style={{ fontSize: '1.5625rem', color, lineHeight: 1 }}>
             {shown ? fmtNum(shown.value) : '—'}
           </span>
-          {unit && <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>{unit}</span>}
+          {unit && <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>{unit}</span>}
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
           <DeltaPill delta={st ? st.delta : null} good={good} unit={unit} />
@@ -263,10 +263,10 @@ export function BpChart({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span className="ncx-val" style={{ fontSize: 30, color: SYS_C, lineHeight: 1 }}>{Math.round(showSys)}</span>
-          <span className="ncx-val" style={{ fontSize: 20, color: 'var(--text-faint)', lineHeight: 1 }}>/</span>
-          <span className="ncx-val" style={{ fontSize: 30, color: DIA_C, lineHeight: 1 }}>{Math.round(showDia)}</span>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 4 }}>mmHg</span>
+          <span className="ncx-val" style={{ fontSize: '1.875rem', color: SYS_C, lineHeight: 1 }}>{Math.round(showSys)}</span>
+          <span className="ncx-val" style={{ fontSize: '1.25rem', color: 'var(--text-faint)', lineHeight: 1 }}>/</span>
+          <span className="ncx-val" style={{ fontSize: '1.875rem', color: DIA_C, lineHeight: 1 }}>{Math.round(showDia)}</span>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginLeft: 4 }}>mmHg</span>
         </div>
         <div style={{ display: 'flex', gap: 18, marginLeft: 'auto' }}>
           <LegendItem c={SYS_C} label="SYSTOLIC" delta={sSt ? sSt.delta : null} />
@@ -320,7 +320,7 @@ export function BpChart({
 function LegendItem({ c, label, delta }: { c: string; label: string; delta: number | null }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
-      <span className="mono" style={{ fontSize: 9, letterSpacing: '0.18em', color: 'var(--text-faint)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.18em', color: 'var(--text-faint)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         <span style={{ width: 14, height: 2, background: c, boxShadow: `0 0 5px ${c}`, display: 'inline-block' }} />
         {label}
       </span>

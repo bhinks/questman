@@ -15,7 +15,7 @@ import { Icon } from './Icon';
 
 const SECTION_HEADER: CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: '0.625rem',
   letterSpacing: '0.26em',
   color: 'var(--text-dim)',
   textTransform: 'uppercase',
@@ -75,7 +75,7 @@ export function ApiKeyPanel() {
         {activeKey ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="mono" style={{ fontSize: 13, color: 'var(--cyan)', letterSpacing: '0.06em' }}>
+              <div className="mono" style={{ fontSize: '0.8125rem', color: 'var(--cyan)', letterSpacing: '0.06em' }}>
                 {activeKey.keyPrefix}…
               </div>
               <div style={{ ...SECTION_HEADER, marginTop: 4 }}>
@@ -86,7 +86,7 @@ export function ApiKeyPanel() {
             <button
               type="button"
               className="btn"
-              style={{ padding: '7px 12px', fontSize: 11, color: 'var(--red)', borderColor: 'var(--red)' }}
+              style={{ padding: '7px 12px', fontSize: '0.6875rem', color: 'var(--red)', borderColor: 'var(--red)' }}
               disabled={isPending}
               onClick={() => revoke.mutate(activeKey.id)}
             >
@@ -111,7 +111,7 @@ export function ApiKeyPanel() {
               className="mono"
               style={{
                 flex: 1,
-                fontSize: 12,
+                fontSize: '0.75rem',
                 wordBreak: 'break-all',
                 background: 'var(--bg-panel)',
                 border: '1px solid var(--line)',
@@ -125,7 +125,7 @@ export function ApiKeyPanel() {
             <button
               type="button"
               className={`btn${copied ? ' btn-primary' : ''}`}
-              style={{ padding: '8px 14px', fontSize: 11, flexShrink: 0 }}
+              style={{ padding: '8px 14px', fontSize: '0.6875rem', flexShrink: 0 }}
               onClick={copyKey}
             >
               <Icon name={copied ? 'check' : 'copy'} size={13} />
@@ -143,7 +143,7 @@ export function ApiKeyPanel() {
         <button
           type="button"
           className="btn btn-primary"
-          style={{ padding: '8px 16px', fontSize: 11 }}
+          style={{ padding: '8px 16px', fontSize: '0.6875rem' }}
           disabled={isPending}
           onClick={() => generate.mutate()}
         >
@@ -154,7 +154,7 @@ export function ApiKeyPanel() {
 
       {generate.isError && (
         <div style={{ padding: '8px 18px', borderTop: '1px solid var(--line)' }}>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--red)' }}>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)' }}>
             {(generate.error as Error)?.message ?? 'Key generation failed'}
           </span>
         </div>

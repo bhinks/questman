@@ -26,7 +26,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
 };
 
@@ -101,7 +101,7 @@ function ChannelChip({ ch }: { ch: NpcChannel | null }) {
   const m = CHANNEL_META[ch] ?? { label: String(ch).toUpperCase(), color: 'var(--text-dim)' };
   return (
     <span className="mono" style={{
-      fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: m.color, padding: '1px 6px',
+      fontSize: '0.5625rem', fontWeight: 700, letterSpacing: '0.1em', color: m.color, padding: '1px 6px',
       border: `1px solid color-mix(in srgb, ${m.color} 35%, transparent)`,
       background: `color-mix(in srgb, ${m.color} 10%, transparent)`,
     }}>{m.label}</span>
@@ -113,7 +113,7 @@ function WhoChip({ who }: { who: NpcInitiatedBy | null }) {
   const me = who === 'me';
   const color = me ? 'var(--cyan)' : 'var(--magenta)';
   return (
-    <span className="mono" style={{ fontSize: 9, letterSpacing: '0.08em', color, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+    <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.08em', color, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
       <Icon name={me ? 'arrowUp' : 'arrowDn'} size={10} style={{ color }} />{me ? 'YOU' : 'THEM'}
     </span>
   );
@@ -177,15 +177,15 @@ function ReachOutLane({ npcs, onOpen }: { npcs: Npc[]; onOpen: (id: string) => v
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div className="ncx-chip" style={{ color: 'var(--magenta)', flex: 'none' }}><Icon name="bell" size={18} /></div>
         <div>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>REACH OUT</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+          <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>REACH OUT</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1875rem', fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
             {due.length ? `${due.length} ${due.length === 1 ? 'person is' : 'people are'} slipping` : 'Everyone’s in touch'}
           </div>
         </div>
         <span className="ncx-serial" style={{ marginLeft: 'auto' }}>BY URGENCY</span>
       </div>
       {due.length === 0 ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>No one&rsquo;s going dark. Nice work keeping the crew close.</div>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>No one&rsquo;s going dark. Nice work keeping the crew close.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))', gap: 12 }}>
           {due.map(n => {
@@ -197,22 +197,22 @@ function ReachOutLane({ npcs, onOpen }: { npcs: Npc[]; onOpen: (id: string) => v
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 9, height: 9, borderRadius: '50%', background: sig.color, flex: 'none' }} />
                   <button onClick={() => onOpen(n.id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', minWidth: 0, flex: 1, textAlign: 'left' }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{n.name}</span>
+                    <span style={{ fontSize: '0.8438rem', fontWeight: 600, color: 'var(--text)' }}>{n.name}</span>
                   </button>
-                  <span className="mono" style={{ fontSize: 9.5, fontWeight: 700, color: sig.color }}>{sig.label}</span>
+                  <span className="mono" style={{ fontSize: '0.5938rem', fontWeight: 700, color: sig.color }}>{sig.label}</span>
                 </div>
-                <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.04em' }}>
+                <div className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', letterSpacing: '0.04em' }}>
                   {n.relationship || '—'} · {tierLabel(tierOf(n.cadenceDays)).toLowerCase()}
                 </div>
                 <div className="ncx-bar slim"><i style={{ width: `${over * 100}%`, background: sig.color }} /><span className="seg-mask" /></div>
-                {last && <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>last: {last.note || (last.channel ? CHANNEL_META[last.channel]?.label.toLowerCase() : '—')}</div>}
+                {last && <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>last: {last.note || (last.channel ? CHANNEL_META[last.channel]?.label.toLowerCase() : '—')}</div>}
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-primary" style={{ flex: 1, padding: '6px', fontSize: 10 }}
+                  <button className="btn btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.625rem' }}
                     disabled={logMut.isPending}
                     onClick={() => logMut.mutate({ npcId: n.id, channel: null, initiatedBy: 'me', note: null })}>
                     <Icon name="check" size={11} /> REACHED OUT
                   </button>
-                  <button className="btn btn-ghost" style={{ padding: '6px 9px', fontSize: 10 }} onClick={() => onOpen(n.id)} title="Log details">{'…'}</button>
+                  <button className="btn btn-ghost" style={{ padding: '6px 9px', fontSize: '0.625rem' }} onClick={() => onOpen(n.id)} title="Log details">{'…'}</button>
                 </div>
               </div>
             );
@@ -231,19 +231,19 @@ function LogForm({ npcId, onClose }: { npcId: string; onClose: () => void }) {
   const [note, setNote] = useState('');
   return (
     <div className="panel-inset" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>LOG CONTACT</span>
+      <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>LOG CONTACT</span>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 0, boxShadow: 'inset 0 0 0 1px var(--line-2)' }}>
           {CHANNELS.map(ch => {
             const on = channel === ch.key;
-            return <button key={ch.key} type="button" onClick={() => setChannel(ch.key)} className="mono" style={{ padding: '6px 12px', fontSize: 10, letterSpacing: '0.08em', cursor: 'pointer', border: 'none', background: on ? `color-mix(in srgb, ${ch.color} 18%, transparent)` : 'transparent', color: on ? ch.color : 'var(--text-dim)', fontWeight: on ? 700 : 500, boxShadow: on ? `inset 0 0 0 1px ${ch.color}` : 'none' }}>{ch.label}</button>;
+            return <button key={ch.key} type="button" onClick={() => setChannel(ch.key)} className="mono" style={{ padding: '6px 12px', fontSize: '0.625rem', letterSpacing: '0.08em', cursor: 'pointer', border: 'none', background: on ? `color-mix(in srgb, ${ch.color} 18%, transparent)` : 'transparent', color: on ? ch.color : 'var(--text-dim)', fontWeight: on ? 700 : 500, boxShadow: on ? `inset 0 0 0 1px ${ch.color}` : 'none' }}>{ch.label}</button>;
           })}
         </div>
         <div style={{ display: 'flex', gap: 0, boxShadow: 'inset 0 0 0 1px var(--line-2)', marginLeft: 'auto' }}>
           {([['me', 'I REACHED OUT'], ['them', 'THEY DID']] as [NpcInitiatedBy, string][]).map(([k, label]) => {
             const on = who === k;
             const c = k === 'me' ? 'var(--cyan)' : 'var(--magenta)';
-            return <button key={k} type="button" onClick={() => setWho(k)} className="mono" style={{ padding: '6px 12px', fontSize: 10, letterSpacing: '0.06em', cursor: 'pointer', border: 'none', background: on ? `color-mix(in srgb, ${c} 16%, transparent)` : 'transparent', color: on ? c : 'var(--text-dim)', fontWeight: on ? 700 : 500, boxShadow: on ? `inset 0 0 0 1px ${c}` : 'none' }}>{label}</button>;
+            return <button key={k} type="button" onClick={() => setWho(k)} className="mono" style={{ padding: '6px 12px', fontSize: '0.625rem', letterSpacing: '0.06em', cursor: 'pointer', border: 'none', background: on ? `color-mix(in srgb, ${c} 16%, transparent)` : 'transparent', color: on ? c : 'var(--text-dim)', fontWeight: on ? 700 : 500, boxShadow: on ? `inset 0 0 0 1px ${c}` : 'none' }}>{label}</button>;
           })}
         </div>
       </div>
@@ -284,15 +284,15 @@ function NpcCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ width: 9, height: 9, flex: 'none', borderRadius: '50%', background: sig.color, boxShadow: sig.level === 'strong' || sig.level === 'frequent' ? `0 0 8px ${sig.color}` : 'none' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{npc.name}</div>
-          <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-dim)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '0.8438rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{npc.name}</div>
+          <div className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-dim)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {npc.relationship || '—'}<span style={{ color: 'var(--text-ghost)' }}> · {npc.cadenceDays != null ? `every ${tierLabel(tierOf(npc.cadenceDays)).toLowerCase()}` : 'frequent'}</span>
           </div>
         </div>
-        <span className="mono" style={{ fontSize: 9, letterSpacing: '0.06em', color: sig.color, padding: '3px 7px', background: `color-mix(in srgb, ${sig.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${sig.color} 35%, transparent)`, display: 'inline-flex', alignItems: 'center', gap: 4, flex: 'none' }}>
+        <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.06em', color: sig.color, padding: '3px 7px', background: `color-mix(in srgb, ${sig.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${sig.color} 35%, transparent)`, display: 'inline-flex', alignItems: 'center', gap: 4, flex: 'none' }}>
           <Icon name={sig.level === 'dark' ? 'bell' : 'clock'} size={10} />{sig.label}
         </span>
-        <button onClick={onToggleLog} className={logging ? 'btn' : 'btn btn-primary'} style={{ padding: '5px 9px', fontSize: 10, flex: 'none' }}>{logging ? 'CANCEL' : 'LOG'}</button>
+        <button onClick={onToggleLog} className={logging ? 'btn' : 'btn btn-primary'} style={{ padding: '5px 9px', fontSize: '0.625rem', flex: 'none' }}>{logging ? 'CANCEL' : 'LOG'}</button>
         <button onClick={onEdit} className="btn btn-ghost" style={{ padding: '5px 6px', flex: 'none' }} aria-label={`Edit ${npc.name}`} title="Edit"><Icon name="edit" size={12} /></button>
         <button onClick={onDelete} className="btn btn-ghost" style={{ padding: '5px 6px', flex: 'none' }} aria-label={`Drop ${npc.name}`} title="Drop"><Icon name="close" size={12} /></button>
       </div>
@@ -304,17 +304,17 @@ function NpcCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: open ? 7 : 0 }}>
           <button onClick={() => setOpen(o => !o)} title={open ? 'Hide log' : 'Show contact log'}
             style={{ display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: 'none', borderTop: '1px solid var(--line)', padding: '8px 0 0' }}>
-            <span className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', flex: 'none' }}>{shortDate(last.date)}</span>
+            <span className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', flex: 'none' }}>{shortDate(last.date)}</span>
             <ChannelChip ch={last.channel} />
             <WhoChip who={last.initiatedBy} />
-            <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{last.note || '—'}</span>
-            <span className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', flex: 'none' }}>{open ? '▾' : '▸'} {recent.length}</span>
+            <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{last.note || '—'}</span>
+            <span className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', flex: 'none' }}>{open ? '▾' : '▸'} {recent.length}</span>
           </button>
           {open && (
             <div className="panel-inset" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
               {recent.slice(0, 8).map((i: Interaction) => (
-                <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                  <span className="mono" style={{ color: 'var(--text-faint)', minWidth: 50, fontSize: 10 }}>{shortDate(i.date)}</span>
+                <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem' }}>
+                  <span className="mono" style={{ color: 'var(--text-faint)', minWidth: 50, fontSize: '0.625rem' }}>{shortDate(i.date)}</span>
                   <ChannelChip ch={i.channel} />
                   <WhoChip who={i.initiatedBy} />
                   <span style={{ color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.note || '—'}</span>
@@ -460,15 +460,15 @@ export function NpcsView() {
         <div className="panel hud" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', flex: '1 1 300px', minWidth: 0 }}>
           <div className="ncx-chip" style={{ color: 'var(--magenta)' }}><Icon name="flag" size={18} /></div>
           <div style={{ minWidth: 0 }}>
-            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: 20, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Crew</h2>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
+            <h2 className="ncx-glitch ncx-chroma" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Crew</h2>
+            <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.16em', color: 'var(--text-faint)', marginTop: 3 }}>
               PEOPLE WORTH KEEPING CLOSE · {npcs.length} CONTACTS{dark ? ` · ${dark} GOING DARK` : ''}
             </div>
           </div>
         </div>
         <div style={{ flex: '2 1 440px', minWidth: 0, display: 'flex' }}>
           <StatStrip npcs={npcs} action={
-            <button className={creating ? 'btn btn-ghost' : 'btn btn-primary'} style={{ padding: '8px 15px', fontSize: 11 }} onClick={() => setCreating(c => !c)}>
+            <button className={creating ? 'btn btn-ghost' : 'btn btn-primary'} style={{ padding: '8px 15px', fontSize: '0.6875rem' }} onClick={() => setCreating(c => !c)}>
               <Icon name={creating ? 'close' : 'plus'} size={13} /> {creating ? 'CLOSE' : 'NEW CONTACT'}
             </button>
           } />
@@ -483,12 +483,12 @@ export function NpcsView() {
       <div className="panel" style={{ padding: '11px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: '1 1 200px', minWidth: 160, background: '#070811', border: '1px solid var(--line-2)', padding: '6px 10px' }}>
           <Icon name="search" size={13} style={{ color: 'var(--text-faint)' }} />
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search crew…" style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12 }} />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search crew…" style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }} />
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {FILTERS.map(([k, label]) => {
             const on = filterTier === k;
-            return <button key={k} onClick={() => setFilterTier(k)} className="mono" style={{ fontSize: 9.5, padding: '5px 10px', cursor: 'pointer', borderRadius: 0, border: on ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)', background: on ? 'rgba(var(--accent-rgb),0.12)' : 'var(--panel-2)', color: on ? 'var(--cyan)' : 'var(--text-dim)' }}>{label}</button>;
+            return <button key={k} onClick={() => setFilterTier(k)} className="mono" style={{ fontSize: '0.5938rem', padding: '5px 10px', cursor: 'pointer', borderRadius: 0, border: on ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)', background: on ? 'rgba(var(--accent-rgb),0.12)' : 'var(--panel-2)', color: on ? 'var(--cyan)' : 'var(--text-dim)' }}>{label}</button>;
           })}
         </div>
         {/* layout toggle */}
@@ -515,7 +515,7 @@ export function NpcsView() {
         <Empty>No contacts yet — add your crew above.</Empty>
       ) : sorted.length === 0 ? (
         <div className="panel" style={{ padding: 28, textAlign: 'center' }}>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>No contacts match.</span>
+          <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>No contacts match.</span>
         </div>
       ) : layout === 'board' ? (
         BOARD_GROUPS.map(g => {
@@ -525,7 +525,7 @@ export function NpcsView() {
             <section key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: g.color }} />
-                <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: g.color, textTransform: 'uppercase' }}>{g.label}</span>
+                <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: g.color, textTransform: 'uppercase' }}>{g.label}</span>
                 <span className="ncx-serial">{rows.length}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(322px, 1fr))', gap: 12, alignItems: 'start' }}>
@@ -557,7 +557,7 @@ export function NpcsView() {
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }

@@ -25,7 +25,7 @@ import { Icon } from './Icon';
 
 const SECTION_HEADER: CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: '0.625rem',
   letterSpacing: '0.26em',
   color: 'var(--text-dim)',
   textTransform: 'uppercase',
@@ -49,7 +49,7 @@ const INPUT: CSSProperties = {
   border: '1px solid var(--line)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 12,
+  fontSize: '0.75rem',
   padding: '8px 10px',
   colorScheme: 'dark',
 };
@@ -321,7 +321,7 @@ export function IntegrationsPanel() {
           <code
             className="mono"
             style={{
-              flex: 1, minWidth: 0, fontSize: 12, wordBreak: 'break-all',
+              flex: 1, minWidth: 0, fontSize: '0.75rem', wordBreak: 'break-all',
               background: 'var(--bg-panel)', border: '1px solid var(--line)',
               padding: '8px 10px', color: 'var(--text)', userSelect: 'all',
             }}
@@ -331,7 +331,7 @@ export function IntegrationsPanel() {
           <button
             type="button"
             className={`btn${copied ? ' btn-primary' : ''}`}
-            style={{ padding: '8px 14px', fontSize: 11, flexShrink: 0 }}
+            style={{ padding: '8px 14px', fontSize: '0.6875rem', flexShrink: 0 }}
             disabled={!s.ingestUrl}
             onClick={copyUrl}
           >
@@ -347,7 +347,7 @@ export function IntegrationsPanel() {
         <button
           type="button"
           className="btn"
-          style={{ padding: '8px 16px', fontSize: 11, color: 'var(--amber)', borderColor: 'var(--amber)' }}
+          style={{ padding: '8px 16px', fontSize: '0.6875rem', color: 'var(--amber)', borderColor: 'var(--amber)' }}
           disabled={rotate.isPending}
           onClick={() => rotate.mutate()}
         >
@@ -357,7 +357,7 @@ export function IntegrationsPanel() {
 
       {save.isError && (
         <div style={{ padding: '8px 18px', borderTop: '1px solid var(--line)' }}>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--red)' }}>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)' }}>
             {(save.error as Error)?.message ?? 'Save failed'}
           </span>
         </div>

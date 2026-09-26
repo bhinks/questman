@@ -261,7 +261,7 @@ export function TransactionsView({
         /* Grouped-by-vendor view */
         <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <div className="mono" style={{ minWidth: 720, fontSize: 12.5 }}>
+            <div className="mono" style={{ minWidth: 720, fontSize: '0.7812rem' }}>
               {grouped!.map(group => (
                 <div key={group.name}>
                   <VendorGroupHeader name={group.name} total={group.total} count={group.count} />
@@ -288,7 +288,7 @@ export function TransactionsView({
             <div
               className="mono"
               role="table"
-              style={{ minWidth: 720, fontSize: 12.5 }}
+              style={{ minWidth: 720, fontSize: '0.7812rem' }}
             >
               {/* Header row */}
               <div role="row" style={{ ...gridRow, ...headerRow }}>
@@ -371,10 +371,10 @@ function Header({
           <Icon name="list" size={18} />
         </div>
         <div>
-          <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
+          <h2 className="ncx-chroma" style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
             TRANSACTION LOG
           </h2>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+          <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginTop: 2 }}>
             every movement on the ledger · filter by month, category, account or text
           </div>
         </div>
@@ -383,7 +383,7 @@ function Header({
             className="btn"
             onClick={onAdd}
             title="Record a manual transaction — cash, Venmo, anything imports miss"
-            style={{ padding: '7px 12px', fontSize: 11, color: 'var(--lime)' }}
+            style={{ padding: '7px 12px', fontSize: '0.6875rem', color: 'var(--lime)' }}
           >
             <Icon name="plus" size={12} /> ADD TRANSACTION
           </button>
@@ -395,7 +395,7 @@ function Header({
               placeholder="FIND DESCRIPTION…"
               title="Filter by description or vendor text"
               style={{
-                padding: '7px 26px 7px 26px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                padding: '7px 26px 7px 26px', fontSize: '0.6875rem', fontFamily: 'var(--font-mono)',
                 letterSpacing: '0.05em', width: 180,
                 background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)', outline: 'none',
               }}
@@ -416,7 +416,7 @@ function Header({
               onChange={e => onAccount(e.target.value)}
               title="Filter the log by source account"
               style={{
-                padding: '7px 10px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                padding: '7px 10px', fontSize: '0.6875rem', fontFamily: 'var(--font-mono)',
                 letterSpacing: '0.05em',
                 background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)',
               }}
@@ -430,7 +430,7 @@ function Header({
             onClick={() => onGroupByVendor(!groupByVendor)}
             title={groupByVendor ? 'Switch to chronological view' : 'Group by normalized vendor name'}
             style={{
-              padding: '7px 12px', fontSize: 11,
+              padding: '7px 12px', fontSize: '0.6875rem',
               color: groupByVendor ? 'var(--cyan)' : 'var(--text-dim)',
               border: groupByVendor ? '1px solid color-mix(in srgb, var(--cyan) 45%, transparent)' : undefined,
               background: groupByVendor ? 'color-mix(in srgb, var(--cyan) 10%, transparent)' : undefined,
@@ -443,7 +443,7 @@ function Header({
             onClick={onNormalize}
             disabled={normalizing}
             title="Cluster similar descriptions into consistent vendor names"
-            style={{ padding: '7px 12px', fontSize: 11, color: 'var(--text-faint)' }}
+            style={{ padding: '7px 12px', fontSize: '0.6875rem', color: 'var(--text-faint)' }}
           >
             <Icon name="zap" size={12} /> {normalizing ? 'NORMALIZING…' : 'NORMALIZE'}
           </button>
@@ -464,7 +464,7 @@ function Header({
 
       {hasChips && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.16em', color: 'var(--text-faint)' }}>FILTERED BY</span>
+          <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.16em', color: 'var(--text-faint)' }}>FILTERED BY</span>
           {monthFilter && <FilterChip label="MONTH" value={monthChipLabel(monthFilter)} onClear={onClearMonth} />}
           {categoryFilter && <FilterChip label="CATEGORY" value={categoryFilter} onClear={onClearCategory} />}
         </div>
@@ -479,7 +479,7 @@ function FilterChip({ label, value, onClear }: { label: string; value: string; o
     <span
       className="mono"
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10, letterSpacing: '0.06em',
+        display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: '0.625rem', letterSpacing: '0.06em',
         padding: '4px 6px 4px 10px', color: 'var(--cyan)',
         border: '1px solid color-mix(in srgb, var(--cyan) 40%, transparent)',
         background: 'color-mix(in srgb, var(--cyan) 12%, transparent)',
@@ -611,7 +611,7 @@ function AddTransactionForm({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         {create.isError && (
-          <span className="mono" style={{ fontSize: 11, color: 'var(--red)', marginRight: 'auto' }}>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)', marginRight: 'auto' }}>
             COULDN&rsquo;T ADD — TRY AGAIN
           </span>
         )}
@@ -633,7 +633,7 @@ function KindToggle({
       className="btn btn-ghost"
       onClick={onClick}
       style={{
-        padding: '7px 12px', fontSize: 11,
+        padding: '7px 12px', fontSize: '0.6875rem',
         color: active ? color : 'var(--text-dim)',
         border: active ? `1px solid color-mix(in srgb, ${color} 45%, transparent)` : undefined,
         background: active ? `color-mix(in srgb, ${color} 10%, transparent)` : undefined,
@@ -651,7 +651,7 @@ const addInputStyle: React.CSSProperties = {
   borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
@@ -695,7 +695,7 @@ function BulkBar({
           onChange={e => setCatId(e.target.value)}
           disabled={busy}
           style={{
-            padding: '7px 10px', fontSize: 11, fontFamily: 'var(--font-mono)',
+            padding: '7px 10px', fontSize: '0.6875rem', fontFamily: 'var(--font-mono)',
             background: '#070811', border: '1px solid var(--line-2)', color: 'var(--text)',
           }}
         >
@@ -707,7 +707,7 @@ function BulkBar({
           disabled={busy || !catId}
           onClick={() => catId && onCategorize(catId)}
           title="Set the selected category on every selected transaction"
-          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--cyan)' }}
+          style={{ padding: '7px 14px', fontSize: '0.6875rem', color: 'var(--cyan)' }}
         >
           <Icon name="layers" size={13} /> RECAT
         </button>
@@ -716,7 +716,7 @@ function BulkBar({
           disabled={busy}
           onClick={onExclude}
           title="Mark as inter-account transfer — drops these from all totals"
-          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--amber)' }}
+          style={{ padding: '7px 14px', fontSize: '0.6875rem', color: 'var(--amber)' }}
         >
           <Icon name="repeat" size={13} /> MARK TRANSFER (EXCLUDE)
         </button>
@@ -725,7 +725,7 @@ function BulkBar({
           disabled={busy}
           onClick={onInclude}
           title="Re-include in totals"
-          style={{ padding: '7px 14px', fontSize: 11, color: 'var(--lime)' }}
+          style={{ padding: '7px 14px', fontSize: '0.6875rem', color: 'var(--lime)' }}
         >
           <Icon name="check" size={13} /> INCLUDE
         </button>
@@ -734,7 +734,7 @@ function BulkBar({
           disabled={busy}
           onClick={onDelete}
           title="Delete selected"
-          style={{ padding: '7px 14px', fontSize: 11 }}
+          style={{ padding: '7px 14px', fontSize: '0.6875rem' }}
         >
           <Icon name="close" size={13} /> DELETE
         </button>
@@ -743,7 +743,7 @@ function BulkBar({
           disabled={busy}
           onClick={onClear}
           title="Clear selection"
-          style={{ padding: '7px 12px', fontSize: 11, color: 'var(--text-faint)' }}
+          style={{ padding: '7px 12px', fontSize: '0.6875rem', color: 'var(--text-faint)' }}
         >
           CLEAR
         </button>
@@ -773,13 +773,13 @@ function VendorGroupHeader({ name, total, count }: { name: string; total: number
         zIndex: 2,
       }}
     >
-      <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text)', letterSpacing: '0.04em' }}>
+      <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text)', letterSpacing: '0.04em' }}>
         {name}
       </span>
-      <span className="kicker" style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>
+      <span className="kicker" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)' }}>
         {count} {count === 1 ? 'txn' : 'txns'}
       </span>
-      <span style={{ fontWeight: 700, fontSize: 13, color: income ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap' }}>
+      <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: income ? 'var(--lime)' : 'var(--text)', whiteSpace: 'nowrap' }}>
         {fmtMoney(total)}
       </span>
     </div>
@@ -832,7 +832,7 @@ function Row({
             {tx.description || '—'}
           </span>
           {excluded && (
-            <span className="ncx-stamp flat" style={{ fontSize: 9.5, color: 'var(--text-faint)' }}>
+            <span className="ncx-stamp flat" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)' }}>
               EXCLUDED
             </span>
           )}
@@ -863,7 +863,7 @@ function Row({
             title="Recategorize this transaction"
             style={{
               flex: 1, minWidth: 0,
-              padding: '3px 4px', fontSize: 11, fontFamily: 'var(--font-mono)',
+              padding: '3px 4px', fontSize: '0.6875rem', fontFamily: 'var(--font-mono)',
               background: '#070811', border: '1px solid var(--line-2)',
               color: tx.categoryId ? 'var(--text-dim)' : 'var(--text-faint)',
               cursor: 'pointer',
@@ -879,7 +879,7 @@ function Row({
             title={`Account: ${tx.account}`}
             style={{
               flexShrink: 0,
-              fontSize: 9,
+              fontSize: '0.5625rem',
               color: 'var(--text-faint)',
               padding: '1px 6px',
               border: '1px solid var(--line-2)',
@@ -911,7 +911,7 @@ function Row({
           onClick={onEdit}
           aria-label={`Edit ${tx.description}`}
           title="Edit transaction"
-          style={{ padding: '5px 8px', fontSize: 11 }}
+          style={{ padding: '5px 8px', fontSize: '0.6875rem' }}
         >
           <Icon name="edit" size={14} />
         </button>
@@ -926,7 +926,7 @@ function LinkChip({ icon, color, label }: { icon: string; color: string; label: 
       className="mono"
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontSize: 10,
+        fontSize: '0.625rem',
         color,
         padding: '1px 7px',
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
@@ -964,7 +964,7 @@ function Check({
 function Empty({ children }: { children: React.ReactNode }) {
   return (
     <div className="panel hud" style={{ padding: 48, textAlign: 'center', color: 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 480, margin: '0 auto' }}>
+      <div className="mono" style={{ fontSize: '0.8125rem', lineHeight: 1.6, maxWidth: 480, margin: '0 auto' }}>
         {children}
       </div>
     </div>
@@ -1022,7 +1022,7 @@ const headerRow: React.CSSProperties = {
 };
 
 const cell: React.CSSProperties = { padding: '0 2px' };
-const cellHead: React.CSSProperties = { ...cell, fontSize: 9.5, color: 'var(--text-faint)' };
+const cellHead: React.CSSProperties = { ...cell, fontSize: '0.5938rem', color: 'var(--text-faint)' };
 const cellCenter: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 };

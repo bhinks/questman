@@ -46,7 +46,7 @@ function applyDisplayVars(s: Pick<DisplaySettings, 'displayCut' | 'displayChroma
 
 const SECTION_HEADER: CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: '0.625rem',
   letterSpacing: '0.26em',
   color: 'var(--text-dim)',
   textTransform: 'uppercase',
@@ -113,7 +113,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
   if (settingsQ.isError) {
     return (
       <div className="panel" style={{ padding: 28, textAlign: 'center' }}>
-        <span className="mono" style={{ fontSize: 12, letterSpacing: '0.2em', color: 'var(--red)' }}>
+        <span className="mono" style={{ fontSize: '0.75rem', letterSpacing: '0.2em', color: 'var(--red)' }}>
           CALIBRATION BUS OFFLINE — SETTINGS UNAVAILABLE
         </span>
       </div>
@@ -122,7 +122,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
   if (!local) {
     return (
       <div className="panel" style={{ padding: 28, textAlign: 'center' }}>
-        <span className="mono" style={{ fontSize: 12, letterSpacing: '0.2em', color: 'var(--text-faint)' }}>
+        <span className="mono" style={{ fontSize: '0.75rem', letterSpacing: '0.2em', color: 'var(--text-faint)' }}>
           READING DISPLAY PROFILE…
         </span>
       </div>
@@ -158,7 +158,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2
             className="ncx-chroma ncx-glitch"
-            style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
+            style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
           >
             Display Calibration
           </h2>
@@ -168,7 +168,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
         </div>
         <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
           <span className="ncx-serial">SYS-CAL-01</span>
-          <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.18em', color: save.isPending ? 'var(--amber)' : 'var(--lime)' }}>
+          <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.18em', color: save.isPending ? 'var(--amber)' : 'var(--lime)' }}>
             {save.isPending ? '▴ WRITING…' : '● SYNCED'}
           </span>
         </div>
@@ -220,7 +220,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
             <span className="ncx-serial">
               CUT-SM {cutSm}PX · SCAN-A {scanA} · SWEEP-A {sweepA}
             </span>
-            <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: 11 }} onClick={resetFactory}>
+            <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: '0.6875rem' }} onClick={resetFactory}>
               <Icon name="repeat" size={13} /> RESET TO FACTORY
             </button>
           </div>
@@ -237,7 +237,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div
                 className="ncx-chroma"
-                style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
+                style={{ fontFamily: 'var(--font-display)', fontSize: '1.625rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
               >
                 Daymon.OS
               </div>
@@ -247,7 +247,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                 <span style={SECTION_HEADER}>CRT INTENSITY</span>
-                <span className="ncx-val mono" style={{ fontSize: 12, color: 'var(--cyan)' }}>{displayCrt}/100</span>
+                <span className="ncx-val mono" style={{ fontSize: '0.75rem', color: 'var(--cyan)' }}>{displayCrt}/100</span>
               </div>
               <div className="ncx-bar">
                 <i
@@ -262,15 +262,15 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <button type="button" className="btn btn-primary" style={{ padding: '9px 16px', fontSize: 11 }}>
+              <button type="button" className="btn btn-primary" style={{ padding: '9px 16px', fontSize: '0.6875rem' }}>
                 <Icon name="zap" size={13} /> PRIMARY
               </button>
-              <button type="button" className="btn" style={{ padding: '9px 16px', fontSize: 11 }}>
+              <button type="button" className="btn" style={{ padding: '9px 16px', fontSize: '0.6875rem' }}>
                 STANDARD
               </button>
             </div>
 
-            <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.18em', color: 'var(--text-ghost)' }}>
+            <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.18em', color: 'var(--text-ghost)' }}>
               PANEL CLIP · CHROMA FRINGE · SWEEP RESPOND LIVE
             </span>
           </div>
@@ -314,7 +314,7 @@ function KnobRow(props: {
         onBlur={onCommit}
         style={{ width: '100%', accentColor: 'var(--cyan)', colorScheme: 'dark', background: 'transparent' }}
       />
-      <span className="ncx-val mono" style={{ fontSize: 14, textAlign: 'right', color: 'var(--cyan)' }}>{display}</span>
+      <span className="ncx-val mono" style={{ fontSize: '0.875rem', textAlign: 'right', color: 'var(--cyan)' }}>{display}</span>
     </div>
   );
 }

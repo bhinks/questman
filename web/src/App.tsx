@@ -42,7 +42,7 @@ function App() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
           BOOTING<span className="cursor-blink">_</span>
         </div>
       </div>
@@ -540,7 +540,7 @@ function HubApp() {
           style={{
             position: 'fixed', bottom: 16, right: 16, maxWidth: 320, padding: 16,
             background: 'var(--panel)', border: '1px solid var(--cyan)',
-            borderRadius: 'var(--r)', color: 'var(--text)', fontSize: 13, zIndex: 1000,
+            borderRadius: 'var(--r)', color: 'var(--text)', fontSize: '0.8125rem', zIndex: 1000,
             display: 'flex', alignItems: 'center', gap: 10,
           }}
         >
@@ -550,7 +550,7 @@ function HubApp() {
             <button
               onClick={() => setImportStatus(null)}
               className="btn btn-ghost"
-              style={{ marginLeft: 'auto', padding: '2px 6px', fontSize: 11 }}
+              style={{ marginLeft: 'auto', padding: '2px 6px', fontSize: '0.6875rem' }}
             >
               <Icon name="close" size={12} />
             </button>
@@ -571,7 +571,7 @@ function HubApp() {
             border: '1px solid var(--amber)',
             borderRadius: 'var(--r)',
             color: 'var(--text)',
-            fontSize: 13,
+            fontSize: '0.8125rem',
             zIndex: 1000
           }}
         >

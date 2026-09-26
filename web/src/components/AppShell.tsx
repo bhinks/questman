@@ -213,7 +213,7 @@ function Clock() {
   }, []);
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
-    <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+    <span className="mono" style={{ fontSize: '0.7188rem', color: 'var(--text-dim)' }}>
       {pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}
     </span>
   );
@@ -235,14 +235,14 @@ function PetWidget({ pet }: { pet: PetMeta }) {
   const status = pet.status[i % pet.status.length];
   return (
     <div className="pet-card">
-      <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 32, height: 32, fontSize: 16 }}>
+      <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 32, height: 32, fontSize: '1rem' }}>
         {pet.emoji}
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.16em' }}>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.16em' }}>
           {pet.name} <span style={{ color: 'var(--text-ghost)' }}>// {pet.species}</span>
         </div>
-        <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {status}<span className="cursor-blink" style={{ color: 'var(--cyan)' }}>_</span>
         </div>
       </div>
@@ -327,9 +327,9 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         {/* ---- DECK ---- */}
         <aside className="ncx-deck">
           <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
+            <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: '0.8125rem' }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, letterSpacing: '0.02em' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 700, letterSpacing: '0.02em' }}>
                 QUEST<span className="ncx-chroma" style={{ color: 'var(--cyan)' }}>MAN</span>
               </div>
               <div className="ncx-serial">SYS 2.4.0 // NC-077</div>
@@ -357,9 +357,9 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
           {/* Runner ID card — an equipped vanity title replaces RUNNER-01. */}
           <div className="ncx-id">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: 13 }}>{p?.level ?? '—'}</div>
+              <div className="ncx-hex" style={{ width: 34, height: 34, fontSize: '0.8125rem' }}>{p?.level ?? '—'}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', whiteSpace: 'normal', lineHeight: 1.35, wordBreak: 'break-word' }}>
+                <div className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.12em', whiteSpace: 'normal', lineHeight: 1.35, wordBreak: 'break-word' }}>
                   {handle} <span style={{ color: equippedTitle ? 'var(--cyan)' : 'var(--text-ghost)' }}>// {equippedTitle ? equippedTitle.name : 'RUNNER-01'}</span>
                 </div>
                 <div className="ncx-bar slim" style={{ marginTop: 6 }}>
@@ -368,7 +368,7 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
                 </div>
               </div>
             </div>
-            <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 7 }}>
+            <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.5625rem', color: 'var(--text-faint)', letterSpacing: '0.14em', marginTop: 7 }}>
               <span>LVL {p?.level ?? '—'}</span>
               <span style={{ color: 'var(--lime)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                 <Icon name="flame" size={10} /> {streak}D
@@ -399,31 +399,31 @@ export function AppShell({ activeTab, onTabChange, children, onUpload, onJackIn,
         <main className="main-col">
           <header className="ncx-topbar">
             <div className="mobile-brand">
-              <div className="ncx-hex" style={{ width: 28, height: 28, fontSize: 11 }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
+              <div className="ncx-hex" style={{ width: 28, height: 28, fontSize: '0.6875rem' }}><span style={{ fontWeight: 900, fontSize: '1.2em', lineHeight: 1 }}>!</span></div>
             </div>
             <div className="ncx-topcell cell-title">
-              <span className="mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--cyan)' }}>
+              <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.2em', color: 'var(--cyan)' }}>
                 ▮ {SCREEN_TITLES[activeTab] || activeTab.toUpperCase()}
               </span>
               <span className="ncx-serial">DAY {streak}</span>
             </div>
             {/* Live HUD stats (the handler feed lives on the Today page now). */}
             <div className="ncx-topcell" style={{ flex: 1, minWidth: 0, gap: 22, overflow: 'hidden' }}>
-              <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+              <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
                 STREAK <span style={{ color: 'var(--lime)' }}>{streak}D</span>
               </span>
               {today && (
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
                   XP <span style={{ color: 'var(--lime)' }}>+{today.xpEarned}</span> · {today.xpAvailable} OPEN
                 </span>
               )}
               {p && (
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
                   €$<span style={{ color: 'var(--amber)' }}>{p.eddies.toLocaleString()}</span>
                 </span>
               )}
               {topBoss && (
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.08em', color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   TGT <span style={{ color: 'var(--magenta)' }}>{topBoss.name.toUpperCase()} {topBoss.pct}%</span>
                 </span>
               )}

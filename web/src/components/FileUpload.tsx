@@ -89,7 +89,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
           </div>
           <h1 
             style={{ 
-              fontSize: 32, 
+              fontSize: '2rem', 
               fontWeight: 700, 
               color: 'var(--text)', 
               letterSpacing: '-0.02em',
@@ -100,7 +100,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
             Finance Terminal
           </h1>
           <p style={{ 
-            fontSize: 15, 
+            fontSize: '0.9375rem', 
             color: 'var(--text-dim)', 
             lineHeight: 1.5 
           }}>
@@ -164,7 +164,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
             
             <div>
               <div style={{ 
-                fontSize: 18, 
+                fontSize: '1.125rem', 
                 fontWeight: 600, 
                 color: 'var(--text)',
                 marginBottom: 8
@@ -172,7 +172,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
                 {isLoading ? 'PROCESSING DATA...' : 'DRAG FILES OR CLICK TO UPLOAD'}
               </div>
               <div style={{ 
-                fontSize: 13, 
+                fontSize: '0.8125rem', 
                 color: 'var(--text-dim)',
                 fontFamily: 'var(--font-mono)',
                 letterSpacing: '0.05em'
@@ -194,7 +194,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
                 alignItems: 'center', 
                 gap: 8, 
                 marginBottom: 12,
-                fontSize: 11,
+                fontSize: '0.6875rem',
                 fontFamily: 'var(--font-mono)',
                 letterSpacing: '0.08em',
                 color: 'var(--text-dim)'
@@ -203,7 +203,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
                 <span>REQUIRED COLUMNS</span>
               </div>
               <div style={{ 
-                fontSize: 13, 
+                fontSize: '0.8125rem', 
                 color: 'var(--text-faint)', 
                 lineHeight: 1.4 
               }}>
@@ -230,7 +230,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
               alignItems: 'center', 
               gap: 8, 
               marginBottom: 12,
-              fontSize: 11,
+              fontSize: '0.6875rem',
               fontFamily: 'var(--font-mono)',
               letterSpacing: '0.08em',
               color: 'var(--red)'
@@ -238,7 +238,7 @@ export function FileUpload({ onFileProcessed, isLoading, setIsLoading }: FileUpl
               <Icon name="close" size={14} style={{ color: 'var(--red)' }} />
               <span>UPLOAD ERROR</span>
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-dim)', lineHeight: 1.4 }}>
               {errors.map((error, index) => (
                 <div key={index}>• {error}</div>
               ))}

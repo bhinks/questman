@@ -3,6 +3,12 @@
    Design tokens + base styles
    ============================================================ */
 
+/* Reading scale (Brent 2026-09-26): text sizes are rem off this root, which grows on wider screens. */
+html{font-size:17px}
+@media (min-width:1400px){html{font-size:18.5px}}
+@media (min-width:1900px){html{font-size:20.5px}}
+@media (min-width:2500px){html{font-size:23px}}
+
 :root {
   /* ---- Surfaces ---- */
   --bg:            #06060c;
@@ -233,7 +239,7 @@ body::after {
 .tnum { font-variant-numeric: tabular-nums; }
 .kicker {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.6875rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--text-faint);
@@ -259,7 +265,7 @@ input, textarea, select { font-family: inherit; }
    be keyed by state so React remounts instead of morphing. */
 .btn, .ncx-btn {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   display: inline-flex;
@@ -412,7 +418,7 @@ input, textarea, select { font-family: inherit; }
 }
 .ncx-deck nav { flex: 1; overflow-y: auto; overflow-x: hidden !important; padding-top: 2px; }
 .ncx-deck-group {
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.3em;
+  font-family: var(--font-mono); font-size: 0.5938rem; letter-spacing: 0.3em;
   color: var(--text-ghost); padding: 9px 16px 4px; display: flex; gap: 8px; align-items: center;
   text-transform: uppercase;
 }
@@ -421,7 +427,7 @@ input, textarea, select { font-family: inherit; }
   position: relative; display: flex; align-items: center; gap: 11px;
   margin: 1px 10px; padding: 6.5px 12px;
   background: transparent; border: none; cursor: pointer; width: calc(100% - 20px);
-  color: var(--text-dim); font-family: var(--font-ui); font-size: 13px; text-align: left;
+  color: var(--text-dim); font-family: var(--font-ui); font-size: 0.8125rem; text-align: left;
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
   transition: background .14s, color .14s, box-shadow .14s;
 }
@@ -433,7 +439,7 @@ input, textarea, select { font-family: inherit; }
 }
 .ncx-deck-item.active svg { color: var(--cyan); filter: drop-shadow(0 0 5px var(--cyan)); }
 .ncx-deck-item.active::after {
-  content: "▸"; margin-left: auto; color: var(--cyan); font-size: 10px;
+  content: "▸"; margin-left: auto; color: var(--cyan); font-size: 0.625rem;
 }
 
 /* runner ID card at deck bottom */
@@ -452,7 +458,7 @@ input, textarea, select { font-family: inherit; }
 }
 .ncx-topcell { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-right: 1px solid var(--line); }
 .ncx-ticker-wrap { flex: 1; overflow: hidden; display: flex; align-items: center; min-width: 0; }
-.ncx-ticker-track { display: flex; gap: 56px; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-dim); }
+.ncx-ticker-track { display: flex; gap: 56px; white-space: nowrap; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; color: var(--text-dim); }
 @media (prefers-reduced-motion: no-preference) {
   .ncx-ticker-track { animation: ncx-marquee 26s linear infinite; }
 }
@@ -467,7 +473,7 @@ input, textarea, select { font-family: inherit; }
   display: flex; align-items: center; gap: 22px;
   padding: 7px 20px; border-top: 1px solid var(--line);
   background: rgba(4,4,10,0.9);
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em;
+  font-family: var(--font-mono); font-size: 0.5938rem; letter-spacing: 0.18em;
   color: var(--text-faint); text-transform: uppercase;
 }
 .ncx-statusbar .lit { color: var(--cyan); }
@@ -548,7 +554,7 @@ input, textarea, select { font-family: inherit; }
   .bn-item {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
     padding: 7px 4px; border: none; background: none; cursor: pointer;
-    color: var(--text-faint); font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-faint); font-family: var(--font-mono); font-size: 0.625rem;
     letter-spacing: 0.03em; border-radius: 9px;
     transition: color .15s, background .15s; /* never `all` — stuck-transition pitfall */
   }
@@ -563,7 +569,7 @@ input, textarea, select { font-family: inherit; }
      inset tiles (the same tile pattern ENV.SCAN uses). Inline styles on
      the cells force the !importants here. */
   .qm-hud-strip { flex-wrap: wrap; gap: 14px !important; }
-  .qm-hud-strip .ncx-hex { width: 46px !important; height: 46px !important; font-size: 18px !important; }
+  .qm-hud-strip .ncx-hex { width: 46px !important; height: 46px !important; font-size: 1.125rem !important; }
   .qm-hud-stat {
     flex: 1 1 28%;
     border-left: none !important;
@@ -572,8 +578,8 @@ input, textarea, select { font-family: inherit; }
     background: #0d0e18;
     box-shadow: inset 0 0 0 1px var(--line);
   }
-  .qm-hud-stat .kicker { font-size: 9.5px !important; }
-  .qm-hud-stat .ncx-val { font-size: 15px !important; }
+  .qm-hud-stat .kicker { font-size: 0.5938rem !important; }
+  .qm-hud-stat .ncx-val { font-size: 0.9375rem !important; }
 }
 
 /* ---- MORE sheet (polish pass §3a): full-deck glass overlay over the
@@ -599,7 +605,7 @@ input, textarea, select { font-family: inherit; }
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 12px 4px 10px; border: none; cursor: pointer; text-align: center;
   background: #0d0e18; box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--text-dim); font-family: var(--font-ui); font-size: 11px;
+  color: var(--text-dim); font-family: var(--font-ui); font-size: 0.6875rem;
   clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
   transition: background .15s, color .15s; /* never `all` — stuck-transition pitfall */
 }
@@ -663,14 +669,14 @@ input, textarea, select { font-family: inherit; }
 
 /* ---- serial codes ---- */
 .ncx-serial {
-  font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.32em;
+  font-family: var(--font-mono); font-size: 0.5312rem; letter-spacing: 0.32em;
   color: var(--text-ghost); text-transform: uppercase; white-space: nowrap;
 }
 .ncx-serial.vert { writing-mode: vertical-rl; }
 
 /* ---- stamps (difficulty / status) ---- */
 .ncx-stamp {
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.2em; font-weight: 700;
+  font-family: var(--font-mono); font-size: 0.5938rem; letter-spacing: 0.2em; font-weight: 700;
   padding: 3px 9px; border: 1px solid currentColor; text-transform: uppercase;
   transform: rotate(-3deg); display: inline-block;
 }
@@ -696,7 +702,7 @@ input, textarea, select { font-family: inherit; }
 .ncx-contract:hover { background: linear-gradient(90deg, rgba(var(--accent-rgb),0.05), transparent 60%), #0d0e1a; }
 .ncx-contract + .ncx-contract { border-top: 1px solid var(--line); }
 .ncx-contract .num {
-  font-family: var(--font-mono); font-size: 10px; color: var(--text-ghost); letter-spacing: 0.1em;
+  font-family: var(--font-mono); font-size: 0.625rem; color: var(--text-ghost); letter-spacing: 0.1em;
   width: 30px; flex: none;
 }
 .ncx-row-done { opacity: 0.45; }
@@ -704,7 +710,7 @@ input, textarea, select { font-family: inherit; }
 
 /* ---- icon chip (42px chamfered, outline icons ONLY — never emoji) ---- */
 .ncx-chip {
-  width: 42px; height: 42px; flex: none; font-size: 20px;
+  width: 42px; height: 42px; flex: none; font-size: 1.25rem;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, rgba(var(--accent-rgb),0.14), color-mix(in srgb, var(--magenta) 12%, transparent));
   box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.22);
@@ -712,9 +718,9 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ---- table ---- */
-.ncx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ncx-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
 .ncx-table th {
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+  font-family: var(--font-mono); font-size: 0.5938rem; letter-spacing: 0.22em; text-transform: uppercase;
   color: var(--text-faint); text-align: left; font-weight: 500;
   padding: 9px 16px; border-bottom: 1px solid var(--line-2); background: rgba(150,168,224,0.03);
 }
@@ -730,13 +736,13 @@ input, textarea, select { font-family: inherit; }
 
 /* ---- terminal log + chamfered input ---- */
 .ncx-term {
-  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.85; letter-spacing: 0.04em;
+  font-family: var(--font-mono); font-size: 0.7188rem; line-height: 1.85; letter-spacing: 0.04em;
   color: var(--text-faint);
 }
 .ncx-term .ok { color: var(--lime); }
 .ncx-term .cy { color: var(--cyan); }
 .ncx-input {
-  font-family: var(--font-mono); font-size: 13px; color: var(--text);
+  font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text);
   background: #070811; border: 1px solid var(--line-2); padding: 11px 14px;
   outline: none; width: 100%;
   transition: border-color .15s, box-shadow .15s;
@@ -1159,7 +1165,7 @@ html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
   gap: 14px;
 }
 .mkt-live {
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+  font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.2em;
   color: var(--text-faint); text-align: center; padding: 9px 0;
   box-shadow: inset 0 0 0 1px var(--line); text-transform: uppercase;
 }
@@ -1199,7 +1205,7 @@ html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
   justify-content: center;
   font-family: var(--font-display);
   font-feature-settings: "tnum" 1, "zero" 1;
-  font-size: clamp(72px, 16vw, 190px);
+  font-size: clamp(4.5rem, 16vw, 11.875rem);
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -1248,7 +1254,7 @@ html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
 }
 .qm-ring-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .qm-clock[data-timer="ring"] {
-  font-size: clamp(44px, 9vw, 104px);
+  font-size: clamp(2.75rem, 9vw, 6.5rem);
   text-shadow: 0 0 16px rgba(var(--accent-rgb), 0.4);
 }
 
@@ -1292,7 +1298,7 @@ html[data-font="sharetech"] .ncx-chroma { letter-spacing: 0.04em; }
 /* ORBITAL — digits inside the SVG ring (a satellite rides the rim), so
    the type shrinks to fit; shares .qm-ring-wrap with the v1 ring face. */
 .qm-clock[data-timer="orbital"] {
-  font-size: clamp(44px, 9vw, 104px);
+  font-size: clamp(2.75rem, 9vw, 6.5rem);
   text-shadow: 0 0 16px rgba(var(--accent-rgb), 0.4);
 }
 
@@ -1452,7 +1458,7 @@ html[data-shell="outrun"] .ncx-chroma {
 /* ---- mini shell previews for the shop cards (shell-agnostic) ---- */
 .mkt-shellprev-tty {
   background: #000; box-shadow: inset 0 0 0 1px rgba(63, 255, 118, 0.25);
-  font-family: var(--font-mono); color: #84dc98; font-size: 10px; line-height: 1.8;
+  font-family: var(--font-mono); color: #84dc98; font-size: 0.625rem; line-height: 1.8;
   padding: 10px 12px; height: 70px; overflow: hidden;
 }
 .mkt-shellprev-outrun {

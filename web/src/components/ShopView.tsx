@@ -236,18 +236,18 @@ export function ShopView() {
       {/* ---- header: chroma title + focal balance panel ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div>
-          <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700 }}>
+          <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '1.625rem', fontWeight: 700 }}>
             NIGHT MARKET
           </div>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 4 }}>
             COSMETICS · FIRMWARE · COMPANIONS · NO REFUNDS
           </div>
         </div>
         <span style={{ flex: 1 }} />
         <Ticks focal>
           <div className="panel hud" style={{ padding: '12px 22px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span className="kicker" style={{ fontSize: 9.5 }}>BALANCE</span>
-            <span className="ncx-val" style={{ fontSize: 24, color: 'var(--amber)', textShadow: '0 0 14px rgba(255,194,75,0.4)' }}>
+            <span className="kicker" style={{ fontSize: '0.5938rem' }}>BALANCE</span>
+            <span className="ncx-val" style={{ fontSize: '1.5rem', color: 'var(--amber)', textShadow: '0 0 14px rgba(255,194,75,0.4)' }}>
               €${player.eddies.toLocaleString()}
             </span>
           </div>
@@ -260,7 +260,7 @@ export function ShopView() {
           <button
             key={k + '-' + (cat === k)}
             className={'btn' + (cat === k ? ' btn-primary' : '')}
-            style={{ padding: '5px 13px', fontSize: 10 }}
+            style={{ padding: '5px 13px', fontSize: '0.625rem' }}
             onClick={() => setCat(k)}
           >
             {label}
@@ -381,7 +381,7 @@ export function ShopView() {
               {isOwned ? (
                 <button
                   key={item.key + '-' + (active ? 'off' : 'on')}
-                  className="btn" style={{ fontSize: 11, padding: 8 }}
+                  className="btn" style={{ fontSize: '0.6875rem', padding: 8 }}
                   disabled={busy}
                   onClick={() => fxToggle.mutate(fxKey)}
                 >
@@ -484,7 +484,7 @@ export function ShopView() {
           return (
             <MktCard key={item.key} equipped={equipped}>
               <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px' }}>
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.12em', textAlign: 'center', lineHeight: 1.45, wordBreak: 'break-word' }}>
+                <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.12em', textAlign: 'center', lineHeight: 1.45, wordBreak: 'break-word' }}>
                   {handle} <span style={{ color: equipped ? 'var(--cyan)' : 'var(--text-dim)' }}>// {name}</span>
                 </span>
               </div>
@@ -518,10 +518,10 @@ export function ShopView() {
           return (
             <MktCard key={item.key} equipped={equipped}>
               <div className="panel-inset mkt-prev" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px' }}>
-                <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 38, height: 38, fontSize: 19 }}>
+                <div className={'ncx-chip ' + (pet.flicker ? 'pet-flicker' : 'pet-chip')} style={{ width: 38, height: 38, fontSize: '1.1875rem' }}>
                   {pet.emoji}
                 </div>
-                <div className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', lineHeight: 1.6, minWidth: 0 }}>
+                <div className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', lineHeight: 1.6, minWidth: 0 }}>
                   <div style={{ color: 'var(--text-dim)', letterSpacing: '0.16em' }}>{pet.species}</div>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pet.status[0]}</div>
                 </div>
@@ -557,18 +557,18 @@ export function ShopView() {
                 <div className="ncx-chip" style={{ width: 34, height: 34, color: 'var(--cyan)' }}>
                   <Icon name={SUPPLY_ICON[item.key] ?? 'bag'} size={15} />
                 </div>
-                <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
+                <span className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{item.name}</span>
                 {active ? (
-                  <span className="ncx-stamp flat" style={{ marginLeft: 'auto', color: 'var(--lime)', fontSize: 9.5 }}>{active}</span>
+                  <span className="ncx-stamp flat" style={{ marginLeft: 'auto', color: 'var(--lime)', fontSize: '0.5938rem' }}>{active}</span>
                 ) : count > 0 ? (
-                  <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)' }}>×{count}</span>
+                  <span className="mono" style={{ marginLeft: 'auto', fontSize: '0.625rem', color: 'var(--text-faint)' }}>×{count}</span>
                 ) : null}
               </div>
               <DescLine text={item.description} />
               {item.soldOut ? (
                 <div
                   className="btn"
-                  style={{ fontSize: 11, padding: 8, opacity: 0.5, cursor: 'default', color: 'var(--text-faint)', letterSpacing: '0.18em', textAlign: 'center', pointerEvents: 'none' }}
+                  style={{ fontSize: '0.6875rem', padding: 8, opacity: 0.5, cursor: 'default', color: 'var(--text-faint)', letterSpacing: '0.18em', textAlign: 'center', pointerEvents: 'none' }}
                   aria-disabled="true"
                 >
                   SOLD OUT
@@ -576,7 +576,7 @@ export function ShopView() {
               ) : (
                 <button
                   className="btn"
-                  style={{ fontSize: 11, padding: 8, opacity: affordable ? undefined : 0.45 }}
+                  style={{ fontSize: '0.6875rem', padding: 8, opacity: affordable ? undefined : 0.45 }}
                   disabled={!affordable || busy}
                   onClick={() => doBuy(item.key)}
                   title={affordable ? undefined : 'Not enough eddies'}
@@ -602,7 +602,7 @@ function MktSection({ label, serial, show, children }: {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{label}</span>
+        <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{label}</span>
         <span style={{ flex: 1 }} />
         <span className="ncx-serial">{serial}</span>
       </div>
@@ -624,7 +624,7 @@ function NameRow({ name, equipped, owned, active }: {
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-      <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.13em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+      <span className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.13em', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
       <span style={{ flex: 1 }} />
       {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>LIVE</span>}
       {active && <span className="ncx-stamp flat" style={{ color: 'var(--lime)' }}>ONLINE</span>}
@@ -634,7 +634,7 @@ function NameRow({ name, equipped, owned, active }: {
 }
 
 function DescLine({ text }: { text: string }) {
-  return <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{text}</div>;
+  return <div style={{ fontSize: '0.7188rem', color: 'var(--text-dim)', lineHeight: 1.5, flex: 1 }}>{text}</div>;
 }
 
 /**
@@ -657,7 +657,7 @@ function ActionSlot({ equipped, owned, liveText, onRemove, price, levelReq, leve
 }) {
   if (equipped) {
     return onRemove ? (
-      <button key="rm" className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onRemove}>
+      <button key="rm" className="btn" style={{ fontSize: '0.6875rem', padding: 8 }} disabled={busy} onClick={onRemove}>
         REMOVE
       </button>
     ) : (
@@ -668,14 +668,14 @@ function ActionSlot({ equipped, owned, liveText, onRemove, price, levelReq, leve
   }
   if (owned) {
     return (
-      <button key="eq" className="btn" style={{ fontSize: 11, padding: 8 }} disabled={busy} onClick={onEquip}>
+      <button key="eq" className="btn" style={{ fontSize: '0.6875rem', padding: 8 }} disabled={busy} onClick={onEquip}>
         EQUIP
       </button>
     );
   }
   if (levelReq && level < levelReq) {
     return (
-      <button key="lock" className="btn" style={{ fontSize: 11, padding: 8 }} disabled>
+      <button key="lock" className="btn" style={{ fontSize: '0.6875rem', padding: 8 }} disabled>
         <Icon name="lock" size={11} /> LVL {levelReq} · €${(price ?? 0).toLocaleString()}
       </button>
     );
@@ -685,7 +685,7 @@ function ActionSlot({ equipped, owned, liveText, onRemove, price, levelReq, leve
     <button
       key="buy"
       className="btn"
-      style={{ fontSize: 11, padding: 8, opacity: affordable ? 1 : 0.45 }}
+      style={{ fontSize: '0.6875rem', padding: 8, opacity: affordable ? 1 : 0.45 }}
       disabled={!affordable || busy}
       onClick={onBuy}
       title={affordable ? undefined : 'Not enough eddies'}
@@ -741,7 +741,7 @@ function ShellPreview({ k }: { k: string }) {
   }
   return ( /* night city — factory firmware */
     <div className="panel-inset mkt-prev" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 7, justifyContent: 'center' }}>
-      <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700 }}>NIGHT CITY</div>
+      <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '0.8125rem', fontWeight: 700 }}>NIGHT CITY</div>
       <div className="ncx-bar slim" style={{ width: '70%' }}>
         <i style={{ width: '62%', background: 'linear-gradient(90deg, var(--cyan-deep), var(--cyan))' }} />
         <span className="seg-mask" />
@@ -758,10 +758,10 @@ function LegacyFacePreview({ k }: { k: string }) {
     inner = (
       <div className="mono" style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
         {['2', '5', ':', '0', '0'].map((ch, i) => ch === ':' ? (
-          <span key={i} style={{ color: 'var(--text-faint)', fontSize: 18, fontWeight: 700 }}>:</span>
+          <span key={i} style={{ color: 'var(--text-faint)', fontSize: '1.125rem', fontWeight: 700 }}>:</span>
         ) : (
           <span key={i} style={{
-            fontSize: 19, fontWeight: 700, color: 'var(--cyan)', padding: '3px 7px',
+            fontSize: '1.1875rem', fontWeight: 700, color: 'var(--cyan)', padding: '3px 7px',
             background: 'linear-gradient(180deg, #14162a 0%, #0d0e1c 49%, #090a14 51%, #101224 100%)',
             boxShadow: 'inset 0 0 0 1px var(--line-2)',
             clipPath: 'polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px)',
@@ -778,13 +778,13 @@ function LegacyFacePreview({ k }: { k: string }) {
           <circle cx="50" cy="50" r="44" fill="none" stroke="var(--cyan)" strokeWidth="7" strokeLinecap="round"
             strokeDasharray={`${0.68 * C} ${C}`} transform="rotate(-90 50 50)" />
         </svg>
-        <span className="mono" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--cyan)' }}>25:00</span>
+        <span className="mono" style={{ fontSize: '0.6562rem', fontWeight: 700, color: 'var(--cyan)' }}>25:00</span>
       </div>
     );
   } else {
     // pulse — reuses the live face's heartbeat keyframes (index.css)
     inner = (
-      <span className="mono qm-preview-pulse" style={{ fontSize: 21, fontWeight: 700, color: 'var(--cyan)' }}>
+      <span className="mono qm-preview-pulse" style={{ fontSize: '1.3125rem', fontWeight: 700, color: 'var(--cyan)' }}>
         25:00
       </span>
     );
@@ -818,13 +818,13 @@ function HandlerCard({ personaKey, price, levelReq, equipped, owned, streak, lev
   return (
     <MktCard equipped={equipped}>
       <div className="panel-inset" style={{ minHeight: 70, padding: '10px 12px' }}>
-        <div className="ncx-term" style={{ fontSize: 10.5, lineHeight: 1.6 }}>
+        <div className="ncx-term" style={{ fontSize: '0.6562rem', lineHeight: 1.6 }}>
           <span className="cy">{meta.name}&gt;</span> {line}
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.13em', whiteSpace: 'nowrap' }}>{meta.name}</span>
-        <span className="ncx-stamp flat" style={{ color: 'var(--violet)', fontSize: 8 }}>{meta.tag}</span>
+        <span className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.13em', whiteSpace: 'nowrap' }}>{meta.name}</span>
+        <span className="ncx-stamp flat" style={{ color: 'var(--violet)', fontSize: '0.5rem' }}>{meta.tag}</span>
         <span style={{ flex: 1 }} />
         {equipped && <span className="ncx-stamp flat" style={{ color: 'var(--cyan)' }}>LIVE</span>}
         {!equipped && owned && <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)' }}>OWNED</span>}
@@ -846,7 +846,7 @@ function HandlerCard({ personaKey, price, levelReq, equipped, owned, streak, lev
 /** Inline purchase feedback — loot crates reveal what dropped here. */
 function FeedbackLine({ feedback }: { feedback: NonNullable<Feedback> }) {
   return (
-    <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.08em', color: feedback.ok ? 'var(--lime)' : 'var(--red)' }}>
+    <div className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.08em', color: feedback.ok ? 'var(--lime)' : 'var(--red)' }}>
       {feedback.ok ? '▸ ' : '✕ '}{feedback.message}
     </div>
   );
@@ -870,7 +870,7 @@ function Ticks({ children, focal, style }: {
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13 }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.8125rem' }}>{children}</div>
     </div>
   );
 }

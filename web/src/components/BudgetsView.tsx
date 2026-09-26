@@ -158,10 +158,10 @@ function Hero({ overview }: { overview: BudgetOverview }) {
           <Icon name="wallet" size={18} />
         </div>
         <div>
-          <h2 className="ncx-chroma" style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
+          <h2 className="ncx-chroma" style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', textTransform: 'uppercase' }}>
             BUDGETS // {fmtMonth(overview.month)}
           </h2>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+          <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', marginTop: 2 }}>
             monthly envelopes · remaining budget is the score
           </div>
         </div>
@@ -186,7 +186,7 @@ function Hero({ overview }: { overview: BudgetOverview }) {
           <span className="kicker" style={{ color: 'var(--text-faint)' }}>REMAINING BUDGET</span>
           <span
             className="ncx-val"
-            style={{ fontSize: 38, lineHeight: 1, color: remainingColor }}
+            style={{ fontSize: '2.375rem', lineHeight: 1, color: remainingColor }}
           >
             {signedMoney(remaining)}
           </span>
@@ -208,7 +208,7 @@ function Hero({ overview }: { overview: BudgetOverview }) {
           }}
         >
           <Icon name="spark" size={16} style={{ color: 'var(--lime)', flexShrink: 0, marginTop: 1 }} />
-          <span style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{overview.suggestion}</span>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text)', lineHeight: 1.5 }}>{overview.suggestion}</span>
         </div>
       )}
     </div>
@@ -218,10 +218,10 @@ function Hero({ overview }: { overview: BudgetOverview }) {
 function MiniStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.06em', color: 'var(--text-faint)' }}>
+      <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.06em', color: 'var(--text-faint)' }}>
         {label}
       </span>
-      <span className="ncx-val" style={{ fontSize: 18, color }}>{value}</span>
+      <span className="ncx-val" style={{ fontSize: '1.125rem', color }}>{value}</span>
     </div>
   );
 }
@@ -283,7 +283,7 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
             flexShrink: 0,
             width: 26, height: 26,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700,
+            fontSize: '0.6875rem', fontWeight: 700,
             color: rank <= 3 ? 'var(--lime)' : 'var(--text-faint)',
             background: rank <= 3
               ? 'color-mix(in srgb, var(--lime) 12%, transparent)'
@@ -299,7 +299,7 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
           <Icon name={item.icon || 'bag'} size={15} style={{ color: item.color || accent, flexShrink: 0 }} />
           <span
             style={{
-              fontSize: 15, fontWeight: 600, color: 'var(--text)',
+              fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -309,7 +309,7 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
 
         {/* spend / cap + remaining + pct */}
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {money(item.spent)}{' '}
             {capDraft == null ? (
               <button
@@ -319,7 +319,7 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
                 title="Click to edit this envelope's monthly cap"
                 style={{
                   background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                  fontSize: 12, color: 'var(--text-faint)',
+                  fontSize: '0.75rem', color: 'var(--text-faint)',
                   textDecoration: 'underline dotted', textUnderlineOffset: 3,
                 }}
               >
@@ -345,7 +345,7 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
                 }}
                 style={{
                   ...inputStyle,
-                  width: 80, textAlign: 'right', padding: '2px 6px', fontSize: 12,
+                  width: 80, textAlign: 'right', padding: '2px 6px', fontSize: '0.75rem',
                   ...(saveCap.isError ? { borderColor: 'var(--red)' } : {}),
                 }}
               />
@@ -354,11 +354,11 @@ function EnvelopeRow({ item, rank }: { item: BudgetItem; rank: number }) {
           <span
             className="mono"
             title="Remaining in this envelope"
-            style={{ fontSize: 13, fontWeight: 700, color: item.remaining < 0 ? 'var(--red)' : 'var(--lime)' }}
+            style={{ fontSize: '0.8125rem', fontWeight: 700, color: item.remaining < 0 ? 'var(--red)' : 'var(--lime)' }}
           >
             {signedMoney(item.remaining)}
           </span>
-          <span className="mono" style={{ fontSize: 11, color: accent }}>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: accent }}>
             {Math.round(item.pct)}%
           </span>
         </span>
@@ -400,12 +400,12 @@ function HistoryGrid({ history }: { history: BudgetHistory }) {
           <span
             key={m}
             className="mono"
-            style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: 'center', letterSpacing: '0.02em' }}
+            style={{ fontSize: '0.625rem', color: 'var(--text-faint)', textAlign: 'center', letterSpacing: '0.02em' }}
           >
             {fmtMonthShort(m)}
           </span>
         ))}
-        <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: 'right' }}>
+        <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', textAlign: 'right' }}>
           UNDER&nbsp;RATE
         </span>
 
@@ -433,7 +433,7 @@ function HistoryRow({ cat, months }: { cat: BudgetHistoryCategory; months: strin
       <span
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0,
-          fontSize: 13, color: 'var(--text-dim)',
+          fontSize: '0.8125rem', color: 'var(--text-dim)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}
       >
@@ -447,7 +447,7 @@ function HistoryRow({ cat, months }: { cat: BudgetHistoryCategory; months: strin
         const cell = byMonth.get(m);
         if (!cell || cell.cap <= 0) {
           return (
-            <span key={m} className="mono" style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center' }}>
+            <span key={m} className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)', textAlign: 'center' }}>
               –
             </span>
           );
@@ -459,7 +459,7 @@ function HistoryRow({ cat, months }: { cat: BudgetHistoryCategory; months: strin
             title={`${fmtMonthShort(m)}: ${money(cell.spent)} / ${money(cell.cap)} (${Math.round(cell.pct)}%)`}
             style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}
           >
-            <span className="mono" style={{ fontSize: 11, color: cell.under ? 'var(--text-dim)' : 'var(--red)' }}>
+            <span className="mono" style={{ fontSize: '0.6875rem', color: cell.under ? 'var(--text-dim)' : 'var(--red)' }}>
               {money(cell.spent)}
             </span>
             <span style={{ width: 8, height: 3, background: dot }} />
@@ -503,7 +503,7 @@ function ManageCategories({
         {!adding && (
           <button
             className="btn"
-            style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: 12 }}
+            style={{ marginLeft: 'auto', padding: '6px 12px', fontSize: '0.75rem' }}
             onClick={() => setAdding(true)}
           >
             <Icon name="plus" size={13} /> NEW CATEGORY
@@ -514,7 +514,7 @@ function ManageCategories({
       {adding && <NewCategoryForm onClose={() => setAdding(false)} onDone={onMutated} />}
 
       {categories.length === 0 && !adding ? (
-        <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+        <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>
           No categories yet. Add one above to start budgeting.
         </div>
       ) : (
@@ -585,7 +585,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
             <AccentPicker value={color} onChange={setColor} autoTitle="Default" />
             <button
               className="btn btn-primary"
-              style={{ padding: '6px 12px', fontSize: 11 }}
+              style={{ padding: '6px 12px', fontSize: '0.6875rem' }}
               disabled={saveMeta.isPending}
               onClick={() => saveMeta.mutate()}
             >
@@ -593,7 +593,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
             </button>
             <button
               className="btn btn-ghost"
-              style={{ padding: '6px 10px', fontSize: 11 }}
+              style={{ padding: '6px 10px', fontSize: '0.6875rem' }}
               onClick={() => { setEditing(false); setName(cat.name); setColor(cat.color ?? ''); }}
             >
               CANCEL
@@ -601,14 +601,14 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
           </div>
         ) : (
           <>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{cat.name}</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)' }}>{cat.name}</span>
             {cat.isSystem && (
-              <span className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', letterSpacing: '0.06em' }}>
+              <span className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', letterSpacing: '0.06em' }}>
                 SYSTEM
               </span>
             )}
             {typeof cat.transactionCount === 'number' && cat.transactionCount > 0 && (
-              <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+              <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>
                 · {cat.transactionCount} txn{cat.transactionCount === 1 ? '' : 's'}
               </span>
             )}
@@ -618,7 +618,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
               title="Monthly cap — leave blank for no envelope"
               style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
-              <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>CAP $</span>
+              <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>CAP $</span>
               <input
                 type="number"
                 min={0}
@@ -634,7 +634,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
             </label>
             <button
               className="btn"
-              style={{ padding: '6px 12px', fontSize: 11, opacity: capDirty && !capInvalid ? 1 : 0.5 }}
+              style={{ padding: '6px 12px', fontSize: '0.6875rem', opacity: capDirty && !capInvalid ? 1 : 0.5 }}
               disabled={!capDirty || capInvalid || saveCap.isPending}
               onClick={() => saveCap.mutate()}
               title={capInvalid ? 'Cap must be a non-negative number' : 'Save cap'}
@@ -644,7 +644,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
 
             <button
               className="btn btn-ghost"
-              style={{ padding: '6px 8px', fontSize: 11 }}
+              style={{ padding: '6px 8px', fontSize: '0.6875rem' }}
               onClick={() => setEditing(true)}
               title="Rename / recolor"
             >
@@ -653,7 +653,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
             {!cat.isSystem && (
               <button
                 className="btn btn-ghost"
-                style={{ padding: '6px 8px', fontSize: 11, color: 'var(--red)' }}
+                style={{ padding: '6px 8px', fontSize: '0.6875rem', color: 'var(--red)' }}
                 onClick={() => setConfirmDelete(true)}
                 title="Delete (transactions move to Uncategorized)"
               >
@@ -665,7 +665,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
       </div>
 
       {capInvalid && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--red)' }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)' }}>
           Cap must be a non-negative number.
         </div>
       )}
@@ -679,14 +679,14 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
             border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',
           }}
         >
-          <span className="mono" style={{ fontSize: 12, color: 'var(--text)' }}>
+          <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text)' }}>
             Delete <strong style={{ color: 'var(--text)' }}>{cat.name}</strong>? Its transactions move to
             Uncategorized.
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button
               className="ncx-btn danger"
-              style={{ padding: '6px 12px', fontSize: 11 }}
+              style={{ padding: '6px 12px', fontSize: '0.6875rem' }}
               disabled={remove.isPending}
               onClick={() => remove.mutate()}
             >
@@ -694,7 +694,7 @@ function CategoryRow({ cat, onMutated }: { cat: FinanceCategory; onMutated: () =
             </button>
             <button
               className="btn btn-ghost"
-              style={{ padding: '6px 10px', fontSize: 11 }}
+              style={{ padding: '6px 10px', fontSize: '0.6875rem' }}
               onClick={() => setConfirmDelete(false)}
             >
               CANCEL
@@ -761,25 +761,25 @@ function NewCategoryForm({ onClose, onDone }: { onClose: () => void; onDone: () 
       </div>
 
       {budgetInvalid && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--red)' }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)' }}>
           Cap must be a non-negative number.
         </div>
       )}
       {create.isError && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--red)' }}>
+        <div className="mono" style={{ fontSize: '0.6875rem', color: 'var(--red)' }}>
           Couldn&rsquo;t create category — try again.
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button className="btn btn-ghost" onClick={onClose} style={{ padding: '6px 12px', fontSize: 12 }}>
+        <button className="btn btn-ghost" onClick={onClose} style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
           CANCEL
         </button>
         <button
           className="btn btn-primary"
           disabled={!canSave}
           onClick={() => create.mutate()}
-          style={{ padding: '6px 14px', fontSize: 12 }}
+          style={{ padding: '6px 14px', fontSize: '0.75rem' }}
         >
           <Icon name="plus" size={13} /> {create.isPending ? 'ADDING…' : 'ADD CATEGORY'}
         </button>
@@ -798,11 +798,11 @@ function SectionLabel({
       <Icon name={icon} size={14} style={{ color }} />
       <span
         className="mono"
-        style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
+        style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}
       >
         {title}
       </span>
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-faint)' }}>// {sub}</span>
+      <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.1em', color: 'var(--text-faint)' }}>// {sub}</span>
     </div>
   );
 }
@@ -818,7 +818,7 @@ function Chip({ children, color }: { children: React.ReactNode; color: string })
 function Empty({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 36, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 480, margin: '0 auto' }}>
+      <div className="mono" style={{ fontSize: '0.8125rem', lineHeight: 1.5, maxWidth: 480, margin: '0 auto' }}>
         {children}
       </div>
     </div>
@@ -845,7 +845,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 0,
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
   boxSizing: 'border-box',
 };

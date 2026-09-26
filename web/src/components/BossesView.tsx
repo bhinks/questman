@@ -83,15 +83,15 @@ export function BossesView() {
       {/* ---- header ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, textTransform: 'uppercase' }}>
+          <div className="ncx-glitch ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '1.625rem', fontWeight: 700, textTransform: 'uppercase' }}>
             ACTIVE TARGETS
           </div>
-          <div className="mono" style={{ fontSize: 10, letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.24em', color: 'var(--text-faint)', marginTop: 4 }}>
             BIG GOALS · RENDERED AS BOSSES · DEAL DAMAGE WEEKLY
           </div>
         </div>
         <span style={{ flex: 1 }} />
-        <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
+        <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
           {active.length} ACTIVE · {down.length} DOWN
         </span>
         <button className="btn" onClick={() => setCreating(c => !c)}>
@@ -110,7 +110,7 @@ export function BossesView() {
       )}
 
       {(down.length > 0 || abandoned.length > 0) && (
-        <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 6 }}>
+        <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase', marginTop: 6 }}>
           ARCHIVE — TARGETS DOWN
         </div>
       )}
@@ -206,7 +206,7 @@ function Dossier({
             >
               <Icon name={meta.icon} size={26} />
             </div>
-            <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.2em', marginTop: 8, color: THREAT_LABEL_COLOR[threat] }}>
+            <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.2em', marginTop: 8, color: THREAT_LABEL_COLOR[threat] }}>
               THREAT {threat}
             </div>
             <div style={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: 4 }}>
@@ -219,15 +219,15 @@ function Dossier({
           {/* dossier body */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span className="ncx-glitch" style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+              <span className="ncx-glitch" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                 {boss.name}
               </span>
               <span className="ncx-stamp flat" style={{ color: accent }}>{meta.label}</span>
               <span className="ncx-serial">TGT-{String(index + 1).padStart(3, '0')}</span>
               <span style={{ flex: 1 }} />
-              <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+              <span className="mono" style={{ fontSize: '0.7188rem', color: 'var(--text-dim)' }}>
                 {boss.direction === 'charge_up' ? 'CHARGED ' : 'HP '}
-                <b className="ncx-val" style={{ color: accent, fontSize: 17 }}>
+                <b className="ncx-val" style={{ color: accent, fontSize: '1.0625rem' }}>
                   {fmt(boss.direction === 'charge_up' ? boss.currentValue : boss.remaining, boss.unit)}
                 </b>
                 <span style={{ color: 'var(--text-faint)' }}> / {fmt(boss.targetValue, boss.unit)}</span>
@@ -243,7 +243,7 @@ function Dossier({
               </button>
             </div>
 
-            <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.1em', color: 'var(--text-dim)', margin: '6px 0 12px' }}>
+            <div className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.1em', color: 'var(--text-dim)', margin: '6px 0 12px' }}>
               {boss.direction === 'grind_down' ? 'GRIND DOWN' : 'CHARGE UP'}
               {boss.linkedProjectId && ' · LINKED PROJECT — MILESTONES DEAL DAMAGE'}
               {(boss.xpReward > 0 || boss.eddieReward > 0) && (
@@ -263,11 +263,11 @@ function Dossier({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 11, flexWrap: 'wrap' }}>
-              <span className="mono" style={{ fontSize: 10, color: accent, letterSpacing: '0.14em' }}>
+              <span className="mono" style={{ fontSize: '0.625rem', color: accent, letterSpacing: '0.14em' }}>
                 {Math.round(boss.pct)}% {boss.direction === 'charge_up' ? 'CHARGED' : 'DEFEATED'}
               </span>
               {logs.map(l => (
-                <span key={l.id} className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
+                <span key={l.id} className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', letterSpacing: '0.08em' }}>
                   {fmtDate(l.createdAt)}{' '}
                   <span style={{ color: accent }}>
                     {/* negative amount = a newBalance log that moved the wrong way:
@@ -282,7 +282,7 @@ function Dossier({
               <span style={{ flex: 1 }} />
               <button
                 className="btn btn-ghost"
-                style={{ fontSize: 9.5, padding: '4px 8px', color: 'var(--text-faint)' }}
+                style={{ fontSize: '0.5938rem', padding: '4px 8px', color: 'var(--text-faint)' }}
                 onClick={() => setStatus.mutate('abandoned')}
               >
                 ABANDON
@@ -295,7 +295,7 @@ function Dossier({
                     onClick={() => setHitMode(m)}
                     title={m === 'payment' ? deltaTitle : balanceTitle}
                     style={{
-                      fontSize: 9, padding: '5px 8px', letterSpacing: '0.1em',
+                      fontSize: '0.5625rem', padding: '5px 8px', letterSpacing: '0.1em',
                       color: hitMode === m ? accent : 'var(--text-faint)',
                       background: hitMode === m ? `color-mix(in srgb, ${accent} 12%, transparent)` : undefined,
                       boxShadow: hitMode === m ? `inset 0 0 0 1px color-mix(in srgb, ${accent} 45%, transparent)` : undefined,
@@ -315,7 +315,7 @@ function Dossier({
                 value={amount}
                 onChange={e => setAmount(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
                 onKeyDown={e => e.key === 'Enter' && submit()}
-                style={{ width: 92, padding: '7px 10px', fontSize: 12 }}
+                style={{ width: 92, padding: '7px 10px', fontSize: '0.75rem' }}
               />
               <input
                 className="ncx-input"
@@ -324,13 +324,13 @@ function Dossier({
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && submit()}
-                style={{ width: 140, padding: '7px 10px', fontSize: 12 }}
+                style={{ width: 140, padding: '7px 10px', fontSize: '0.75rem' }}
               />
               {/* keyed by state: className flips primary↔plain (stuck-transition pitfall) */}
               <button
                 key={boss.id + '-' + (focal ? 'primary' : 'plain')}
                 className={'btn' + (focal ? ' btn-primary' : '')}
-                style={{ padding: '7px 16px', fontSize: 11 }}
+                style={{ padding: '7px 16px', fontSize: '0.6875rem' }}
                 disabled={!canHit || hit.isPending}
                 onClick={submit}
               >
@@ -340,7 +340,7 @@ function Dossier({
             </div>
 
             {hit.isError && (
-              <div className="mono" style={{ fontSize: 10, color: 'var(--red)', marginTop: 6, letterSpacing: '0.08em' }}>
+              <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--red)', marginTop: 6, letterSpacing: '0.08em' }}>
                 HIT FAILED — TRY AGAIN.
               </div>
             )}
@@ -371,22 +371,22 @@ function ArchiveRow({ boss }: { boss: Boss }) {
   return (
     <div className="ncx-panel" style={{ padding: '13px 20px', display: 'flex', alignItems: 'center', gap: 12, opacity: 0.75, flexWrap: 'wrap' }}>
       <Icon name={defeated ? 'trophy' : 'flag'} size={15} style={{ color: defeated ? 'var(--amber)' : 'var(--text-faint)' }} />
-      <span className="mono" style={{ fontSize: 10.5, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+      <span className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
         {defeated ? `DOWN — ${boss.name}` : boss.name}
       </span>
       {defeated
-        ? <span className="ncx-stamp flat" style={{ color: 'var(--lime)', fontSize: 9.5 }}>FLATLINED</span>
-        : <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)', fontSize: 9.5 }}>ABANDONED</span>}
+        ? <span className="ncx-stamp flat" style={{ color: 'var(--lime)', fontSize: '0.5938rem' }}>FLATLINED</span>
+        : <span className="ncx-stamp flat" style={{ color: 'var(--text-faint)', fontSize: '0.5938rem' }}>ABANDONED</span>}
       <span style={{ flex: 1 }} />
       {defeated ? (
-        <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+        <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>
           {boss.defeatedAt ? `${fmtDate(boss.defeatedAt)} · ` : ''}
           <span style={{ color: 'var(--lime)' }}>
             +{boss.xpReward.toLocaleString()} XP · +€${boss.eddieReward.toLocaleString()}
           </span>
         </span>
       ) : (
-        <button className="btn btn-ghost" style={{ fontSize: 9.5, padding: '4px 10px' }} onClick={() => setStatus.mutate('active')}>
+        <button className="btn btn-ghost" style={{ fontSize: '0.5938rem', padding: '4px 10px' }} onClick={() => setStatus.mutate('active')}>
           <Icon name="repeat" size={11} /> REVIVE
         </button>
       )}
@@ -425,10 +425,10 @@ function KillOverlay({ boss, onClose }: { boss: Boss; onClose: () => void }) {
         >
           <div className="kicker" style={{ color: 'var(--lime)', marginBottom: 14 }}>TARGET FLATLINED</div>
           <Icon name="trophy" size={34} style={{ color: 'var(--amber)' }} />
-          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 700, textTransform: 'uppercase', marginTop: 10 }}>
+          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, textTransform: 'uppercase', marginTop: 10 }}>
             {boss.name}
           </div>
-          <div className="ncx-val" style={{ fontSize: 16, color: 'var(--lime)', marginTop: 14 }}>
+          <div className="ncx-val" style={{ fontSize: '1rem', color: 'var(--lime)', marginTop: 14 }}>
             +{boss.xpReward.toLocaleString()} XP · +€${boss.eddieReward.toLocaleString()}
           </div>
           <button className="btn btn-primary" style={{ marginTop: 24, padding: '10px 28px' }} onClick={onClose}>
@@ -485,7 +485,7 @@ function BossForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="ncx-panel focal" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+      <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
         SPAWN TARGET // NEW DOSSIER
       </div>
 
@@ -572,7 +572,7 @@ function BossForm({ onClose }: { onClose: () => void }) {
         </Field>
       </div>
 
-      <div className="mono" style={{ fontSize: 10, letterSpacing: '0.08em', color: 'var(--text-faint)' }}>
+      <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.08em', color: 'var(--text-faint)' }}>
         {direction === 'grind_down'
           ? 'STARTS AT FULL TARGET HP; EACH HIT REDUCES IT. DEFEATED AT 0.'
           : 'STARTS EMPTY; EACH CONTRIBUTION RAISES IT. DEFEATED AT TARGET.'}
@@ -592,7 +592,7 @@ function BossForm({ onClose }: { onClose: () => void }) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span className="mono" style={{ fontSize: 9.5, letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+      <span className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.26em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
         {label}
       </span>
       {children}
@@ -603,7 +603,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function Empty({ children, color }: { children: ReactNode; color?: string }) {
   return (
     <div className="fade-up ncx-panel focal" style={{ padding: 40, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 12, letterSpacing: '0.14em' }}>{children}</div>
+      <div className="mono" style={{ fontSize: '0.75rem', letterSpacing: '0.14em' }}>{children}</div>
     </div>
   );
 }

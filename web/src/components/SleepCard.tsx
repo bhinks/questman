@@ -57,7 +57,7 @@ function DriftPill({ minutes }: { minutes: number | null }) {
   if (minutes == null) return null;
   const color = minutes <= 25 ? 'var(--lime)' : minutes <= 50 ? 'var(--amber)' : 'var(--red)';
   return (
-    <span className="mono" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.03em', color, whiteSpace: 'nowrap' }}>
+    <span className="mono" style={{ fontSize: '0.6562rem', fontWeight: 700, letterSpacing: '0.03em', color, whiteSpace: 'nowrap' }}>
       ±{Math.round(minutes)}m
     </span>
   );
@@ -151,15 +151,15 @@ function SleepScheduleChart({ nights, slept }: { nights: Night[]; slept: Array<N
       {/* header: scrubbed (or latest) bedtime + drift vs the window average */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span className="ncx-val" style={{ fontSize: 25, color: VIOLET, lineHeight: 1 }}>
+          <span className="ncx-val" style={{ fontSize: '1.5625rem', color: VIOLET, lineHeight: 1 }}>
             {shown?.bedtime != null ? clock(shown.bedtime) : '—'}
           </span>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+          <span className="mono" style={{ fontSize: '0.6875rem', color: 'var(--text-faint)' }}>
             {shown?.hours != null ? `→ ${clock(shown.bedtime! + shown.hours)} · ${shown.hours.toFixed(1)}h` : 'BEDTIME'}
           </span>
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.18em', color: 'var(--text-faint)', marginRight: 6 }}>DRIFT</span>
+          <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.18em', color: 'var(--text-faint)', marginRight: 6 }}>DRIFT</span>
           <DriftPill minutes={driftMin} />
           <div className="ncx-serial" style={{ marginTop: 3 }}>
             {hover != null && shown ? nightLabel(shown.date) : `LAST ${nights.length} NIGHTS`}
@@ -183,7 +183,7 @@ function SleepScheduleChart({ nights, slept }: { nights: Night[]; slept: Array<N
               <line x1={0} y1={y(h)} x2={W} y2={y(h)}
                 stroke={h === 0 ? 'var(--line-2)' : 'var(--line)'} strokeWidth="1" />
               <text x={2} y={y(h) - 3} className="mono"
-                style={{ fontSize: 8.5, fill: 'var(--text-ghost)', letterSpacing: '0.08em' }}>
+                style={{ fontSize: '0.5312rem', fill: 'var(--text-ghost)', letterSpacing: '0.08em' }}>
                 {clock(h).replace(':00 ', '')}
               </text>
             </g>
@@ -194,7 +194,7 @@ function SleepScheduleChart({ nights, slept }: { nights: Night[]; slept: Array<N
             stroke={VIOLET} strokeWidth="1" strokeDasharray="5 4" opacity={0.65}
             style={{ filter: `drop-shadow(0 0 3px ${VIOLET})` }} />
           <text x={W - 2} y={y(avg) - 4} textAnchor="end" className="mono"
-            style={{ fontSize: 8.5, fill: VIOLET, letterSpacing: '0.08em', opacity: 0.9 }}>
+            style={{ fontSize: '0.5312rem', fill: VIOLET, letterSpacing: '0.08em', opacity: 0.9 }}>
             AVG {clock(avg)}
           </text>
 
@@ -219,7 +219,7 @@ function SleepScheduleChart({ nights, slept }: { nights: Night[]; slept: Array<N
           {nights.map((n, i) => (
             <text key={i} x={x(i)} y={H - 6} textAnchor="middle" className="mono"
               style={{
-                fontSize: 8.5, letterSpacing: '0.08em',
+                fontSize: '0.5312rem', letterSpacing: '0.08em',
                 fill: hover === i ? 'var(--text-dim)' : n.bedtime == null ? 'var(--text-ghost)' : 'var(--text-faint)',
               }}>
               {'SMTWTFS'[n.date.getDay()]}

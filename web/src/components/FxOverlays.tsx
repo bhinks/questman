@@ -163,7 +163,7 @@ function FxCursorPreview() {
 function FxGlitchPreview() {
   return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span className="fx-glitchprev ncx-chroma mono" style={{ fontSize: 11, letterSpacing: '0.22em', color: 'var(--text-dim)' }}>
+      <span className="fx-glitchprev ncx-chroma mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.22em', color: 'var(--text-dim)' }}>
         ✓ CONTRACT CLEARED
       </span>
     </div>

@@ -83,34 +83,34 @@ export function LevelUpOverlay() {
           style={{ padding: '38px 56px', textAlign: 'center', minWidth: 380, animation: 'ncx-levelup-in .4s cubic-bezier(.22,.61,.36,1) both' }}
         >
           <div className="kicker" style={{ color: 'var(--cyan)', marginBottom: 14 }}>RUNNER ADVANCEMENT</div>
-          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: 54, fontWeight: 700, lineHeight: 1 }}>
+          <div className="ncx-chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '3.375rem', fontWeight: 700, lineHeight: 1 }}>
             LEVEL {info.level}
           </div>
           {/* The equipped Handler's scripted line (handoff copy, verbatim). */}
-          <div className="mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--text-dim)', marginTop: 16 }}>
+          <div className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.2em', color: 'var(--text-dim)', marginTop: 16 }}>
             {personaMeta(personaQ.data?.persona).levelUp(info.level)}
           </div>
-          <div className="mono" style={{ fontSize: 10.5, letterSpacing: '0.2em', color: 'var(--text-faint)', marginTop: 8 }}>
+          <div className="mono" style={{ fontSize: '0.6562rem', letterSpacing: '0.2em', color: 'var(--text-faint)', marginTop: 8 }}>
             {info.totalXp.toLocaleString()} LIFETIME XP
           </div>
 
           {/* The retrospective: where the cred came from. */}
           {sources.length > 0 && (
             <div style={{ marginTop: 22, textAlign: 'left' }}>
-              <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.26em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 10 }}>
+              <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.26em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 10 }}>
                 CRED SOURCES
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {sources.map(([mod, xp]) => (
                   <div key={mod} style={{ display: 'grid', gridTemplateColumns: '76px 1fr 56px', gap: 10, alignItems: 'center' }}>
-                    <span className="mono" style={{ fontSize: 9, letterSpacing: '0.16em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                    <span className="mono" style={{ fontSize: '0.5625rem', letterSpacing: '0.16em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                       {mod}
                     </span>
                     <div className="ncx-bar slim">
                       <i style={{ width: `${(xp / maxXp) * 100}%`, background: MODULE_COLORS[mod] ?? 'var(--cyan)', opacity: 0.9 }} />
                       <span className="seg-mask" />
                     </div>
-                    <span className="mono" style={{ fontSize: 9.5, color: 'var(--text-faint)', textAlign: 'right' }}>
+                    <span className="mono" style={{ fontSize: '0.5938rem', color: 'var(--text-faint)', textAlign: 'right' }}>
                       {xp.toLocaleString()}
                     </span>
                   </div>

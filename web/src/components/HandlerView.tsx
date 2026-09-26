@@ -297,7 +297,7 @@ function PersonaMasthead({
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div
           className="ncx-hex"
-          style={{ width: 52, height: 52, fontSize: 18, flex: 'none', background: `linear-gradient(160deg, ${accent}, var(--violet) 75%, var(--magenta))` }}
+          style={{ width: 52, height: 52, fontSize: '1.125rem', flex: 'none', background: `linear-gradient(160deg, ${accent}, var(--violet) 75%, var(--magenta))` }}
         >
           {personaLabel[0] ?? 'H'}
         </div>
@@ -305,21 +305,21 @@ function PersonaMasthead({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h2
               className="ncx-glitch ncx-chroma"
-              style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.03em', textTransform: 'uppercase' }}
+              style={{ fontSize: '1.375rem', fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)', letterSpacing: '0.03em', textTransform: 'uppercase' }}
             >
               HANDLER
             </h2>
-            <span className="mono" style={{ fontSize: 11, letterSpacing: '0.16em', color: 'var(--text)' }}>{personaLabel}</span>
+            <span className="mono" style={{ fontSize: '0.6875rem', letterSpacing: '0.16em', color: 'var(--text)' }}>{personaLabel}</span>
             <Chip color={accent}>{tag}</Chip>
           </div>
           {personaBlurb && (
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 4 }}>
+            <div className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-faint)', marginTop: 4 }}>
               {personaBlurb}
             </div>
           )}
           <div
             className="ncx-term"
-            style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 10, color: enabled ? 'var(--text)' : 'var(--text-faint)' }}
+            style={{ fontSize: '0.7812rem', lineHeight: 1.6, marginTop: 10, color: enabled ? 'var(--text)' : 'var(--text-faint)' }}
           >
             <span style={{ color: voiceColor }}>{voiceName}&gt;</span> {transmission}
             {enabled && <span className="cursor-blink" style={{ color: accent }}>_</span>}
@@ -333,7 +333,7 @@ function PersonaMasthead({
             onClick={() => toggleEnabled.mutate(!enabled)}
             title={enabled ? 'Silence the Handler' : 'Bring the Handler online'}
             style={{
-              padding: '5px 13px', fontSize: 11,
+              padding: '5px 13px', fontSize: '0.6875rem',
               color: enabled ? 'var(--lime)' : 'var(--text-faint)',
               boxShadow: `inset 0 0 0 1px ${enabled ? 'color-mix(in srgb, var(--lime) 45%, transparent)' : 'var(--line-2)'}`,
             }}
@@ -344,7 +344,7 @@ function PersonaMasthead({
             />
             {enabled ? 'ONLINE' : 'MUTED'}
           </button>
-          <div className="mono" style={{ fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-faint)', textAlign: 'right', lineHeight: 1.7 }}>
+          <div className="mono" style={{ fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--text-faint)', textAlign: 'right', lineHeight: 1.7 }}>
             <div><span style={{ color: freshSignal > 0 ? accent : 'var(--text-faint)' }}>{freshSignal}</span> FRESH SIGNAL</div>
             <div>WEEK · <span style={{ color: weekStatus === 'awaiting' ? 'var(--amber)' : 'var(--lime)' }}>{weekStatus === 'awaiting' ? 'AWAITING' : 'FILED'}</span></div>
           </div>
@@ -353,7 +353,7 @@ function PersonaMasthead({
 
       {options.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 13 }}>
-          <span className="kicker" style={{ fontSize: 9, alignSelf: 'center', marginRight: 2 }}>VOICE</span>
+          <span className="kicker" style={{ fontSize: '0.5625rem', alignSelf: 'center', marginRight: 2 }}>VOICE</span>
           {options.map(opt => {
             const sel = opt.key === persona;
             const locked = opt.owned === false;
@@ -366,7 +366,7 @@ function PersonaMasthead({
                 title={locked ? 'Unlock in the Night Market' : opt.blurb}
                 className="mono"
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '5px 11px', fontSize: 10.5, letterSpacing: '0.06em',
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '5px 11px', fontSize: '0.6562rem', letterSpacing: '0.06em',
                   cursor: locked ? 'not-allowed' : (sel ? 'default' : 'pointer'), borderRadius: 0,
                   border: sel ? `1px solid ${c}` : locked ? '1px dashed var(--line-2)' : '1px solid var(--line-2)',
                   background: sel ? `color-mix(in srgb, ${c} 14%, transparent)` : 'var(--panel-2)',
@@ -409,7 +409,7 @@ function MissionStrip({
             className="mono"
             title={filed ? 'Filed' : 'Awaiting debrief'}
             style={{
-              padding: '4px 9px', fontSize: 10, letterSpacing: '0.04em', cursor: 'pointer', borderRadius: 0,
+              padding: '4px 9px', fontSize: '0.625rem', letterSpacing: '0.04em', cursor: 'pointer', borderRadius: 0,
               border: active ? '1px solid rgba(var(--accent-rgb),0.55)' : '1px solid var(--line-2)',
               background: active ? 'rgba(var(--accent-rgb), 0.12)' : 'var(--panel-2)',
               color: active ? 'var(--cyan)' : 'var(--text-dim)',
@@ -440,7 +440,7 @@ function MissionStrip({
 function MissionTiles({ stats }: { stats: WeeklyStats | null }) {
   if (!stats) {
     return (
-      <div className="mono" style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+      <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>
         No stats recorded for this cycle.
       </div>
     );
@@ -472,7 +472,7 @@ function MissionTiles({ stats }: { stats: WeeklyStats | null }) {
         {v?.weightDelta != null && <Vital label="WEIGHT Δ" value={`${v.weightDelta > 0 ? '+' : ''}${v.weightDelta.toFixed(1)}`} />}
         {topCats.length > 0 && <span className="kicker" style={{ color: 'var(--text-faint)', marginLeft: 'auto' }}>TOP SPEND</span>}
         {topCats.map((c, i) => (
-          <span key={`${c.name}-${i}`} className="mono" style={{ fontSize: 10.5, color: 'var(--text-dim)' }}>
+          <span key={`${c.name}-${i}`} className="mono" style={{ fontSize: '0.6562rem', color: 'var(--text-dim)' }}>
             {c.name} <span style={{ color: 'var(--amber)', fontWeight: 700 }}>${c.amount.toLocaleString()}</span>
           </span>
         ))}
@@ -486,11 +486,11 @@ function StatTile({
 }: { label: string; value: string; sub?: string; color: string; icon: string }) {
   return (
     <div className="panel-inset" style={{ padding: '10px 8px', textAlign: 'center' }}>
-      <div className="kicker" style={{ fontSize: 8.5, marginBottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+      <div className="kicker" style={{ fontSize: '0.5312rem', marginBottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
         <Icon name={icon} size={10} style={{ color }} /> {label}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'var(--font-display)' }}>{value}</div>
-      {sub && <div className="mono" style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{sub}</div>}
+      <div style={{ fontSize: '1.125rem', fontWeight: 700, color, fontFamily: 'var(--font-display)' }}>{value}</div>
+      {sub && <div className="mono" style={{ fontSize: '0.5625rem', color: 'var(--text-faint)', marginTop: 1 }}>{sub}</div>}
     </div>
   );
 }
@@ -498,8 +498,8 @@ function StatTile({
 function Vital({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-      <span className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', letterSpacing: '0.05em' }}>{label}</span>
-      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{value}</span>
+      <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', letterSpacing: '0.05em' }}>{label}</span>
+      <span className="mono" style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text)' }}>{value}</span>
     </div>
   );
 }
@@ -547,7 +547,7 @@ function InsightCard({ insight }: { insight: Insight }) {
       }}
     >
       {/* compact meta line — honesty label kept, inline */}
-      <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 8.5, letterSpacing: '0.08em', flexWrap: 'wrap' }}>
+      <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.5312rem', letterSpacing: '0.08em', flexWrap: 'wrap' }}>
         <span
           title="Correlation from your own logs — not a diagnosis."
           style={{ color: 'var(--text-faint)', borderBottom: '1px dashed var(--line-2)', textTransform: 'uppercase' }}
@@ -559,13 +559,13 @@ function InsightCard({ insight }: { insight: Insight }) {
         {spawned && <span style={{ marginLeft: 'auto', color: 'var(--lime)', fontWeight: 700 }}>● QUEST ADDED</span>}
         {dismissed && <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>DISMISSED</span>}
       </div>
-      <h3 style={{ fontSize: 13.5, fontWeight: 700, margin: 0, color: 'var(--text)', lineHeight: 1.3 }}>{insight.title}</h3>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.45 }}>{insight.body}</div>
+      <h3 style={{ fontSize: '0.8438rem', fontWeight: 700, margin: 0, color: 'var(--text)', lineHeight: 1.3 }}>{insight.title}</h3>
+      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', lineHeight: 1.45 }}>{insight.body}</div>
       {insight.evidence && (
-        <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', lineHeight: 1.4 }}>{insight.evidence}</div>
+        <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', lineHeight: 1.4 }}>{insight.evidence}</div>
       )}
       {insight.suggestion && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 11.5, color: 'var(--text)', lineHeight: 1.4, paddingLeft: 9, borderLeft: `2px solid ${conf}` }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: '0.7188rem', color: 'var(--text)', lineHeight: 1.4, paddingLeft: 9, borderLeft: `2px solid ${conf}` }}>
           <Icon name="spark" size={12} style={{ color: conf, flexShrink: 0, marginTop: 2 }} />
           <span>{insight.suggestion}</span>
         </div>
@@ -574,7 +574,7 @@ function InsightCard({ insight }: { insight: Insight }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 1 }}>
           <button
             className="btn btn-primary"
-            style={{ padding: '5px 11px', fontSize: 10 }}
+            style={{ padding: '5px 11px', fontSize: '0.625rem' }}
             disabled={busy}
             onClick={() => accept.mutate()}
             title="Spawn a quest from this pattern"
@@ -583,7 +583,7 @@ function InsightCard({ insight }: { insight: Insight }) {
           </button>
           <button
             className="btn btn-ghost"
-            style={{ padding: '5px 11px', fontSize: 10 }}
+            style={{ padding: '5px 11px', fontSize: '0.625rem' }}
             disabled={busy}
             onClick={() => dismiss.mutate()}
             title="Hide this pattern"
@@ -638,10 +638,10 @@ function TransmissionsPanel({
               >
                 <Chip color={meta.color}>{meta.label}</Chip>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="mono" style={{ fontSize: 12.5, color: 'var(--text)', lineHeight: 1.55 }}>
+                  <div className="mono" style={{ fontSize: '0.7812rem', color: 'var(--text)', lineHeight: 1.55 }}>
                     <span style={{ color: meta.color, userSelect: 'none' }}>&gt; </span>{m.text}
                   </div>
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 4 }}>
+                  <div className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)', marginTop: 4 }}>
                     {!m.seen && <span style={{ color: accent, marginRight: 8 }}>● NEW</span>}{timeAgo(m.createdAt)}
                     {m.persona && (
                       <> · <span style={{ color: personaMeta(m.persona).accent }}>{personaMeta(m.persona).name}</span></>
@@ -665,12 +665,12 @@ function NarrativeCard({ accent, label, text }: { accent: string; label: string;
       className="panel"
       style={{ padding: 16, borderLeft: `3px solid ${accent}`, background: `linear-gradient(180deg, color-mix(in srgb, ${accent} 7%, transparent), transparent)` }}
     >
-      <div className="mono" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 9.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: accent }}>
+      <div className="mono" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.5938rem', letterSpacing: '0.24em', textTransform: 'uppercase', color: accent }}>
         <Icon name="eye" size={12} style={{ color: accent }} /> &gt; {label} · AFTER-ACTION
       </div>
       <div
         className="mono"
-        style={{ fontSize: 12.5, lineHeight: 1.6, color: text ? 'var(--text)' : 'var(--text-faint)', whiteSpace: 'pre-wrap' }}
+        style={{ fontSize: '0.7812rem', lineHeight: 1.6, color: text ? 'var(--text)' : 'var(--text-faint)', whiteSpace: 'pre-wrap' }}
       >
         {text || 'Awaiting the Handler’s read on this cycle. The narrative lands once the week is digested.'}
       </div>
@@ -738,12 +738,12 @@ function ReflectionCard({ review }: { review: WeeklyReview }) {
           className="btn btn-primary"
           disabled={submit.isPending}
           onClick={() => submit.mutate()}
-          style={{ padding: '8px 16px', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.06em' }}
+          style={{ padding: '8px 16px', fontSize: '0.7188rem', fontWeight: 700, letterSpacing: '0.06em' }}
         >
           <Icon name="check" size={13} /> {submitLabel}
         </button>
         {submit.isError && (
-          <span className="mono" style={{ fontSize: 10.5, color: 'var(--red)' }}>
+          <span className="mono" style={{ fontSize: '0.6562rem', color: 'var(--red)' }}>
             COULDN&rsquo;T FILE — TRY AGAIN
           </span>
         )}
@@ -751,7 +751,7 @@ function ReflectionCard({ review }: { review: WeeklyReview }) {
           <span
             className="mono"
             style={{
-              fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--lime)',
+              fontSize: '0.6562rem', fontWeight: 700, letterSpacing: '0.04em', color: 'var(--lime)',
               padding: '4px 9px', background: 'color-mix(in srgb, var(--lime) 12%, transparent)',
               border: '1px solid color-mix(in srgb, var(--lime) 35%, transparent)',
             }}
@@ -772,7 +772,7 @@ function PanelHead({
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <Icon name={icon} size={14} style={{ color }} />
-      <span className="mono" style={{ fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color }}>{title}</span>
+      <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.26em', textTransform: 'uppercase', color }}>{title}</span>
       {sub && <span className="ncx-serial">{sub}</span>}
       {right && (
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -794,7 +794,7 @@ function Chip({ children, color }: { children: React.ReactNode; color: string })
 function Splash({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
     <div className="panel hud" style={{ padding: 32, textAlign: 'center', color: color ?? 'var(--text-faint)' }}>
-      <div className="mono" style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 480, margin: '0 auto' }}>
+      <div className="mono" style={{ fontSize: '0.8125rem', lineHeight: 1.5, maxWidth: 480, margin: '0 auto' }}>
         {children}
       </div>
     </div>
@@ -808,7 +808,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 'var(--r-sm)',
   color: 'var(--text)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 13,
+  fontSize: '0.8125rem',
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box',
