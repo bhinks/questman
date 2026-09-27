@@ -8,7 +8,8 @@
  *      "braindance queue" suggestions. Games can be pushed to the Media
  *      library as a MediaItem (type:'game') with one click.
  *
- * Env vars consumed: STEAM_API_KEY, STEAM_USER_ID.
+ * Per-user: the member's Steam ID (+ optional personal API key) from UserSettings;
+ * STEAM_API_KEY env is only the fallback app key.
  * When either is unset, all routes return { configured: false }.
  *
  * Exports buildSteamCandidates() consumed by QuestEngine.
@@ -21,7 +22,8 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { QuestCandidate } from '../services/anthropic';
 import {
-  steamConfigured,
+  steamCredsFor,
+  steamServerKey,
   fetchOwnedGames,
   buildIconUrl,
 } from '../services/SteamService';
@@ -48,10 +50,11 @@ async function mediaModuleId(userId: string): Promise<string> {
  */
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
-  const configured = steamConfigured();
+  const configured = !!(await steamCredsFor(userId));
 
   if (!configured) {
-    return res.json({ configured: false });
+    // serverKey tells the "connect Steam" prompt whether a Steam ID alone is enough.
+    return res.json({ configured: false, serverKey: steamServerKey() });
   }
 
   const [totalCount, unplayedCount, lastSyncRow, recentPlayed] = await Promise.all([
@@ -93,11 +96,12 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
 router.post('/sync', asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.id;
 
-  if (!steamConfigured()) {
-    throw new AppError('Steam API not configured (STEAM_API_KEY / STEAM_USER_ID missing)', 400);
+  const creds = await steamCredsFor(userId);
+  if (!creds) {
+    throw new AppError('Steam is not set up for you yet: add your Steam ID in SYS // CALIBRATION → Integrations', 400);
   }
 
-  const result = await fetchOwnedGames();
+  const result = await fetchOwnedGames(creds);
   if (!result) {
     throw new AppError('Steam library fetch failed — check your API key and Steam ID, and ensure the profile is public', 502);
   }

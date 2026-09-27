@@ -8,6 +8,9 @@
  *     gating. Both must be set to be "configured"; blank = no weather.
  *   - CALENDAR: private ICS feed URLs (comma- or newline-separated) for the
  *     Today agenda + day-planner busy time.
+ *   - STEAM: the member's own Steam64 ID plus an optional personal Web API key
+ *     (write-only; the server's app key is the fallback). Replaces the old
+ *     STEAM_USER_ID / STEAM_API_KEY env pair (2026-09-27).
  *   - PHONE UPLINK: the phone's local Health Connect server URL/token the
  *     background poller GETs on your own cadence, plus the read-only per-user
  *     ingest token + secret URL the phone bridge POSTs to (managed like an
@@ -57,7 +60,7 @@ const INPUT: CSSProperties = {
 /** The subset of fields editable here (ingestToken/ingestUrl are read-only). */
 type IntegrationPatch = Partial<Pick<AppSettings,
   'weatherLat' | 'weatherLon' | 'calendarIcsUrls' | 'healthPullUrl' |
-  'healthPullToken' | 'healthPullMinutes' | 'healthBackfillDays'>>;
+  'healthPullToken' | 'healthPullMinutes' | 'healthBackfillDays' | 'steamId'>> & { steamApiKey?: string | null };
 
 /** Input-friendly working copy (strings so a half-typed field never fights a
  *  refetch and empty means "unset / null"). */
@@ -69,6 +72,8 @@ interface FormState {
   healthPullToken: string;
   healthPullMinutes: number;
   healthBackfillDays: number;
+  steamId: string;
+  steamApiKey: string;   // write-only: always starts blank
 }
 
 /** Stored comma-separated → one-per-line for the textarea. */
@@ -90,12 +95,15 @@ function toForm(s: AppSettings): FormState {
     healthPullToken: s.healthPullToken ?? '',
     healthPullMinutes: s.healthPullMinutes ?? 30,
     healthBackfillDays: s.healthBackfillDays ?? 365,
+    steamId: s.steamId ?? '',
+    steamApiKey: '',
   };
 }
 
 export function IntegrationsPanel() {
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
+  const [locMsg, setLocMsg] = useState('');
 
   const settingsQ = useQuery({
     queryKey: ['settings'],
@@ -157,6 +165,32 @@ export function IntegrationsPanel() {
     persist({ [field]: next } as IntegrationPatch);
   };
 
+  /** Fill lat/lon from the browser (rounded to ~1 km: weather needs no more precision). */
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { setLocMsg('THIS BROWSER CAN\'T SHARE A LOCATION'); return; }
+    setLocMsg('ASKING THE BROWSER…');
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = Math.round(pos.coords.latitude * 100) / 100;
+      const lon = Math.round(pos.coords.longitude * 100) / 100;
+      tune({ weatherLat: String(lat), weatherLon: String(lon) });
+      persist({ weatherLat: lat, weatherLon: lon });
+      setLocMsg('');
+    }, () => setLocMsg('LOCATION BLOCKED · TYPE IT IN INSTEAD'), { timeout: 10000, maximumAge: 600000 });
+  };
+
+  const commitSteamId = () => {
+    const raw = (formRef.current?.steamId ?? '').trim();
+    const next = raw === '' ? null : raw;
+    if ((s.steamId ?? null) === next) return;
+    persist({ steamId: next });
+  };
+  const commitSteamKey = () => {
+    const raw = (formRef.current?.steamApiKey ?? '').trim();
+    if (!raw) return;                       // blank = keep whatever is stored
+    persist({ steamApiKey: raw });
+    tune({ steamApiKey: '' });
+  };
+
   const copyUrl = async () => {
     if (!s.ingestUrl) return;
     try {
@@ -169,12 +203,13 @@ export function IntegrationsPanel() {
   const locConfigured = s.weatherLat != null && s.weatherLon != null;
   const calConfigured = !!s.calendarIcsUrls;
   const healthConfigured = !!s.healthPullUrl;
+  const steamConfigured = !!s.steamId && (s.steamApiKeySet || s.steamServerKey);
 
   return (
     <div className="ncx-panel">
       {/* ---- Header ---- */}
       <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <span style={SECTION_HEADER}>LOCATION · CALENDAR · HEALTH</span>
+        <span style={SECTION_HEADER}>YOUR INTEGRATIONS · LOCATION · CALENDAR · STEAM · HEALTH</span>
         <span className="ncx-serial" style={{ color: save.isPending || rotate.isPending ? 'var(--amber)' : 'var(--lime)' }}>
           {save.isPending || rotate.isPending ? '▴ WRITING…' : '● SYNCED'}
         </span>
@@ -219,6 +254,12 @@ export function IntegrationsPanel() {
           onKeyUp={e => e.key === 'Enter' && commitCoord('weatherLon')}
         />
       </div>
+      <div style={{ padding: '10px 18px 14px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" className="btn" style={{ padding: '8px 14px', fontSize: '0.6875rem' }} onClick={useMyLocation}>
+          <Icon name="target" size={13} /> USE MY LOCATION
+        </button>
+        {locMsg && <span className="ncx-serial">{locMsg}</span>}
+      </div>
 
       {/* ---- Calendar ---- */}
       <div style={{ padding: '14px 18px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, borderTop: '1px solid var(--line)' }}>
@@ -239,6 +280,55 @@ export function IntegrationsPanel() {
           onChange={e => tune({ icsText: e.target.value })}
           onBlur={commitIcs}
         />
+      </div>
+
+      {/* ---- Steam ---- */}
+      <div style={{ padding: '14px 18px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, borderTop: '1px solid var(--line)' }}>
+        <span style={SECTION_HEADER}>STEAM</span>
+        <span className="ncx-serial" style={{ color: steamConfigured ? 'var(--cyan)' : 'var(--text-ghost)' }}>
+          {steamConfigured ? 'LIBRARY LINKED' : 'NOT LINKED'}
+        </span>
+      </div>
+      <div style={{ padding: '14px 18px', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={SECTION_HEADER}>YOUR STEAM ID</div>
+        <div className="ncx-serial">THE 17-DIGIT NUMBER IN YOUR PROFILE URL (steamcommunity.com/profiles/…) · YOUR GAME DETAILS MUST BE PUBLIC</div>
+        <input
+          inputMode="numeric"
+          aria-label="Steam ID"
+          value={form.steamId}
+          placeholder="76561198000000000"
+          style={{ ...INPUT, maxWidth: 260 }}
+          onChange={e => tune({ steamId: e.target.value.replace(/\D/g, '').slice(0, 17) })}
+          onBlur={commitSteamId}
+          onKeyUp={e => e.key === 'Enter' && commitSteamId()}
+        />
+      </div>
+      <div style={{ padding: '14px 18px', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={SECTION_HEADER}>STEAM WEB API KEY {s.steamApiKeySet ? '· SAVED' : '· OPTIONAL'}</div>
+        <div className="ncx-serial">
+          {s.steamServerKey
+            ? 'OPTIONAL · THE HUB HAS ITS OWN KEY · ADD YOURS ONLY IF YOU WANT TO USE YOUR OWN'
+            : 'REQUIRED · GET ONE AT steamcommunity.com/dev/apikey'} · NEVER SHOWN AGAIN AFTER SAVING
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="password"
+            aria-label="Steam Web API key"
+            value={form.steamApiKey}
+            placeholder={s.steamApiKeySet ? '•••••••• (saved · type to replace)' : '32 letters and numbers'}
+            autoComplete="off"
+            style={{ ...INPUT, flex: 1, minWidth: 200 }}
+            onChange={e => tune({ steamApiKey: e.target.value })}
+            onBlur={commitSteamKey}
+            onKeyUp={e => e.key === 'Enter' && commitSteamKey()}
+          />
+          {s.steamApiKeySet && (
+            <button type="button" className="btn" style={{ padding: '8px 14px', fontSize: '0.6875rem' }}
+              onClick={() => persist({ steamApiKey: null })}>
+              <Icon name="close" size={13} /> FORGET KEY
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ---- Phone uplink: pull config ---- */}

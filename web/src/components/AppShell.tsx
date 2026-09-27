@@ -82,14 +82,14 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     ['progress', 'Street Cred', 'trophy'], ['shop', 'Shop', 'bag'],
   ]},
   { group: 'SYSTEM', items: [
-    ['calibration', 'Calibration', 'bolt'],
+    ['calibration', 'Settings', 'bolt'],
   ]},
 ];
 
 /** The four tabs pinned to the mobile bottom nav (everything else → MORE). */
 const PINNED_TABS: string[] = ['today', 'habits', 'operations', 'health'];
 /** Bottom-nav cells are narrow: short labels for the long tab names. */
-const BOTTOM_LABELS: Record<string, string> = { operations: 'Ops', progress: 'Cred', calibration: 'Config' };
+const BOTTOM_LABELS: Record<string, string> = { operations: 'Ops', progress: 'Cred', calibration: 'Settings' };
 
 /**
  * Maps module keys (from the server) to the nav tab IDs they unlock.
@@ -202,7 +202,7 @@ const SCREEN_TITLES: Record<string, string> = {
   shop: 'SHOP // NIGHT MARKET',
   overview: 'VAULT // FINANCE', budgets: 'VAULT // BUDGETS',
   bills: 'VAULT // BILLS', savings: 'VAULT // SAVINGS',
-  calibration: 'SYS // CALIBRATION',
+  calibration: 'SYS // SETTINGS',
 };
 
 function Clock() {

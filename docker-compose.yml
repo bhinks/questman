@@ -1,5 +1,5 @@
 # =====================================================================
-# Daymon — local self-hosted deployment.
+# Questman — local self-hosted deployment.
 #
 #   docker compose up --build
 #
@@ -14,7 +14,7 @@
 # =====================================================================
 
 # Pin the compose project name so it's independent of the parent
-# directory. Deliberately STILL `questman` after the Daymon rename: the
+# directory. (The app was briefly named Questman, Jul-Sep 2026; it's Questman again.) The
 # project name prefixes the data volume (questman_questman-data), so
 # renaming it would strand the live database. Same for the container
 # names, the volume below, and the /data/questman.db path — legacy
@@ -55,6 +55,9 @@ services:
       # Shared secret (16+ chars) for POST /api/ingest/metrics — lets
       # phone-side health bridges push DailyMetrics without a JWT.
       INGEST_TOKEN: ${INGEST_TOKEN:-}
+      # Steam: each member links their OWN Steam ID in Settings. This optional
+      # app-wide Web API key lets them link with just the ID (like TMDB_API_KEY).
+      STEAM_API_KEY: ${STEAM_API_KEY:-}
       # Health PULL mode: poll the phone's Health Connect local server
       # (health-connect-webhook app) instead of receiving webhooks.
       HEALTH_PULL_URL: ${HEALTH_PULL_URL:-}

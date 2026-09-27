@@ -32,6 +32,7 @@ interface SteamGame {
 
 interface SteamStatusResponse {
   configured: boolean;
+  serverKey?: boolean;
   totalGames?: number;
   unplayedGames?: number;
   lastSyncedAt?: string | null;
@@ -151,30 +152,7 @@ export function SteamView() {
   }
 
   if (!status?.configured) {
-    return (
-      <div className="fade-up">
-        <div className="panel" style={{ padding: 24, maxWidth: 520 }}>
-          <div className="mono" style={{ color: 'var(--cyan)', fontSize: '0.625rem', letterSpacing: '0.1em', marginBottom: 12 }}>
-            STEAM // NOT CONFIGURED
-          </div>
-          <p style={{ color: 'var(--text)', marginBottom: 16, lineHeight: 1.6 }}>
-            To connect your Steam library, set these environment variables on the server and rebuild:
-          </p>
-          <div className="mono" style={{
-            background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 4,
-            padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-faint)', lineHeight: 1.8,
-          }}>
-            STEAM_API_KEY=your_web_api_key<br />
-            STEAM_USER_ID=your_steam64_id
-          </div>
-          <p style={{ color: 'var(--text-faint)', fontSize: '0.75rem', marginTop: 12, lineHeight: 1.6 }}>
-            Get a free API key at <strong style={{ color: 'var(--text-dim)' }}>steamcommunity.com/dev/apikey</strong>.
-            Your Steam64 ID is at <strong style={{ color: 'var(--text-dim)' }}>steamid.io</strong>.
-            Game details must be Public in your Steam privacy settings.
-          </p>
-        </div>
-      </div>
-    );
+    return <SteamConnect serverKey={!!status?.serverKey} onDone={() => qc.invalidateQueries({ queryKey: ['steam'] })} />;
   }
 
   const games = gamesQuery.data?.games ?? [];
@@ -465,6 +443,65 @@ function GameRow({ game, isAdding, isAdded, onAddToMedia }: {
           <><Icon name="play" size={10} /> QUEUE</>
         )}
       </button>
+    </div>
+  );
+}
+
+
+/** First-run "connect Steam" form (per-user since 2026-09-27; it used to say
+ *  "set STEAM_API_KEY / STEAM_USER_ID on the server"). Saves to /api/settings,
+ *  where the same fields live under Settings → Your integrations. */
+function SteamConnect({ serverKey, onDone }: { serverKey: boolean; onDone: () => void }) {
+  const [id, setId] = useState('');
+  const [key, setKey] = useState('');
+  const [err, setErr] = useState('');
+  const save = useMutation({
+    mutationFn: () => api.put('/api/settings', { steamId: id, ...(key.trim() ? { steamApiKey: key.trim() } : {}) }),
+    onSuccess: () => { setErr(''); onDone(); },
+    onError: (e: Error) => setErr(e.message || 'Could not save'),
+  });
+  const ready = /^\d{17}$/.test(id) && (serverKey || /^[0-9A-Fa-f]{32}$/.test(key.trim()));
+  const field = {
+    width: '100%', background: 'transparent', border: '1px solid var(--line)', color: 'var(--text)',
+    fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', padding: '10px 12px',
+  } as const;
+  return (
+    <div className="fade-up">
+      <div className="panel" style={{ padding: 24, maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="mono" style={{ color: 'var(--cyan)', fontSize: '0.625rem', letterSpacing: '0.1em' }}>
+          STEAM // CONNECT YOUR LIBRARY
+        </div>
+        <p style={{ color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>
+          Link your own Steam account to track playtime and get backlog quests. Only you see your library.
+        </p>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-dim)' }}>YOUR STEAM ID</span>
+          <input style={field} inputMode="numeric" placeholder="76561198000000000" value={id}
+            onChange={e => setId(e.target.value.replace(/\D/g, '').slice(0, 17))} />
+          <span style={{ color: 'var(--text-faint)', fontSize: '0.75rem', lineHeight: 1.5 }}>
+            The 17-digit number in your profile address (steamcommunity.com/profiles/…). If your profile uses a
+            custom name, <strong style={{ color: 'var(--text-dim)' }}>steamid.io</strong> will look it up.
+          </span>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="mono" style={{ fontSize: '0.625rem', letterSpacing: '0.14em', color: 'var(--text-dim)' }}>
+            STEAM WEB API KEY {serverKey ? '(OPTIONAL)' : ''}
+          </span>
+          <input style={field} type="password" autoComplete="off" placeholder={serverKey ? 'Leave blank to use the hub’s key' : '32 letters and numbers'}
+            value={key} onChange={e => setKey(e.target.value)} />
+          <span style={{ color: 'var(--text-faint)', fontSize: '0.75rem', lineHeight: 1.5 }}>
+            {serverKey ? 'The hub already has a key, so your ID is enough. ' : ''}
+            Get your own free key at <strong style={{ color: 'var(--text-dim)' }}>steamcommunity.com/dev/apikey</strong>.
+            Set <em>Game details</em> to Public in your Steam privacy settings.
+          </span>
+        </label>
+        {err && <div className="mono" style={{ color: 'var(--red)', fontSize: '0.75rem' }}>{err}</div>}
+        <div>
+          <button type="button" className="btn btn-primary" disabled={!ready || save.isPending} onClick={() => save.mutate()}>
+            <Icon name="check" size={13} /> {save.isPending ? 'LINKING…' : 'LINK STEAM'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

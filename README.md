@@ -1,6 +1,6 @@
-# Daymon
+# Questman
 
-A gamified personal **life hub** with a cyberpunk aesthetic. Daymon turns the
+A gamified personal **life hub** with a cyberpunk aesthetic. Questman turns the
 scattered inputs of a day — quests, habits, chores, projects, workouts, vitals,
 media, finances, and the people you keep up with — into one ranked daily board,
 and wraps it in an XP/eddies economy so doing the work actually feels like
@@ -98,13 +98,28 @@ blocks on an external feed.
 | `ANTHROPIC_API_KEY` | create a key in the Anthropic Console (<https://platform.claude.com/>). The key alone enables nothing; you still flip the switches in SYS // CALIBRATION. |
 | `ANTHROPIC_MODEL` | defaults to `claude-opus-4-8`; `claude-sonnet-4-6` or `claude-haiku-4-5` for lighter/cheaper use |
 
-Prefer to keep AI fully on-box? Point Daymon at a local **[Ollama](https://ollama.com)**
+Prefer to keep AI fully on-box? Point Questman at a local **[Ollama](https://ollama.com)**
 node instead (URL + model, set in the AI Calibration panel) — zero cloud egress.
 A daily token cap (also in-panel) backstops cost.
 
+### Per-person settings
+
+Everything personal is set by each person in **Settings → Your integrations**,
+not in server env: location (or tap *Use my location*), calendar feeds, phone
+health uplink and Steam (your 17-digit Steam ID, plus an optional personal Web
+API key; the server's optional `STEAM_API_KEY` is only a shared app key). The old
+`HUB_LAT` / `HUB_LON` / `CALENDAR_ICS_URL` / `STEAM_USER_ID` env values are copied
+onto the first (hub) user once at startup and are otherwise unused.
+
+### Send a quest
+
+The **+ / Quick Capture** sheet has a *For* row: pick someone else in the family
+and the quest lands on their Today, tagged "from you", as a small, medium or big
+one-off (8/15/25 XP, set by the server). Up to 10 a day per sender.
+
 ### Weather-aware chores (optional, keyless)
 
-Set `HUB_LAT` / `HUB_LON` (decimal degrees, e.g. `40.71` / `-74.01`). Uses
+Set your location in Settings (or `HUB_LAT` / `HUB_LON` for the first user). Uses
 [Open-Meteo](https://open-meteo.com) — no key. Outdoor chores then only generate
 quests when their weather rule passes, and the planner picks the best window.
 
@@ -210,7 +225,7 @@ docker compose down -v            # stop + wipe the data volume (fresh slate)
 Dev mode (no Docker): `npm run dev` in both `backend/` and `web/` — backend on
 `:3001`, Vite on `:5173`. Tests: `npm test` in `backend/`; the web nav tests in
 `web/tests/` run on the backend's vitest binary until `web/` gets its own
-runner (`cd web && ../backend/node_modules/.bin/vitest run --root . --dir tests`). A seeded **demo account** (`demo@daymon.app` /
+runner (`cd web && ../backend/node_modules/.bin/vitest run --root . --dir tests`). A seeded **demo account** (`demo@questman.app` /
 `demo123`) exists for clicking around without your real data; run
 `npm run db:seed` in `backend/` to (re)create it.
 

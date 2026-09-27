@@ -702,6 +702,11 @@ export function TodayView({ onJackIn, onNavigate }: { onJackIn: (seed: FocusSeed
                 <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.7812rem', color: 'var(--text-dim)', padding: '5px 0' }}>
                   <Icon name={moduleIcon(q.module.key)} size={14} style={{ color: 'var(--text-faint)', flex: 'none' }} />
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</span>
+                  {q.meta?.gift && (
+                    <span className="mono" style={{ flex: 'none', fontSize: '0.5625rem', letterSpacing: '0.12em', color: 'var(--magenta)' }}>
+                      🎁 {q.meta.gift.fromName.toUpperCase()}
+                    </span>
+                  )}
                   <span className="mono" style={{ fontSize: '0.625rem', color: 'var(--text-faint)' }}>+{q.xpReward}</span>
                   {/* Off-plan ≠ unreachable: counters tick +1, one-shots complete. */}
                   <button
@@ -857,6 +862,12 @@ function LedgerRow({
           <span className="ncx-row-title-text" style={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {quest.title}
           </span>
+          {quest.meta?.gift && (
+            <span className="mono" style={{ flex: 'none', fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--magenta)' }}
+              title={`A quest from ${quest.meta.gift.fromName}`}>
+              🎁 FROM {quest.meta.gift.fromName.toUpperCase()}
+            </span>
+          )}
           {!done && !skipped && carriedDays > 0 && (
             <span className="mono" style={{ flex: 'none', fontSize: '0.5938rem', letterSpacing: '0.14em', color: 'var(--amber)' }}>
               CARRIED ×{carriedDays}D

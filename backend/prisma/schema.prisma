@@ -198,6 +198,12 @@ model UserSettings {
   healthPullMinutes  Int     @default(30)
   healthBackfillDays Int     @default(365)
   ingestToken        String? @unique
+  //   - Steam (2026-09-27, was STEAM_API_KEY / STEAM_USER_ID env): each member's
+  //     own Steam64 ID, plus an optional personal Web API key. With no personal
+  //     key the server's STEAM_API_KEY (an app credential, like TMDB) is used,
+  //     but the ID is always the member's own: no ID = no Steam.
+  steamId            String?
+  steamApiKey        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

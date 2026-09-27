@@ -76,6 +76,10 @@ const updateSchema = z.object({
   healthPullToken: z.string().max(500).nullable().optional(),
   healthPullMinutes: z.number().int().min(5).max(1440).optional(),
   healthBackfillDays: z.number().int().min(2).max(3650).optional(),
+  // Steam: the member's own Steam64 ID (17 digits) and an optional personal Web
+  // API key (32 hex). The key is write-only: GET reports only steamApiKeySet.
+  steamId: z.string().regex(/^\d{17}$/, 'A Steam ID is the 17-digit number from your profile URL').nullable().optional(),
+  steamApiKey: z.string().regex(/^[0-9A-Fa-f]{32}$/, 'A Steam Web API key is 32 letters and numbers').nullable().optional(),
   // ingestToken is NOT settable here — it's (re)generated via
   // POST /api/settings/ingest-token or lazily on GET (treated like an API key).
 });
@@ -92,6 +96,7 @@ const SETTINGS_SELECT = {
   weatherLat: true, weatherLon: true, calendarIcsUrls: true,
   healthPullUrl: true, healthPullToken: true, healthPullMinutes: true,
   healthBackfillDays: true, ingestToken: true,
+  steamId: true, steamApiKey: true,
 } as const;
 
 type SettingsRow = {
@@ -106,6 +111,7 @@ type SettingsRow = {
   weatherLat: number | null; weatherLon: number | null; calendarIcsUrls: string | null;
   healthPullUrl: string | null; healthPullToken: string | null; healthPullMinutes: number;
   healthBackfillDays: number; ingestToken: string | null;
+  steamId: string | null; steamApiKey: string | null;
 };
 
 function project(s: SettingsRow | null) {
@@ -136,14 +142,20 @@ function project(s: SettingsRow | null) {
     healthPullMinutes: 30,
     healthBackfillDays: 365,
     ingestToken: null as string | null,
+    steamId: null as string | null,
+    steamApiKey: null as string | null,
   };
-  const { aiTokensUsed, aiTokensUsedOn, ...rest } = base;
+  const { aiTokensUsed, aiTokensUsedOn, steamApiKey, ...rest } = base;
   return {
     ...rest,
     aiProvider: base.aiProvider === 'ollama' ? 'ollama' : 'anthropic',
     // Read-only status for the panel (never accepted on PUT):
     aiCloudKey: !!config.anthropic.apiKey,
     aiTokensUsedToday: tokensUsedToday({ aiTokensUsed, aiTokensUsedOn }),
+    // Steam: the key never leaves the server; the panel only learns whether one is set
+    // and whether the server has an app key to fall back on.
+    steamApiKeySet: !!steamApiKey,
+    steamServerKey: !!process.env.STEAM_API_KEY?.trim(),
   };
 }
 

@@ -1,7 +1,7 @@
 {
-  "name": "daymon-backend",
+  "name": "questman-backend",
   "version": "1.0.0",
-  "description": "Daymon — Cyberpunk Life Hub backend API",
+  "description": "Questman — Cyberpunk Life Hub backend API",
   "main": "src/server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",

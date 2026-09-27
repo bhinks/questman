@@ -14,10 +14,10 @@ import { provisionLifeHub } from './provision';
 
 /** The dedicated demo account. Login is via the DEMO button (a minted token),
  *  not a password, so the stored hash is throwaway. */
-export const DEMO_EMAIL = 'demo@daymon.app';
+export const DEMO_EMAIL = 'demo@questman.app';
 /** Pre-rename demo address — reseeding also sweeps this so an instance that
  *  ran as Questman doesn't keep an orphaned demo account. */
-const LEGACY_DEMO_EMAIL = 'demo@questman.app';
+const LEGACY_DEMO_EMAIL = 'demo@daymon.app';   // the Jul-Sep 2026 Daymon name
 export const DEMO_NAME = 'V';
 
 const d = (daysAgo: number): Date => {

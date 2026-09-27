@@ -239,7 +239,7 @@ export function CalibrationView({ restricted = false }: { restricted?: boolean }
                 className="ncx-chroma"
                 style={{ fontFamily: 'var(--font-display)', fontSize: '1.625rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}
               >
-                Daymon.OS
+                Questman.OS
               </div>
               <span className="ncx-stamp medium">SIGNAL</span>
             </div>

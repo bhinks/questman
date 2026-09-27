@@ -48,6 +48,8 @@ import adminRoutes from './routes/admin';
 import apikeyRoutes from './routes/apikeys';
 import v1Routes from './routes/v1';
 import steamRoutes from './routes/steam';
+import giftRoutes from './routes/gifts';
+import hubRoutes from './routes/hub';
 import { adminAuth } from './middleware/admin';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 
@@ -159,6 +161,10 @@ app.use('/api/settings/models', authMiddleware, requireUnrestricted());
 app.use('/api/settings', authMiddleware, restrictSettingsWrite(), settingsRoutes);
 app.use('/api/focus', authMiddleware, focusRoutes);
 app.use('/api/steam', authMiddleware, gate('/api/steam'), steamRoutes);
+// Family: send a quest to someone else (ungated: kids on a chores-only board can send and get them).
+app.use('/api/gifts', authMiddleware, giftRoutes);
+// NovaHQ landing card badge (own auth: the HinksID session, else the Questman cookie).
+app.use('/api/hub', hubRoutes);
 // Admin routes: accept either a logged-in admin JWT or the ADMIN_API_KEY header.
 app.use('/api/admin', adminAuth, adminRoutes);
 // API key management (requires a logged-in session). Restricted members may
@@ -207,7 +213,7 @@ async function seedHubUserIntegrations(): Promise<void> {
       select: {
         weatherLat: true, weatherLon: true, calendarIcsUrls: true,
         healthPullUrl: true, healthPullToken: true, healthPullMinutes: true,
-        healthBackfillDays: true, ingestToken: true,
+        healthBackfillDays: true, ingestToken: true, steamId: true,
       },
     });
     if (!row) return;
@@ -227,6 +233,9 @@ async function seedHubUserIntegrations(): Promise<void> {
     }
     if (row.healthPullToken === null && config.health.pullToken) patch.healthPullToken = config.health.pullToken;
     if (row.ingestToken === null && config.ingestToken) patch.ingestToken = config.ingestToken;
+    // Steam went per-user 2026-09-27: the old global STEAM_USER_ID becomes the hub user's own ID.
+    const envSteamId = process.env.STEAM_USER_ID?.trim();
+    if (row.steamId === null && envSteamId && /^\d{17}$/.test(envSteamId)) patch.steamId = envSteamId;
 
     if (Object.keys(patch).length === 0) return;
     await prisma.userSettings.update({ where: { userId: hubId }, data: patch });
@@ -262,7 +271,7 @@ process.on('SIGINT', gracefulShutdown);
 // Start server
 const PORT = config.port || 3001;
 server.listen(PORT, () => {
-  logger.info(`🚀 Daymon backend running on port ${PORT}`);
+  logger.info(`🚀 Questman backend running on port ${PORT}`);
   logger.info(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`📊 Database: ${config.database.url}`);
   // One-time: migrate the old global integration env (location, calendar,

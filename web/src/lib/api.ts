@@ -1,5 +1,5 @@
 /**
- * Typed fetch wrapper for the Daymon backend.
+ * Typed fetch wrapper for the Questman backend.
  *
  * In dev we hit http://localhost:3001 directly (CORS configured to
  * allow http://localhost:5173 with credentials). In Docker/prod, nginx
@@ -329,7 +329,7 @@ export interface Quest {
   target: number;
   progress: number;
   isAiThemed: boolean;
-  meta: { emoji?: string; flavor?: string; bestWindow?: string } | null;
+  meta: { emoji?: string; flavor?: string; bestWindow?: string; gift?: { fromId: string; fromName: string } } | null;
   module: { key: string; name: string; color: string | null; icon: string | null };
   // Planner / check-in fields (roadmap §5).
   estMinutes: number | null;
@@ -356,7 +356,7 @@ export interface PlanQuest {
   currentCount: number;
   source: string;
   module: { key: string; name: string; color: string | null; icon: string | null };
-  meta: { emoji?: string; flavor?: string; bestWindow?: string } | null;
+  meta: { emoji?: string; flavor?: string; bestWindow?: string; gift?: { fromId: string; fromName: string } } | null;
   inPlan: boolean;
   /** Outdoor quest that passes its weather rule today but not tomorrow. */
   lastClearDay?: boolean;
@@ -768,6 +768,9 @@ export interface IntegrationSettings {
   // Read-only / managed like an API key (not settable via PUT):
   ingestToken: string | null;     // per-user secret in the /api/ingest URL
   ingestUrl: string | null;       // convenience URL to paste into the phone bridge
+  steamId: string | null;         // the member's own Steam64 ID (17 digits)
+  steamApiKeySet: boolean;        // a personal Steam Web API key is stored (write-only)
+  steamServerKey: boolean;        // the server has an app key, so an ID alone is enough
 }
 
 /** The full /api/settings payload: display + AI + R&R + integration blocks. */

@@ -1,13 +1,16 @@
 /**
  * Steam Web API integration.
  *
- * Fetches owned games and recent playtime for the configured Steam user.
- * Env vars: STEAM_API_KEY, STEAM_USER_ID (Steam64 account ID).
+ * Fetches owned games and recent playtime for ONE member's Steam account.
+ * Per-user since 2026-09-27: the Steam64 ID (and optionally a personal Web API
+ * key) live on UserSettings; the server's STEAM_API_KEY is only a fallback
+ * app credential. No member ID = not configured (never someone else's library).
  *
  * Follows the project integration contract: never throws, returns null on
  * any failure (network, bad shape, missing key). All fetches carry a timeout
  * so a slow Steam API can't hang the server.
  */
+import { prisma } from '../server';
 
 const TIMEOUT_MS = 8000;
 
@@ -42,8 +45,25 @@ export interface SteamRecentResult {
 
 // --- Helpers ----------------------------------------------------------------
 
-export function steamConfigured(): boolean {
-  return !!(process.env.STEAM_API_KEY?.trim() && process.env.STEAM_USER_ID?.trim());
+export interface SteamCreds {
+  key: string;
+  id: string;
+}
+
+/** A member's Steam credentials: their own Steam64 ID plus their own API key,
+ *  else the server's app key. null = not configured for this member. */
+export async function steamCredsFor(userId: string): Promise<SteamCreds | null> {
+  const row = await prisma.userSettings.findUnique({
+    where: { userId }, select: { steamId: true, steamApiKey: true },
+  });
+  const id = row?.steamId?.trim();
+  const key = row?.steamApiKey?.trim() || process.env.STEAM_API_KEY?.trim();
+  return id && key ? { id, key } : null;
+}
+
+/** Whether the server has an app-level key (so a member only needs their ID). */
+export function steamServerKey(): boolean {
+  return !!process.env.STEAM_API_KEY?.trim();
 }
 
 /** Build a full icon CDN URL from an app id + icon hash. */
@@ -72,11 +92,9 @@ async function fetchJson(url: string): Promise<unknown | null> {
  * Returns null when Steam is unconfigured, the user has a private profile,
  * or the request fails for any reason.
  */
-export async function fetchOwnedGames(): Promise<SteamLibraryResult | null> {
-  if (!steamConfigured()) return null;
-
-  const key = process.env.STEAM_API_KEY!;
-  const id  = process.env.STEAM_USER_ID!;
+export async function fetchOwnedGames(creds: SteamCreds | null): Promise<SteamLibraryResult | null> {
+  if (!creds) return null;
+  const { key, id } = creds;
   const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${encodeURIComponent(key)}&steamid=${encodeURIComponent(id)}&include_appinfo=true&include_played_free_games=true&format=json`;
 
   const data = await fetchJson(url) as any;
@@ -99,11 +117,9 @@ export async function fetchOwnedGames(): Promise<SteamLibraryResult | null> {
  * Fetch recently-played games (last ~14 days) for the configured Steam user.
  * Returns null when Steam is unconfigured or the request fails.
  */
-export async function fetchRecentGames(): Promise<SteamRecentResult | null> {
-  if (!steamConfigured()) return null;
-
-  const key = process.env.STEAM_API_KEY!;
-  const id  = process.env.STEAM_USER_ID!;
+export async function fetchRecentGames(creds: SteamCreds | null): Promise<SteamRecentResult | null> {
+  if (!creds) return null;
+  const { key, id } = creds;
   const url = `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${encodeURIComponent(key)}&steamid=${encodeURIComponent(id)}&count=20&format=json`;
 
   const data = await fetchJson(url) as any;
