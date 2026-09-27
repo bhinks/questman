@@ -318,7 +318,13 @@ router.post('/sso', asyncHandler(async (req, res) => {
   // keeps its role and the event is logged for the admin to sort out. PUT /me
   // already refuses email changes from non-admins; this is the second lock.
   if (claimPatch.role === 'admin' && user.role !== 'admin') {
-    const ssoBound = createdNow || isSsoBoundPassword(user.password);
+    // Bootstrap (Brent 2026-09-27): an instance with NO admin at all trusts the HinksID
+    // admin claim even on a legacy row, the same condition seed.ts uses to grant the hub
+    // user admin. SSO rows made before the '!sso' marker (June-Sept 2026) carry a random
+    // bcrypt hash, so without this the family's real admin could never be promoted.
+    // Once any admin exists, the SSO-bound guard below applies unchanged.
+    const noAdminYet = (await prisma.user.count({ where: { role: 'admin' } })) === 0;
+    const ssoBound = createdNow || isSsoBoundPassword(user.password) || noAdminYet;
     if (!ssoBound) {
       delete claimPatch.role;
       logger.warn({ msg: '[sso] admin role claim ignored: account is not SSO-bound', email, userId: user.id });
