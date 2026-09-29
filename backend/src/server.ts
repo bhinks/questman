@@ -163,7 +163,7 @@ app.use('/api/focus', authMiddleware, focusRoutes);
 app.use('/api/steam', authMiddleware, gate('/api/steam'), steamRoutes);
 // Family: send a quest to someone else (ungated: kids on a chores-only board can send and get them).
 app.use('/api/gifts', authMiddleware, giftRoutes);
-// NovaHQ landing card badge (own auth: the HinksID session, else the Questman cookie).
+// NovaHQ landing card badge (own auth: the NovaID session, else the Questman cookie).
 app.use('/api/hub', hubRoutes);
 // Admin routes: accept either a logged-in admin JWT or the ADMIN_API_KEY header.
 app.use('/api/admin', adminAuth, adminRoutes);

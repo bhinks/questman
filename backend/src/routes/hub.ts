@@ -6,12 +6,14 @@
  *   { linked: true, generated: false, gifts }    today's board hasn't been rolled yet
  *   { linked: false }                            no Questman account for this viewer
  *
- * Who the viewer is: the landing page is a HinksID page, so the HinksID session
+ * Who the viewer is: the landing page is a NovaID page, so the NovaID session
  * cookie wins (verified by calling nova-auth's /auth/me with it, the same way
  * FamilyNet checks budgets). That keeps the badge right on a shared tablet where
- * the Questman cookie may belong to someone else. With no HinksID session (a local
+ * the Questman cookie may belong to someone else. With no NovaID session (a local
  * install), the Questman session cookie is used. The account is found by the same
- * email the SSO hand-off mints (lowercased email, else u<id>@hinks.local); nothing
+ * email the SSO hand-off mints: the lowercased email, or for an emailless identity
+ * the synthetic u<id>@<something>.local address NovaHQ derives from the NovaID id
+ * (matched on its shape, so the domain NovaHQ picks is not hard-coded here). Nothing
  * is auto-provisioned and nothing is generated here, so the card never costs an AI call.
  */
 import express from 'express';
@@ -19,11 +21,15 @@ import { prisma } from '../server';
 import { AUTH_COOKIE, readCookie, verifyAuthToken } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { startOfLocalDay } from '../utils/dates';
+import { config } from '../config';
 
 const router = express.Router();
-const AUTH_ME_URL = (process.env.HINKSID_AUTH_ME_URL ?? 'http://nova-auth:8082/auth/me').trim();
+const AUTH_ME_URL = config.novaIdAuthMeUrl;
 
-async function hinksIdEmail(cookie: string | undefined): Promise<string | null> {
+/** The viewer's NovaID identity: their email, or just their id when they have none. */
+type NovaIdViewer = { email: string } | { id: string };
+
+async function novaIdViewer(cookie: string | undefined): Promise<NovaIdViewer | null> {
   if (!AUTH_ME_URL || !cookie) return null;
   try {
     const ctrl = new AbortController();
@@ -33,7 +39,8 @@ async function hinksIdEmail(cookie: string | undefined): Promise<string | null> 
     if (!r.ok) return null;
     const me = await r.json() as { id?: number | string; email?: string | null };
     if (me?.id == null) return null;
-    return (me.email ?? '').trim().toLowerCase() || `u${me.id}@hinks.local`;
+    const email = (me.email ?? '').trim().toLowerCase();
+    return email ? { email } : { id: String(me.id) };
   } catch {
     return null;
   }
@@ -42,9 +49,17 @@ async function hinksIdEmail(cookie: string | undefined): Promise<string | null> 
 router.get('/summary', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   let userId: string | null = null;
-  const email = await hinksIdEmail(req.headers.cookie);
-  if (email) {
-    const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const viewer = await novaIdViewer(req.headers.cookie);
+  if (viewer) {
+    const u = 'email' in viewer
+      ? await prisma.user.findUnique({ where: { email: viewer.email }, select: { id: true } })
+      // Emailless identity: SSO stored u<id>@<domain>.local. The '@' ends the id, so
+      // u1 never matches u12; the oldest row wins should two domains ever coexist.
+      : await prisma.user.findFirst({
+        where: { email: { startsWith: `u${viewer.id}@`, endsWith: '.local' } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
     userId = u?.id ?? null;
     if (!userId) return res.json({ linked: false });
   } else {

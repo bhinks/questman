@@ -43,7 +43,7 @@ interface AppShellProps {
 
 /**
  * What this member may see. `restricted` is a non-admin with an allowlist
- * (HinksID kids by default): they lose Bosses, Handler, the import button
+ * (NovaID kids by default): they lose Bosses, Handler, the import button
  * and the AI/API-key parts of Calibration. The server gates every route
  * regardless (requireModule); this only trims the chrome.
  */

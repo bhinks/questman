@@ -12,7 +12,7 @@
  * key-up). The ["settings"] query is shared with App + AppShell, so it is
  * invalidated after every write.
  *
- * `restricted` (a non-admin with a module allowlist, i.e. a HinksID kid by
+ * `restricted` (a non-admin with a module allowlist, i.e. a NovaID kid by
  * default) hides the AI governor, the integrations panel (ingest token,
  * health-pull and calendar URLs the server fetches) and API-key minting; the
  * three display knobs stay. The server refuses /api/apikeys for them too.

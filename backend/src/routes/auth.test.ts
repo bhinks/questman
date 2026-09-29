@@ -24,7 +24,7 @@ vi.mock('../utils/provision', async (orig) => ({
 }));
 vi.mock('../config', () => ({
   config: {
-    hinksIdSsoSecret: 'sso-secret-for-tests-0123456789',
+    novaIdSsoSecret: 'sso-secret-for-tests-0123456789',
     jwt: { secret: 'jwt-secret-for-tests-0123456789', expiresIn: '1h' },
     allowRegistration: false,
   },
@@ -74,8 +74,8 @@ function seed(rows: Row[]) {
   });
 }
 
-const KID: Row = { id: 'kid-a', email: 'u7@hinks.local', name: 'KidA', tokenVersion: 0, password: SSO_UNUSABLE_PASSWORD, role: 'user', allowedModuleKeys: '["chores"]' };
-const ADMIN: Row = { id: 'adm', email: 'brent@test.local', name: 'Brent', tokenVersion: 0, password: BCRYPT_LIKE, role: 'admin', allowedModuleKeys: null };
+const KID: Row = { id: 'kid-a', email: 'u7@example.test', name: 'KidA', tokenVersion: 0, password: SSO_UNUSABLE_PASSWORD, role: 'user', allowedModuleKeys: '["chores"]' };
+const ADMIN: Row = { id: 'adm', email: 'brent@example.test', name: 'Brent', tokenVersion: 0, password: BCRYPT_LIKE, role: 'admin', allowedModuleKeys: null };
 
 beforeEach(() => {
   db.user.findUnique.mockReset(); db.user.create.mockReset(); db.user.update.mockReset(); db.category.createMany.mockReset();
@@ -99,7 +99,7 @@ describe('PUT /me', () => {
   });
   it('a non-admin may not change their email (403, nothing written)', async () => {
     seed([KID, ADMIN]);
-    const r = await call('PUT', '/me', { session: KID, body: { email: 'u1@hinks.local' } });
+    const r = await call('PUT', '/me', { session: KID, body: { email: 'u1@example.test' } });
     expect(r.status).toBe(403);
     expect((r.err as AppError).message).toMatch(/admin-only/);
     expect(db.user.update).not.toHaveBeenCalled();
@@ -113,9 +113,9 @@ describe('PUT /me', () => {
   });
   it('an admin may change their own email when it is free', async () => {
     seed([ADMIN, KID]);
-    const r = await call('PUT', '/me', { session: ADMIN, body: { email: 'brent2@test.local' } });
+    const r = await call('PUT', '/me', { session: ADMIN, body: { email: 'brent2@example.test' } });
     expect(r.status).toBe(200);
-    expect(db.user.update.mock.calls[0][0]).toMatchObject({ where: { id: 'adm' }, data: { email: 'brent2@test.local' } });
+    expect(db.user.update.mock.calls[0][0]).toMatchObject({ where: { id: 'adm' }, data: { email: 'brent2@example.test' } });
   });
   it('an admin taking an address another row holds gets 409', async () => {
     seed([ADMIN, KID]);
@@ -131,25 +131,25 @@ describe('PUT /me', () => {
 });
 
 describe('POST /sso', () => {
-  const NEW_ROW = (over: Partial<Row>): Row => ({ id: 'new', email: 'u9@hinks.local', tokenVersion: 0, password: SSO_UNUSABLE_PASSWORD, role: 'user', ...over });
+  const NEW_ROW = (over: Partial<Row>): Row => ({ id: 'new', email: 'u9@example.test', tokenVersion: 0, password: SSO_UNUSABLE_PASSWORD, role: 'user', ...over });
 
   it('a brand-new non-admin account with no modules claim starts chores-only, with the SSO password marker', async () => {
     seed([]);
     db.user.create.mockImplementation(async (args: { data: Record<string, unknown> }) => NEW_ROW({ email: args.data.email as string }));
-    const r = await call('POST', '/sso', { body: { token: ssoToken({ sub: '9', email: 'U9@hinks.local', name: 'KidC' }) } });
+    const r = await call('POST', '/sso', { body: { token: ssoToken({ sub: '9', email: 'U9@example.test', name: 'KidC' }) } });
     expect(r.status).toBe(302);
     expect(r.redirect).toBe('/');
     expect(r.cookies).toEqual(['token']);
     expect(db.user.create).toHaveBeenCalledTimes(1);
     const data = db.user.create.mock.calls[0][0].data as Record<string, unknown>;
-    expect(data).toMatchObject({ email: 'u9@hinks.local', password: SSO_UNUSABLE_PASSWORD, name: 'KidC', role: 'user', allowedModuleKeys: '["chores"]' });
+    expect(data).toMatchObject({ email: 'u9@example.test', password: SSO_UNUSABLE_PASSWORD, name: 'KidC', role: 'user', allowedModuleKeys: '["chores"]' });
     expect(db.category.createMany).toHaveBeenCalledTimes(1);
     expect(db.user.update).not.toHaveBeenCalled();
   });
   it('a brand-new admin account with modules null gets no chores default and is promoted', async () => {
     seed([]);
-    db.user.create.mockImplementation(async () => NEW_ROW({ email: 'u1@hinks.local' }));
-    const r = await call('POST', '/sso', { body: { token: ssoToken({ sub: '1', email: 'u1@hinks.local', name: 'Brent', role: 'admin', modules: null }) } });
+    db.user.create.mockImplementation(async () => NEW_ROW({ email: 'u1@example.test' }));
+    const r = await call('POST', '/sso', { body: { token: ssoToken({ sub: '1', email: 'u1@example.test', name: 'Brent', role: 'admin', modules: null }) } });
     expect(r.status).toBe(302);
     const data = db.user.create.mock.calls[0][0].data as Record<string, unknown>;
     expect('allowedModuleKeys' in data).toBe(false);
@@ -159,10 +159,10 @@ describe('POST /sso', () => {
   it('the name is trimmed and capped at 80 chars, falling back to the email local part', async () => {
     seed([]);
     db.user.create.mockImplementation(async () => NEW_ROW({}));
-    await call('POST', '/sso', { body: { token: ssoToken({ sub: '9', email: 'u9@hinks.local', name: ' ' + 'n'.repeat(120) + ' ' }) } });
+    await call('POST', '/sso', { body: { token: ssoToken({ sub: '9', email: 'u9@example.test', name: ' ' + 'n'.repeat(120) + ' ' }) } });
     expect((db.user.create.mock.calls[0][0].data as Record<string, unknown>).name).toBe('n'.repeat(80));
     db.user.create.mockClear();
-    await call('POST', '/sso', { body: { token: ssoToken({ sub: '9', email: 'u9@hinks.local', name: '   ' }) } });
+    await call('POST', '/sso', { body: { token: ssoToken({ sub: '9', email: 'u9@example.test', name: '   ' }) } });
     expect((db.user.create.mock.calls[0][0].data as Record<string, unknown>).name).toBe('u9');
   });
   it('an existing SSO-bound account is promoted by role: admin', async () => {
@@ -174,9 +174,9 @@ describe('POST /sso', () => {
     expect(log.info).toHaveBeenCalledWith(expect.objectContaining({ msg: expect.stringContaining('promoted') }));
   });
   it('an existing account that SSO did not create is never promoted (logged), modules still apply', async () => {
-    const hijacked: Row = { ...KID, password: BCRYPT_LIKE, email: 'u1@hinks.local' };
+    const hijacked: Row = { ...KID, password: BCRYPT_LIKE, email: 'u1@example.test' };
     seed([hijacked]);
-    const r = await call('POST', '/sso', { body: { token: ssoToken({ sub: '1', email: 'u1@hinks.local', role: 'admin', modules: null }) } });
+    const r = await call('POST', '/sso', { body: { token: ssoToken({ sub: '1', email: 'u1@example.test', role: 'admin', modules: null }) } });
     expect(r.status).toBe(302);
     expect(db.user.update).toHaveBeenCalledTimes(1);
     expect(db.user.update.mock.calls[0][0]).toEqual({ where: { id: 'kid-a' }, data: { allowedModuleKeys: null } });
@@ -210,7 +210,7 @@ describe('POST /sso', () => {
   });
   it('rejects a token signed with the wrong secret, a missing token and a missing email claim', async () => {
     seed([]);
-    const bad = jwt.sign({ email: 'u7@hinks.local', role: 'admin' }, JWT_SECRET, { algorithm: 'HS256', expiresIn: '5m' });
+    const bad = jwt.sign({ email: 'u7@example.test', role: 'admin' }, JWT_SECRET, { algorithm: 'HS256', expiresIn: '5m' });
     expect((await call('POST', '/sso', { body: { token: bad } })).status).toBe(401);
     expect((await call('POST', '/sso', { body: {} })).status).toBe(400);
     expect((await call('POST', '/sso', { body: { token: ssoToken({ sub: '7' }) } })).status).toBe(400);

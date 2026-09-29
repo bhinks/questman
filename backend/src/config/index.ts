@@ -72,11 +72,15 @@ const configSchema = z.object({
   // Unset = API key auth disabled (admin endpoints require a logged-in admin user).
   adminApiKey: z.string().min(16).optional(),
 
-  // Shared secret for HinksID SSO. When set, NovaHQ can redirect users to
+  // Shared secret for NovaID SSO. When set, NovaHQ can redirect users to
   // GET /api/auth/sso?token=<signed-jwt> to start a Questman session without
   // typing a password. The token must be a short-lived JWT signed with this
   // secret by NovaHQ. Must be 16+ chars. Unset = SSO disabled.
-  hinksIdSsoSecret: z.string().min(16).optional(),
+  novaIdSsoSecret: z.string().min(16).optional(),
+
+  // nova-auth's /auth/me, called with the viewer's NovaID session cookie to
+  // identify them for the NovaHQ card badge (/api/hub/summary). Empty = off.
+  novaIdAuthMeUrl: z.string(),
 
   // Long-lived shared secret for POST /api/ingest/* (phone-side health
   // bridges that can't do the JWT login dance). Min 16 chars — fail fast
@@ -159,7 +163,11 @@ const env = {
 
   adminApiKey: process.env.ADMIN_API_KEY || undefined,
 
-  hinksIdSsoSecret: process.env.HINKSID_SSO_SECRET || undefined,
+  // NOVAID_* wins; the legacy HINKSID_* name is still read so a deployment whose
+  // .env predates the NovaID rename keeps SSO working until it is updated.
+  novaIdSsoSecret: process.env.NOVAID_SSO_SECRET || process.env.HINKSID_SSO_SECRET || undefined,
+
+  novaIdAuthMeUrl: (process.env.NOVAID_AUTH_ME_URL ?? 'http://nova-auth:8082/auth/me').trim(),
 
   ingestToken: process.env.INGEST_TOKEN || undefined,
 

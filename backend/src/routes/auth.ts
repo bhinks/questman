@@ -219,21 +219,21 @@ router.post('/demo', asyncHandler(async (req, res) => {
   res.json({ message: 'Demo session started', user, token });
 }));
 
-// HinksID SSO entry point. NovaHQ mints a short-lived JWT signed with the shared
-// HINKSID_SSO_SECRET and POSTs it here via an auto-submitting form, so the token
+// NovaID SSO entry point. NovaHQ mints a short-lived JWT signed with the shared
+// NOVAID_SSO_SECRET and POSTs it here via an auto-submitting form, so the token
 // never rides a URL (no access-log / browser-history exposure). We verify the
 // signature, resolve the account by the NORMALIZED email claim, issue a Questman
-// session cookie, and redirect into the SPA. For emailless HinksID identities
-// NovaHQ derives a STABLE synthetic email from the immutable HinksID id, so a
+// session cookie, and redirect into the SPA. For emailless NovaID identities
+// NovaHQ derives a STABLE synthetic email from the immutable NovaID id, so a
 // recycled username can never collide onto another person's account.
 //
 // NovaHQ token payload:
 //   { sub, email, name?, iat, exp, modules?: string[] | null, role?: "admin" | "user" }
-// `modules` and `role` are the HinksID admin's controls (creative-hub brief 2.15
+// `modules` and `role` are the NovaID admin's controls (creative-hub brief 2.15
 // and 3.6): applied on EVERY SSO login, so a change in the NovaHQ admin panel
 // lands the next time the member clicks the Questman card.
 router.post('/sso', asyncHandler(async (req, res) => {
-  if (!config.hinksIdSsoSecret) {
+  if (!config.novaIdSsoSecret) {
     throw new AppError('SSO is not configured on this instance', 501);
   }
 
@@ -249,7 +249,7 @@ router.post('/sso', asyncHandler(async (req, res) => {
   try {
     // Shared secret (not JWT_SECRET) so neither side can forge the other's tokens;
     // pin HS256 + a max age so a captured token can't outlive its short window.
-    payload = jwt.verify(token, config.hinksIdSsoSecret, { algorithms: ['HS256'], maxAge: '10m' }) as SsoPayload;
+    payload = jwt.verify(token, config.novaIdSsoSecret, { algorithms: ['HS256'], maxAge: '10m' }) as SsoPayload;
   } catch {
     throw new AppError('Invalid or expired SSO token', 401);
   }
@@ -261,7 +261,7 @@ router.post('/sso', asyncHandler(async (req, res) => {
   }
 
   // Find the account by email, or AUTO-PROVISION one on first SSO. Brent's call:
-  // an unknown HinksID identity self-onboards rather than 403 (the family hub is
+  // an unknown NovaID identity self-onboards rather than 403 (the family hub is
   // admin-curated at NovaHQ, so Questman trusts a validly-signed identity). Mirrors
   // /register — a full life-hub user — but with a random, unusable password, since
   // SSO users never sign in with a Questman password.
@@ -302,7 +302,7 @@ router.post('/sso', asyncHandler(async (req, res) => {
     await createDefaultCategories(user.id);
   }
 
-  // HinksID claims, applied on every SSO login. `modules` absent leaves the
+  // NovaID claims, applied on every SSO login. `modules` absent leaves the
   // allowlist untouched; null clears it (all modules); an array is validated
   // against the module key list (unknown keys dropped, fail closed to "[]").
   // `role: "admin"` promotes; any other value writes nothing (never demotes).
@@ -311,14 +311,14 @@ router.post('/sso', asyncHandler(async (req, res) => {
   if (dropped.length > 0) {
     logger.warn({ msg: '[sso] unknown module keys dropped from claim', email, dropped });
   }
-  // The email lookup above is the only binding between a HinksID identity and
+  // The email lookup above is the only binding between a NovaID identity and
   // a Questman row, so the admin promotion is limited to rows SSO itself made
   // (created just now, or carrying the SSO password marker). A row that got
   // this email any other way (a local password account, an admin-panel edit)
   // keeps its role and the event is logged for the admin to sort out. PUT /me
   // already refuses email changes from non-admins; this is the second lock.
   if (claimPatch.role === 'admin' && user.role !== 'admin') {
-    // Bootstrap (Brent 2026-09-27): an instance with NO admin at all trusts the HinksID
+    // Bootstrap (Brent 2026-09-27): an instance with NO admin at all trusts the NovaID
     // admin claim even on a legacy row, the same condition seed.ts uses to grant the hub
     // user admin. SSO rows made before the '!sso' marker (June-Sept 2026) carry a random
     // bcrypt hash, so without this the family's real admin could never be promoted.
@@ -329,7 +329,7 @@ router.post('/sso', asyncHandler(async (req, res) => {
       delete claimPatch.role;
       logger.warn({ msg: '[sso] admin role claim ignored: account is not SSO-bound', email, userId: user.id });
     } else {
-      logger.info({ msg: '[sso] promoted to admin by HinksID role claim', email, userId: user.id });
+      logger.info({ msg: '[sso] promoted to admin by NovaID role claim', email, userId: user.id });
     }
   }
   if (Object.keys(claimPatch).length > 0) {
@@ -387,7 +387,7 @@ export const profileUpdateSchema = z.object({
 
 // Update user profile. The email is the SSO binding key (/sso resolves the
 // account by it), so a non-admin may not rewrite it: a member who renamed
-// themselves to another HinksID identity's address would receive that
+// themselves to another NovaID identity's address would receive that
 // identity's next SSO login, claims included. Admins edit any address through
 // /api/admin/users; here they may still fix their own. The SPA never sends
 // `email` on this route.

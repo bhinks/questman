@@ -182,10 +182,10 @@ Sealed domains are partitioned out *before* any prompt is built; a sealed
 calendar is never even fetched. With everything off (the default), the app still
 works fully — quests use rule-based titles and the Handler stays quiet.
 
-## Multi-user (HinksID SSO)
+## Multi-user (NovaID SSO)
 
 On NovaHQ, members reach Questman through `/auth/sso/questman`, which mints a
-short-lived HS256 token (shared `HINKSID_SSO_SECRET`) carrying `email`, `name`,
+short-lived HS256 token (shared `NOVAID_SSO_SECRET`) carrying `email`, `name`,
 `modules` and `role`. `POST /api/auth/sso` applies those claims on every SSO
 login: `modules` (an array of module keys, `["chores"]` for a non-admin unless
 the member's `questman_modules` pref says otherwise; `null` means every module)
